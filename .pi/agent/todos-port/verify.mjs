@@ -59,6 +59,9 @@ const indexSrc = readFileSync(join(EXT, "index.ts"), "utf8");
 check("index.ts registers no command", !/registerCommand/.test(indexSrc));
 check("index.ts has no render hooks", !/renderCall|renderResult/.test(indexSrc));
 check("index.ts has no desktop-notify emission", !/desktop-notify|deriveTodoNotifications/.test(indexSrc));
+check("todo tool is model-only", /exposure: ?"model-only"/.test(indexSrc));
+check("reminder runs on the actionable boundary", /agent_before_settle/.test(indexSrc) && !/agent_settled/.test(indexSrc));
+check("execute writes a snapshot entry", /appendEntry\(TODO_SNAPSHOT_CUSTOM_TYPE/.test(indexSrc));
 
 // 3. The unit suite is green. bun writes its summary to stderr, so use
 //    spawnSync to capture both streams regardless of exit code.
@@ -95,20 +98,25 @@ check("live pi: completed a task", /\[X\] alpha/.test(liveOut));
 
 // 6. Branch replay: init in one session, then resume and view it. The resumed
 //    run must rebuild the list from the branch, not from memory. Read the
-//    transcript, since --print shows only the final text.
+//    transcript, since --print shows only the final text. Also assert the
+//    durable todo_snapshot entry landed, which is what makes replay survive a
+//    codemode-wrapped call.
 const sessionDir = mkdtempSync(join(tmpdir(), "todos-verify-"));
 let replayOk = false;
+let snapshotOk = false;
 try {
   pi(["--session-dir", sessionDir, "--print", "Call the todo tool with op=init and items=[\"replay probe\"]. Reply with exactly SEED_OK."]);
   const sessionFile = join(
     sessionDir,
     readdirSync(sessionDir).filter((f) => f.endsWith(".jsonl")).sort().pop() ?? "",
   );
+  snapshotOk = readFileSync(sessionFile, "utf8").includes("todo_snapshot");
   const resumed = pi(["--session", sessionFile, "--print", "--mode", "json", "Call the todo tool with op=view. Reply with exactly REPLAY_PROBE_OK."]);
   replayOk = /replay probe/.test(resumed);
 } finally {
   rmSync(sessionDir, { recursive: true, force: true });
 }
+check("durable todo_snapshot entry written", snapshotOk);
 check("branch replay restores the list on resume", replayOk);
 
 // 7. The bundled skill is advertised in the system prompt.

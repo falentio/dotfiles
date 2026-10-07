@@ -14,3 +14,9 @@ ts	phase	decision	why	evidence	result
 2026-10-07T13:54:00Z	review	corrected two comment justifications the no-comments pass got wrong	they cited formatSummary String.replace and the Markdown round-trip, both absent	state.ts, test/state.test.ts	fixed
 2026-10-07T13:55:00Z	review	dismissed the dead-export flag on TodoStatus	the reviewer missed its use at types.ts:28	grep TodoStatus	dismissed
 2026-10-07T13:56:00Z	ship	committed four ordered units (core, shell, comments, lever)	sequence-verifiable-units: each commit is green on its own	git log main..HEAD	4 commits
+2026-10-07T15:40:00Z	apply	chose to apply proposals 1-3, declined 4-6	1+2 close the reproduced data-loss bug; 4-6 add surface for uses you do not have (experience-first)	IMPROVEMENT-SPEC.md	chosen
+2026-10-07T15:42:00Z	apply	proved the three pi@1 mechanisms before writing	settle blocking unknowns first: model-only blocks codemode, boundary continues, appendEntry lands	/tmp/{expprobe,bndprobe,orderprobe}	VERIFIED
+2026-10-07T15:50:00Z	apply	delegated the fix to an implementation subagent	review separation; lead verifies the artifact	delegate todos-improve-1	125 pass, tsc clean
+2026-10-07T15:55:00Z	apply	reproduced the original bug and the fix on the real pi surface	prove-it-works: codemode call now fails, direct call persists, resume restores	/tmp/todos-fixproof*, resume shows the task	VERIFIED
+2026-10-07T15:57:00Z	apply	confirmed the boundary reminder fires once and does not loop	continue:true is the loop risk; budget guards hold	/tmp/todos-remproof, loopproof	VERIFIED
+2026-10-07T16:00:00Z	apply	strengthened verify.mjs to guard the new invariants	encode-lessons-in-structure: the regression that was missed becomes a check	verify.mjs 16/16	VERIFIED
