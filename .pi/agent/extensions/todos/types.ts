@@ -48,10 +48,6 @@ export interface TodoToolDetails {
 	completedTasks?: TodoCompletionTransition[];
 }
 
-// =============================================================================
-// Schema
-// =============================================================================
-
 const TodoOp = StringEnum(
 	[
 		"init",

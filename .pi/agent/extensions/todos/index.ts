@@ -93,10 +93,6 @@ export default function todosExtension(pi: ExtensionAPI): void {
 			"Todo eager mode (default|preferred|always). Overrides PI_TODO_EAGER and todo.json.",
 	});
 
-	// =========================================================================
-	// Canonical in-memory state
-	// =========================================================================
-
 	let phases: TodoPhase[] = [];
 	let config: TodoConfig = TODO_CONFIG_DEFAULTS;
 	let lastAssistant: AssistantMessage | undefined;
@@ -108,10 +104,6 @@ export default function todosExtension(pi: ExtensionAPI): void {
 	function setPhases(next: TodoPhase[]): void {
 		phases = clonePhases(next);
 	}
-
-	// =========================================================================
-	// Tracker host
-	// =========================================================================
 
 	const tracker = new TodoTracker({
 		config: () => config,
@@ -131,10 +123,6 @@ export default function todosExtension(pi: ExtensionAPI): void {
 			);
 		},
 	});
-
-	// =========================================================================
-	// todo tool
-	// =========================================================================
 
 	const todoTool = defineTool({
 		name: "todo",
@@ -196,20 +184,12 @@ export default function todosExtension(pi: ExtensionAPI): void {
 
 	pi.registerTool(todoTool);
 
-	// =========================================================================
-	// Bundled skill
-	// =========================================================================
-
 	// session_start runs before resources_discover (pi emits them back-to-back
 	// at startup and on /reload), so `config` is already resolved here.
 	pi.on("resources_discover", async (_event, _ctx) => {
 		if (!config.enabled) return undefined;
 		return { skillPaths: [BUNDLED_SKILLS_DIR] };
 	});
-
-	// =========================================================================
-	// Session lifecycle
-	// =========================================================================
 
 	pi.on("session_start", async (_event, ctx) => {
 		const loaded = resolveTodoConfig(
@@ -238,10 +218,6 @@ export default function todosExtension(pi: ExtensionAPI): void {
 	pi.on("session_compact", async (_event, ctx) => {
 		tracker.syncFromBranch(ctx);
 	});
-
-	// =========================================================================
-	// Prompt lifecycle
-	// =========================================================================
 
 	pi.on("before_agent_start", async (event, ctx) => {
 		tracker.resetCycle();

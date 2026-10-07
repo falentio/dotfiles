@@ -5,8 +5,6 @@
  * (state helpers section).
  */
 
-// pi provides typebox through its coding-agent runtime; knip cannot see that host provision.
-// pi-lens-ignore: knip:unlisted
 import { Value } from "typebox/value";
 import {
 	todoSchema,
@@ -121,8 +119,8 @@ export function isTodoPhase(value: unknown): value is TodoPhase {
 		)
 			return false;
 		// An optional blocker that is present but wrongly typed (legacy or
-		// hand-edited snapshot) would crash `forDisplay(String.replace)` at
-		// render time — validate instead of trusting the file.
+		// hand-edited snapshot) would otherwise reach `formatSummary` and
+		// `String.replace`, so validate instead of trusting the file.
 		return (
 			candidate.blocker === undefined ||
 			typeof candidate.blocker === "string"
@@ -200,11 +198,11 @@ const DEFAULT_INIT_PHASE = "Tasks";
 /**
  * Collapse whitespace runs (incl. newlines) to single spaces — the same
  * one-line guarantee the `block` op gives `reason`. Task content and phase
- * names ride on single lines everywhere downstream: the Markdown checklist
- * round-trip (a raw newline splits one task into two input lines and breaks
- * re-import), the HUD rows, and the summary text. Normalizing at this
- * boundary keeps every consumer one-line-safe without touching identity
- * (targeting ops reference the stored, normalized text).
+ * names ride on single lines everywhere downstream: the summary text and the
+ * Markdown round-trip (a raw newline splits one task into two input lines and
+ * breaks re-import). Normalizing at this boundary keeps every consumer
+ * one-line-safe without touching identity (targeting ops reference the stored,
+ * normalized text).
  */
 function normalizeSingleLine(value: string): string {
 	return value.replace(/\s+/g, " ").trim();
@@ -372,10 +370,9 @@ function applyEntry(
 				return phases;
 			}
 			// Collapse whitespace runs (incl. newlines) to single spaces: a blocker
-			// note rides on one Markdown checklist line (as a trailing HTML comment)
-			// and one HUD/summary line, so an embedded newline from a multi-line
-			// external error or user question would corrupt the round-trip parse and
-			// the rendered line. Normalizing here keeps every consumer one-line-safe.
+			// note rides on one summary line, so an embedded newline from a
+			// multi-line external error or user question would corrupt the rendered
+			// line. Normalizing here keeps every consumer one-line-safe.
 			const reason = entry.reason?.replace(/\s+/g, " ").trim() || undefined;
 			for (const task of getTaskTargets(phases, entry, errors)) {
 				// Only actionable open work can be blocked: blocking a phase must not

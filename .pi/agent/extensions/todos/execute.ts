@@ -71,7 +71,6 @@ export function executeTodoOp(
 	}
 	const entry: TodoParams = resolved;
 	const op = entry.op;
-	// Pure-view calls are reads: no normalization, no state write.
 	const readOnly = op === "view";
 	const { phases: updated, errors } = readOnly
 		? { phases: previousPhases, errors: [] as string[] }

@@ -328,7 +328,7 @@ describe("checkCompletion", () => {
 
 	it("reads live host state, so reminders track external mutations", async () => {
 		// The tracker must not keep its own snapshot: completing a task outside
-		// the tracker (the todo tool or /todo writes the host copy) silences the
+		// the tracker (the todo tool writes the host copy) silences the
 		// reminder, and creating a task arms it.
 		const { tracker, sent, setHostPhases } = makeTracker({
 			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],

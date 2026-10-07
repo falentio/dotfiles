@@ -3,8 +3,7 @@
  * session branch backward, exactly like omp's `getLatestTodoPhasesFromEntries`.
  *
  * Two durable sources, newest-first, first match wins:
- * 1. an explicit custom entry `user_todo_edit` (`{ phases }`) — written by
- *    every `/todo` manual edit;
+ * 1. an explicit custom entry `user_todo_edit` (`{ phases }`);
  * 2. the latest successful `todo` toolResult message's `details.phases` —
  *    the tool result itself is the durable record.
  */

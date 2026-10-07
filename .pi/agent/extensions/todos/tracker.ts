@@ -9,10 +9,6 @@
  *   from the `agent_settled` handler.
  * - omp's pre-prompt maintenance thunk → pi's `before_agent_start` extension
  *   event (the handler result's `message` is injected into the turn).
- * - `planModeEnabled()`, `hasPendingAsyncWake()`, `agentKind()`, and
- *   `consumeLastServedToolChoiceLabel()` are stubbed (no plan mode, no async
- *   jobs, no subagents in scope): plan mode → false, async wake → false,
- *   kind → "main", tool-choice label → undefined.
  * - The eager `always` mode cannot force a `tool_choice` through pi's
  *   extension API; it injects the MUST-call reminder text instead.
  */
@@ -23,7 +19,7 @@ import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import type { TodoConfig } from "./config.ts";
 import { renderEagerTodoPrompt, renderMidRunNudgePrompt } from "./prompts.ts";
 import { getLatestTodoPhasesFromEntries } from "./persistence.ts";
-import { clonePhases, isTodoPhase } from "./state.ts";
+import { clonePhases } from "./state.ts";
 import type { TodoItem, TodoPhase } from "./types.ts";
 
 const MID_RUN_NUDGE_MUTATION_THRESHOLD = 12;
@@ -75,10 +71,6 @@ export function isAwaitingUserAnswer(message: AssistantMessage): boolean {
 		(isQuestionPromptLine(lastLine) || isResponseCueLine(lastLine))
 	);
 }
-
-// ---------------------------------------------------------------------------
-// Prompt-line heuristics (ported from omp todo-tracker.ts)
-// ---------------------------------------------------------------------------
 
 const MARKDOWN_PROMPT_PREFIX_RE = /^(?:>\s*)?(?:(?:[-*+]|\d+[.)])\s+)*/;
 const PROMPT_LABEL_RE = /^(?:q(?:uestion)?|ask)\s*\d*\s*[:.)-]\s*/i;
@@ -134,17 +126,13 @@ function assistantText(message: AssistantMessage): string {
 		.trim();
 }
 
-// ---------------------------------------------------------------------------
-// Tracker
-// ---------------------------------------------------------------------------
-
 /**
  * Owns eager preludes, mid-run nudges, and completion reminders.
  *
  * Todo state itself is NOT duplicated here: every read goes through
  * `host.getPhases()` and every write through `host.setPhases()`, so the
- * host's single canonical copy (mutated by the tool and `/todo` commands)
- * is always the one the tracker reasons about. Keeping a private copy was
+ * host's single canonical copy (mutated by the tool) is always the one the
+ * tracker reasons about. Keeping a private copy was
  * the stale-reminder bug: the host copy moved on each mutation while this
  * one only refreshed at session events, so reminders fired about tasks the
  * agent had long since completed (and never for tasks freshly created).
@@ -381,6 +369,3 @@ export function pruneSupersededTrackerMessages<T>(
 			!isTrackerContextMessage(message) || index > lastConsumedMessageIndex,
 	);
 }
-
-// Re-exported for consumers that validate persisted phases.
-export { isTodoPhase };
