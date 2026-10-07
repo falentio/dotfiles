@@ -34,12 +34,10 @@ function makeTracker(overrides: {
 	entries?: SessionEntry[];
 	activeTools?: string[];
 	pending?: boolean;
-	sent?: string[];
 }) {
 	// Mirrors the production wiring: the host owns the single canonical copy
 	// and the tracker reads/writes it through the host interface.
 	let phases: TodoPhase[] = [];
-	const sent: string[] = [];
 	const host = {
 		config: () => ({ ...TODO_CONFIG_DEFAULTS, ...overrides.config }),
 		getPhases: () => phases,
@@ -49,15 +47,11 @@ function makeTracker(overrides: {
 		getBranch: (ctx: ExtensionContext) => ctx.sessionManager.getBranch(),
 		hasPendingMessages: (ctx: ExtensionContext) => ctx.hasPendingMessages(),
 		getActiveToolNames: () => overrides.activeTools ?? ["todo", "bash"],
-		sendReminder: async (_ctx: ExtensionContext, text: string) => {
-			sent.push(text);
-		},
 	};
 	const tracker = new TodoTracker(host);
 	if (overrides.phases) tracker.setPhases(overrides.phases);
 	return {
 		tracker,
-		sent,
 		setHostPhases: (next: TodoPhase[]) => {
 			phases = next;
 		},
@@ -234,22 +228,21 @@ describe("takeMidRunNudge", () => {
 });
 
 describe("checkCompletion", () => {
-	it("sends no reminder when all todos are complete", async () => {
-		const { tracker, sent } = makeTracker({
+	it("returns null when all todos are complete", async () => {
+		const { tracker } = makeTracker({
 			phases: [
 				{ name: "Work", tasks: [{ content: "a", status: "completed" }] },
 			],
 		});
-		const reminded = await tracker.checkCompletion(
+		const reminder = await tracker.checkCompletion(
 			makeContext(),
 			assistantMessage("All done."),
 		);
-		expect(reminded).toBe(false);
-		expect(sent).toEqual([]);
+		expect(reminder).toBeNull();
 	});
 
-	it("sends a reminder with the incomplete list and re-arms the budget", async () => {
-		const { tracker, sent } = makeTracker({
+	it("returns the reminder with the incomplete list and re-arms the budget", async () => {
+		const { tracker } = makeTracker({
 			phases: [
 				{
 					name: "Work",
@@ -261,84 +254,90 @@ describe("checkCompletion", () => {
 				},
 			],
 		});
-		const reminded = await tracker.checkCompletion(
+		const reminder = await tracker.checkCompletion(
 			makeContext(),
 			assistantMessage("I stopped here."),
 		);
-		expect(reminded).toBe(true);
-		expect(sent).toHaveLength(1);
-		expect(sent[0]).toContain("2 incomplete todo item(s)");
-		expect(sent[0]).toContain("- Work");
-		expect(sent[0]).toContain("  - a");
-		expect(sent[0]).toContain("  - b");
+		expect(reminder).toContain("2 incomplete todo item(s)");
+		expect(reminder).toContain("- Work");
+		expect(reminder).toContain("  - a");
+		expect(reminder).toContain("  - b");
 		// blocked tasks are excluded from the reminder list
-		expect(sent[0]).not.toContain("  - c");
-		expect(sent[0]).toContain("(Reminder 1/3)");
+		expect(reminder).not.toContain("  - c");
+		expect(reminder).toContain("(Reminder 1/3)");
 	});
 
 	it("stays silent after a reminder until progress is made", async () => {
-		const { tracker, sent } = makeTracker({
+		const { tracker } = makeTracker({
 			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
 		});
-		await tracker.checkCompletion(makeContext(), assistantMessage("Stopped."));
-		const again = await tracker.checkCompletion(
-			makeContext(),
-			assistantMessage("Stopped again."),
-		);
-		expect(again).toBe(false);
-		expect(sent).toHaveLength(1);
+		expect(
+			await tracker.checkCompletion(
+				makeContext(),
+				assistantMessage("Stopped."),
+			),
+		).not.toBeNull();
+		expect(
+			await tracker.checkCompletion(
+				makeContext(),
+				assistantMessage("Stopped again."),
+			),
+		).toBeNull();
 		// Progress (any tool result) re-arms the reminder.
 		tracker.onToolResult("edit", false);
-		await tracker.checkCompletion(
-			makeContext(),
-			assistantMessage("Stopped again."),
-		);
-		expect(sent).toHaveLength(2);
+		expect(
+			await tracker.checkCompletion(
+				makeContext(),
+				assistantMessage("Stopped again."),
+			),
+		).not.toBeNull();
 	});
 
 	it("respects remindersMax", async () => {
-		const { tracker, sent } = makeTracker({
+		const { tracker } = makeTracker({
 			config: { remindersMax: 2 },
 			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
 		});
-		await tracker.checkCompletion(makeContext(), assistantMessage("Stop 1."));
+		expect(
+			await tracker.checkCompletion(makeContext(), assistantMessage("Stop 1.")),
+		).not.toBeNull();
 		tracker.onToolResult("edit", false);
-		await tracker.checkCompletion(makeContext(), assistantMessage("Stop 2."));
-		expect(sent).toHaveLength(2);
+		expect(
+			await tracker.checkCompletion(makeContext(), assistantMessage("Stop 2.")),
+		).not.toBeNull();
 		tracker.onToolResult("edit", false);
-		await tracker.checkCompletion(makeContext(), assistantMessage("Stop 3."));
-		expect(sent).toHaveLength(2);
+		expect(
+			await tracker.checkCompletion(makeContext(), assistantMessage("Stop 3.")),
+		).toBeNull();
 	});
 
-	it("does not remind when the assistant is awaiting user input", async () => {
-		const { tracker, sent } = makeTracker({
+	it("returns null when the assistant is awaiting user input", async () => {
+		const { tracker } = makeTracker({
 			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
 		});
-		const reminded = await tracker.checkCompletion(
+		const reminder = await tracker.checkCompletion(
 			makeContext(),
 			assistantMessage("Should I continue with the current approach?"),
 		);
-		expect(reminded).toBe(false);
-		expect(sent).toEqual([]);
+		expect(reminder).toBeNull();
 	});
 
-	it("does not remind while messages are pending (loop will re-enter anyway)", async () => {
-		const { tracker, sent } = makeTracker({
+	it("returns null while messages are pending (loop will re-enter anyway)", async () => {
+		const { tracker } = makeTracker({
 			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
 		});
-		const reminded = await tracker.checkCompletion(
+		const reminder = await tracker.checkCompletion(
 			makeContext([], true),
 			assistantMessage("Stopped."),
 		);
-		expect(reminded).toBe(false);
-		expect(sent).toEqual([]);
+		expect(reminder).toBeNull();
 	});
 
 	it("reads live host state, so reminders track external mutations", async () => {
 		// The tracker must not keep its own snapshot: completing a task outside
 		// the tracker (the todo tool writes the host copy) silences the
 		// reminder, and creating a task arms it.
-		const { tracker, sent, setHostPhases } = makeTracker({
+		const { tracker, setHostPhases } = makeTracker({
 			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
 		});
 		setHostPhases([
@@ -349,7 +348,7 @@ describe("checkCompletion", () => {
 				makeContext(),
 				assistantMessage("Finished."),
 			),
-		).toBe(false);
+		).toBeNull();
 		setHostPhases([
 			{
 				name: "Work",
@@ -361,25 +360,23 @@ describe("checkCompletion", () => {
 				makeContext(),
 				assistantMessage("Stopped."),
 			),
-		).toBe(true);
-		expect(sent[0]).toContain("brand new");
+		).toContain("brand new");
 	});
 
-	it("does not remind when the todo tool is not active", async () => {
-		const { tracker, sent } = makeTracker({
+	it("returns null when the todo tool is not active", async () => {
+		const { tracker } = makeTracker({
 			activeTools: ["bash"],
 			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
 		});
-		const reminded = await tracker.checkCompletion(
+		const reminder = await tracker.checkCompletion(
 			makeContext(),
 			assistantMessage("Stopped."),
 		);
-		expect(reminded).toBe(false);
-		expect(sent).toEqual([]);
+		expect(reminder).toBeNull();
 	});
 
-	it("does not remind after aborted or errored runs", async () => {
-		const { tracker, sent } = makeTracker({
+	it("returns null after aborted or errored runs", async () => {
+		const { tracker } = makeTracker({
 			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
 		});
 		expect(
@@ -387,65 +384,49 @@ describe("checkCompletion", () => {
 				makeContext(),
 				assistantMessage("Interrupted.", "aborted"),
 			),
-		).toBe(false);
+		).toBeNull();
 		expect(
 			await tracker.checkCompletion(
 				makeContext(),
 				assistantMessage("API blew up.", "error"),
 			),
-		).toBe(false);
+		).toBeNull();
 		// A clean stop still reminds.
 		expect(
 			await tracker.checkCompletion(
 				makeContext(),
 				assistantMessage("Stopped normally."),
 			),
-		).toBe(true);
-		expect(sent).toHaveLength(1);
+		).not.toBeNull();
 	});
 
 	it("resets the budget when reminders are disabled or the list is empty", async () => {
-		const { tracker, sent } = makeTracker({
+		const { tracker } = makeTracker({
 			config: { reminders: false },
 			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
 		});
-		await tracker.checkCompletion(makeContext(), assistantMessage("Stop."));
-		expect(sent).toEqual([]);
+		expect(
+			await tracker.checkCompletion(makeContext(), assistantMessage("Stop.")),
+		).toBeNull();
 
 		const empty = makeTracker({ config: { remindersMax: 1 } });
-		await empty.tracker.checkCompletion(
-			makeContext(),
-			assistantMessage("Stop."),
-		);
-		expect(empty.sent).toEqual([]);
+		expect(
+			await empty.tracker.checkCompletion(
+				makeContext(),
+				assistantMessage("Stop."),
+			),
+		).toBeNull();
 	});
 
-	it("sends the reminder through the host sendReminder path", async () => {
-		const sent: string[] = [];
-		let phases: TodoPhase[] = [];
-		const host = {
-			config: () => ({ ...TODO_CONFIG_DEFAULTS }),
-			getPhases: () => phases,
-			setPhases: (next: TodoPhase[]) => {
-				phases = next;
-			},
-			getBranch: (ctx: ExtensionContext) => ctx.sessionManager.getBranch(),
-			hasPendingMessages: (ctx: ExtensionContext) => ctx.hasPendingMessages(),
-			getActiveToolNames: () => ["todo"],
-			sendReminder: async (_ctx: ExtensionContext, text: string) => {
-				sent.push(text);
-			},
-		};
-		const tracker = new TodoTracker(host);
-		tracker.setPhases([
-			{ name: "Work", tasks: [{ content: "a", status: "pending" }] },
-		]);
-		await tracker.checkCompletion(
+	it("returns the reminder text the boundary handler injects", async () => {
+		const { tracker } = makeTracker({
+			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
+		});
+		const reminder = await tracker.checkCompletion(
 			makeContext(),
 			assistantMessage("Done for now."),
 		);
-		expect(sent).toHaveLength(1);
-		expect(sent[0]).toContain(TODO_REMINDER_CUSTOM_TYPE ? "incomplete" : "");
+		expect(reminder).toContain("incomplete todo item(s)");
 	});
 });
 

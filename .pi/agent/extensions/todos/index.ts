@@ -55,6 +55,7 @@ import {
 	TodoTracker,
 	pruneSupersededTrackerMessages,
 } from "./tracker.ts";
+import { TODO_SNAPSHOT_CUSTOM_TYPE } from "./persistence.ts";
 import { clonePhases, inferTodoOp } from "./state.ts";
 import { TODO_TOOL_DESCRIPTION } from "./prompts.ts";
 import {
@@ -112,16 +113,6 @@ export default function todosExtension(pi: ExtensionAPI): void {
 		getBranch: (ctx) => ctx.sessionManager.getBranch(),
 		hasPendingMessages: (ctx) => ctx.hasPendingMessages(),
 		getActiveToolNames: () => pi.getActiveTools(),
-		sendReminder: async (_ctx, reminderText) => {
-			pi.sendMessage(
-				{
-					customType: TODO_REMINDER_CUSTOM_TYPE,
-					content: reminderText,
-					display: false,
-				},
-				{ triggerTurn: true },
-			);
-		},
 	});
 
 	const todoTool = defineTool({
@@ -137,6 +128,9 @@ export default function todosExtension(pi: ExtensionAPI): void {
 		],
 		parameters: todoSchema,
 		executionMode: "sequential",
+		// Kept out of the codemode callable set: a codemode-wrapped call records
+		// only the outer codemode result, so todo state would not survive resume.
+		exposure: "model-only",
 
 		// Repairs a missing `op` (models routinely send `{list:[...]}` with no
 		// op) before schema validation, mirroring omp's `lenientArgValidation`
@@ -166,7 +160,10 @@ export default function todosExtension(pi: ExtensionAPI): void {
 			// pi signals tool errors by throwing; the model receives the message
 			// text (omp's formatSummary output, errors + full current list).
 			if (outcome.failed) throw new Error(outcome.summary);
-			if (!outcome.readOnly) setPhases(outcome.phases);
+			if (!outcome.readOnly) {
+				setPhases(outcome.phases);
+				pi.appendEntry(TODO_SNAPSHOT_CUSTOM_TYPE, { phases: outcome.phases });
+			}
 			const details: TodoToolDetails = {
 				op: outcome.op,
 				phases: outcome.phases,
@@ -255,7 +252,19 @@ export default function todosExtension(pi: ExtensionAPI): void {
 		}
 	});
 
-	pi.on("agent_settled", async (_event, ctx) => {
-		await tracker.checkCompletion(ctx, lastAssistant);
+	pi.on("agent_before_settle", async (_event, ctx) => {
+		const reminder = await tracker.checkCompletion(ctx, lastAssistant);
+		if (reminder === null) return undefined;
+		return {
+			entries: [
+				{
+					type: "custom_message",
+					customType: TODO_REMINDER_CUSTOM_TYPE,
+					content: reminder,
+					display: false,
+				},
+			],
+			continue: true,
+		};
 	});
 }

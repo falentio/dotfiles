@@ -7,6 +7,7 @@ import { describe, expect, it } from "bun:test";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import {
 	getLatestTodoPhasesFromEntries,
+	TODO_SNAPSHOT_CUSTOM_TYPE,
 	USER_TODO_EDIT_CUSTOM_TYPE,
 } from "../persistence.ts";
 import type { TodoPhase } from "../types.ts";
@@ -64,6 +65,33 @@ describe("getLatestTodoPhasesFromEntries", () => {
 			messageEntry("user", undefined, undefined),
 		];
 		expect(getLatestTodoPhasesFromEntries(entries)).toEqual(phasesB);
+	});
+
+	it("reads a todo_snapshot custom entry", () => {
+		const entries = [customEntry(TODO_SNAPSHOT_CUSTOM_TYPE, { phases: phasesB })];
+		expect(getLatestTodoPhasesFromEntries(entries)).toEqual(phasesB);
+	});
+
+	it("still reads a legacy user_todo_edit custom entry", () => {
+		const entries = [customEntry(USER_TODO_EDIT_CUSTOM_TYPE, { phases: phasesB })];
+		expect(getLatestTodoPhasesFromEntries(entries)).toEqual(phasesB);
+	});
+
+	it("prefers the newest snapshot across both custom kinds and toolResults", () => {
+		const entries = [
+			customEntry(USER_TODO_EDIT_CUSTOM_TYPE, { phases: phasesA }),
+			messageEntry("toolResult", "todo", { phases: phasesB }),
+			customEntry(TODO_SNAPSHOT_CUSTOM_TYPE, { phases: phasesC }),
+		];
+		expect(getLatestTodoPhasesFromEntries(entries)).toEqual(phasesC);
+	});
+
+	it("prefers the newest snapshot over an older toolResult", () => {
+		const entries = [
+			messageEntry("toolResult", "todo", { phases: phasesB }),
+			customEntry(TODO_SNAPSHOT_CUSTOM_TYPE, { phases: phasesA }),
+		];
+		expect(getLatestTodoPhasesFromEntries(entries)).toEqual(phasesA);
 	});
 
 	it("skips error toolResults and unrelated messages", () => {

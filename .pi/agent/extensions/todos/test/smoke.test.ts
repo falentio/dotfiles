@@ -15,6 +15,7 @@ import type {
 	ExtensionToolContext,
 } from "@earendil-works/pi-coding-agent";
 import todosExtension from "../index.ts";
+import { TODO_SNAPSHOT_CUSTOM_TYPE } from "../persistence.ts";
 import {
 	branchWithTodo,
 	dispatch,
@@ -55,7 +56,7 @@ describe("todos extension factory", () => {
 			"tool_result",
 			"context",
 			"agent_end",
-			"agent_settled",
+			"agent_before_settle",
 		]) {
 			expect(handlers.has(event)).toBe(true);
 		}
@@ -71,6 +72,9 @@ describe("todos extension factory", () => {
 		expect(tool).toBeDefined();
 		expect(tool?.label).toBe("Todo");
 		expect(tool?.executionMode).toBe("sequential");
+		// Excluded from the codemode callable set so a wrapped call still records
+		// the durable todo state, not just the outer codemode result.
+		expect(tool?.exposure).toBe("model-only");
 		expect(tool?.promptSnippet).toContain("structured todo list");
 	});
 
@@ -253,22 +257,19 @@ describe("todos extension factory", () => {
 		expect(results[0]).toBeUndefined();
 	});
 
-	async function makeReminderCapture(api: ExtensionAPI) {
-		const sent: Array<{
-			message: { customType: string; content: string; display: boolean };
-			options: unknown;
-		}> = [];
-		api.sendMessage = (message: never, options?: unknown) => {
-			sent.push({ message, options });
+	async function makeEntryCapture(api: ExtensionAPI) {
+		const entries: Array<{ customType: string; data: unknown }> = [];
+		api.appendEntry = (customType: string, data?: unknown) => {
+			entries.push({ customType, data });
 		};
-		return sent;
+		return entries;
 	}
 
 	async function settleAssistant(
 		handlers: Map<string, AnyHandler[]>,
 		ctx: ExtensionContext,
 		text = "All current todos are done.",
-	): Promise<void> {
+	): Promise<unknown> {
 		await dispatch(
 			handlers,
 			"agent_end",
@@ -284,7 +285,23 @@ describe("todos extension factory", () => {
 			},
 			ctx,
 		);
-		await dispatch(handlers, "agent_settled", { type: "agent_settled" }, ctx);
+		const [result] = await dispatch(
+			handlers,
+			"agent_before_settle",
+			{ type: "agent_before_settle" },
+			ctx,
+		);
+		return result;
+	}
+
+	interface ReminderResult {
+		continue?: boolean;
+		entries?: Array<{
+			type: string;
+			customType: string;
+			content: string;
+			display: boolean;
+		}>;
 	}
 
 	// P1 regression: the tracker and the tool must share one canonical state,
@@ -292,7 +309,6 @@ describe("todos extension factory", () => {
 	// "stale reminder … scaffold session" bug.
 	it("does not remind about todos the tool already completed", async () => {
 		const { api, handlers, tools } = makeRecordingAPI();
-		const sent = await makeReminderCapture(api);
 		todosExtension(api);
 		sandboxAgentDir();
 		const ctx = makeContext(
@@ -324,13 +340,14 @@ describe("todos extension factory", () => {
 			undefined,
 			ctx as ExtensionToolContext,
 		);
-		await settleAssistant(handlers, ctx);
-		expect(sent).toEqual([]);
+		const result = (await settleAssistant(handlers, ctx)) as
+			| ReminderResult
+			| undefined;
+		expect(result).toBeUndefined();
 	});
 
 	it("reminds about live incomplete todos", async () => {
 		const { api, handlers, tools } = makeRecordingAPI();
-		const sent = await makeReminderCapture(api);
 		todosExtension(api);
 		sandboxAgentDir();
 		const ctx = makeContext(
@@ -356,16 +373,21 @@ describe("todos extension factory", () => {
 			undefined,
 			ctx as ExtensionToolContext,
 		);
-		await settleAssistant(handlers, ctx, "Stopping here.");
-		expect(sent).toHaveLength(1);
-		expect(sent[0]?.message.customType).toBe("todo-reminder");
-		expect(sent[0]?.message.content).toContain("Wire workspace");
-		expect(sent[0]?.options).toEqual({ triggerTurn: true });
+		const result = (await settleAssistant(
+			handlers,
+			ctx,
+			"Stopping here.",
+		)) as ReminderResult | undefined;
+		expect(result?.continue).toBe(true);
+		expect(result?.entries).toHaveLength(1);
+		expect(result?.entries?.[0]?.type).toBe("custom_message");
+		expect(result?.entries?.[0]?.customType).toBe("todo-reminder");
+		expect(result?.entries?.[0]?.content).toContain("Wire workspace");
+		expect(result?.entries?.[0]?.display).toBe(false);
 	});
 
 	it("does not remind after completion", async () => {
 		const { api, handlers, tools } = makeRecordingAPI();
-		const sent = await makeReminderCapture(api);
 		todosExtension(api);
 		sandboxAgentDir();
 		const ctx = makeContext(
@@ -406,8 +428,91 @@ describe("todos extension factory", () => {
 			{ type: "before_agent_start", prompt: "Unrelated next prompt" },
 			ctx,
 		);
-		await settleAssistant(handlers, ctx);
-		expect(sent).toEqual([]);
+		const result = await settleAssistant(handlers, ctx);
+		expect(result).toBeUndefined();
+	});
+
+	it("writes a todo_snapshot custom entry on a successful mutation", async () => {
+		const { api, handlers, tools } = makeRecordingAPI();
+		const entries = await makeEntryCapture(api);
+		todosExtension(api);
+		sandboxAgentDir();
+		const ctx = makeContext(
+			{ cwd: "/tmp/project" },
+			{
+				getBranch: () => [],
+				getCwd: () => "/tmp/project",
+				getSessionFile: () => "/tmp/project/session.jsonl",
+			},
+		);
+		await dispatch(
+			handlers,
+			"session_start",
+			{ type: "session_start", reason: "startup" },
+			ctx,
+		);
+		const tool = tools.find((t) => t.name === "todo");
+		if (!tool) throw new Error("todo tool missing");
+		await tool.execute!(
+			"init",
+			{ op: "init", items: ["Wire workspace"] },
+			undefined,
+			undefined,
+			ctx as ExtensionToolContext,
+		);
+		expect(entries).toHaveLength(1);
+		expect(entries[0]?.customType).toBe(TODO_SNAPSHOT_CUSTOM_TYPE);
+		expect(entries[0]?.data).toEqual({
+			phases: [
+				{
+					name: "Tasks",
+					tasks: [{ content: "Wire workspace", status: "in_progress" }],
+				},
+			],
+		});
+	});
+
+	it("writes nothing on a view or a failed mutation", async () => {
+		const { api, handlers, tools } = makeRecordingAPI();
+		const entries = await makeEntryCapture(api);
+		todosExtension(api);
+		sandboxAgentDir();
+		const ctx = makeContext(
+			{ cwd: "/tmp/project" },
+			{
+				getBranch: () =>
+					branchWithTodo([
+						{ name: "Work", tasks: [{ content: "a", status: "pending" }] },
+					]) as never,
+				getCwd: () => "/tmp/project",
+				getSessionFile: () => "/tmp/project/session.jsonl",
+			},
+		);
+		await dispatch(
+			handlers,
+			"session_start",
+			{ type: "session_start", reason: "startup" },
+			ctx,
+		);
+		const tool = tools.find((t) => t.name === "todo");
+		if (!tool) throw new Error("todo tool missing");
+		await tool.execute!(
+			"view",
+			{ op: "view" },
+			undefined,
+			undefined,
+			ctx as ExtensionToolContext,
+		);
+		await expect(
+			tool.execute!(
+				"missing",
+				{ op: "done", task: "not there" },
+				undefined,
+				undefined,
+				ctx as ExtensionToolContext,
+			),
+		).rejects.toThrow();
+		expect(entries).toEqual([]);
 	});
 
 	it("prunes superseded tracker messages from outgoing context", async () => {

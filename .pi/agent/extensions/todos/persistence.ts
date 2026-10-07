@@ -3,9 +3,10 @@
  * session branch backward, exactly like omp's `getLatestTodoPhasesFromEntries`.
  *
  * Two durable sources, newest-first, first match wins:
- * 1. an explicit custom entry `user_todo_edit` (`{ phases }`);
+ * 1. an explicit snapshot custom entry (`todo_snapshot` now, `user_todo_edit`
+ *    from `@gamaraan/todos-tool` sessions) holding `{ phases }`;
  * 2. the latest successful `todo` toolResult message's `details.phases` —
- *    the tool result itself is the durable record.
+ *    the fallback for direct calls whose custom entry is missing.
  */
 
 import type {
@@ -15,7 +16,15 @@ import type {
 import { clonePhases, isTodoPhase } from "./state.ts";
 import type { TodoPhase } from "./types.ts";
 
+/** What the todo tool writes now, from `execute`. */
+export const TODO_SNAPSHOT_CUSTOM_TYPE = "todo_snapshot";
+/** Legacy type written by `@gamaraan/todos-tool`; the reader still replays it. */
 export const USER_TODO_EDIT_CUSTOM_TYPE = "user_todo_edit";
+
+const SNAPSHOT_CUSTOM_TYPES: ReadonlySet<string> = new Set([
+	TODO_SNAPSHOT_CUSTOM_TYPE,
+	USER_TODO_EDIT_CUSTOM_TYPE,
+]);
 
 /**
  * Accept a persisted phases array only when every entry structurally
@@ -48,7 +57,7 @@ export function getLatestTodoPhasesFromEntries(
 		if (entry === undefined) continue;
 		if (
 			entry.type === "custom" &&
-			entry.customType === USER_TODO_EDIT_CUSTOM_TYPE
+			SNAPSHOT_CUSTOM_TYPES.has(entry.customType)
 		) {
 			const customEntry = entry as CustomEntry<
 				{ phases?: unknown } | undefined

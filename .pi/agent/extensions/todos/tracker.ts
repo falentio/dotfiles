@@ -5,8 +5,9 @@
  * Ported from Oh My Pi's `packages/coding-agent/src/session/todo-tracker.ts`
  * and adapted to pi's extension API:
  *
- * - omp's `scheduleAgentContinue` → `pi.sendMessage(..., { triggerTurn: true })`
- *   from the `agent_settled` handler.
+ * - omp's `scheduleAgentContinue` → the `agent_before_settle` handler, which
+ *   appends a `custom_message` and returns `continue: true` for one more model
+ *   request.
  * - omp's pre-prompt maintenance thunk → pi's `before_agent_start` extension
  *   event (the handler result's `message` is injected into the turn).
  * - The eager `always` mode cannot force a `tool_choice` through pi's
@@ -51,8 +52,6 @@ export interface TodoTrackerHost {
 	getBranch(ctx: ExtensionContext): SessionEntry[];
 	hasPendingMessages(ctx: ExtensionContext): boolean;
 	getActiveToolNames(ctx: ExtensionContext): string[];
-	/** Send the completion-reminder message and trigger a fresh agent turn. */
-	sendReminder(ctx: ExtensionContext, reminderText: string): Promise<void>;
 }
 
 /** Whether the last assistant line reads as a question/response cue the user must answer. */
@@ -247,31 +246,32 @@ export class TodoTracker {
 	}
 
 	/**
-	 * Checks a terminal assistant turn and schedules a continuation for
-	 * incomplete todos. Returns true when a reminder was sent.
+	 * Checks a terminal assistant turn and returns the completion reminder to
+	 * inject, or null when none is due. The caller appends it as a
+	 * `custom_message` and continues the turn.
 	 */
 	async checkCompletion(
 		ctx: ExtensionContext,
 		lastAssistant: AssistantMessage | undefined,
-	): Promise<boolean> {
+	): Promise<string | null> {
 		const settings = this.#host.config();
 		if (!settings.reminders || !settings.enabled) {
 			this.#reminderCount = 0;
 			this.#reminderAwaitingProgress = false;
-			return false;
+			return null;
 		}
-		if (this.#reminderAwaitingProgress) return false;
-		if (this.#reminderCount >= settings.remindersMax) return false;
+		if (this.#reminderAwaitingProgress) return null;
+		if (this.#reminderCount >= settings.remindersMax) return null;
 		// Without the todo tool an incomplete list is deliberate (read-only
 		// mode, tools subset) — reminding the model to edit state it cannot
 		// touch is pure noise. Mirrors the guards on the eager prelude and
 		// mid-run nudge.
-		if (!this.#host.getActiveToolNames(ctx).includes("todo")) return false;
+		if (!this.#host.getActiveToolNames(ctx).includes("todo")) return null;
 		const phases = this.phases;
 		if (phases.length === 0) {
 			this.#reminderCount = 0;
 			this.#reminderAwaitingProgress = false;
-			return false;
+			return null;
 		}
 		const incompleteByPhase = phases
 			.map((phase) => ({
@@ -288,7 +288,7 @@ export class TodoTracker {
 		if (incomplete.length === 0) {
 			this.#reminderCount = 0;
 			this.#reminderAwaitingProgress = false;
-			return false;
+			return null;
 		}
 		// Never nag after an interrupted or failed run: the user pressed Esc
 		// (or the model errored), treating it as a signal to stop, not as an
@@ -298,9 +298,9 @@ export class TodoTracker {
 			(lastAssistant.stopReason === "aborted" ||
 				lastAssistant.stopReason === "error")
 		)
-			return false;
-		if (lastAssistant && isAwaitingUserAnswer(lastAssistant)) return false;
-		if (this.#host.hasPendingMessages(ctx)) return false;
+			return null;
+		if (lastAssistant && isAwaitingUserAnswer(lastAssistant)) return null;
+		if (this.#host.hasPendingMessages(ctx)) return null;
 		this.#reminderCount++;
 		const todoList = incompleteByPhase
 			.map(
@@ -308,16 +308,15 @@ export class TodoTracker {
 					`- ${phase.name}\n${phase.tasks.map((task) => `  - ${task.content}`).join("\n")}`,
 			)
 			.join("\n");
-		const reminder =
+		this.#mutationsSinceLastTouch = 0;
+		this.#reminderAwaitingProgress = true;
+		return (
 			`<system-reminder>\n` +
 			`You stopped with ${incomplete.length} incomplete todo item(s):\n${todoList}\n\n` +
 			`Please continue working on these tasks or mark them complete if finished.\n` +
 			`(Reminder ${this.#reminderCount}/${settings.remindersMax})\n` +
-			`</system-reminder>`;
-		this.#mutationsSinceLastTouch = 0;
-		this.#reminderAwaitingProgress = true;
-		await this.#host.sendReminder(ctx, reminder);
-		return true;
+			`</system-reminder>`
+		);
 	}
 }
 
