@@ -24,9 +24,10 @@ import type { TodoItem, TodoPhase } from "./types.ts";
 
 const MID_RUN_NUDGE_MUTATION_THRESHOLD = 12;
 const MID_RUN_NUDGE_MAX_PER_CYCLE = 2;
+// omp's `eval` is pi's `codemode`; the other names match pi's built-in tools.
 const MUTATING_TOOLS: Record<string, true> = {
 	bash: true,
-	eval: true,
+	codemode: true,
 	edit: true,
 	write: true,
 };

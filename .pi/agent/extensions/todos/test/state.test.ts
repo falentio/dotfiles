@@ -238,7 +238,7 @@ describe("TodoTool operations", () => {
 		expect(result.phases[0]?.tasks[0]?.status).toBe("blocked");
 	});
 
-	it("normalizes a multi-line blocker reason so the markdown round-trip survives", () => {
+	it("normalizes a multi-line blocker reason so the summary stays one line", () => {
 		const tool = makeTool();
 		tool.run({ op: "init", list: [{ phase: "Work", items: ["a"] }] });
 		// A blocker reason lifted from a multi-line external error or user question.

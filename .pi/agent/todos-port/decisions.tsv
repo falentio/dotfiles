@@ -1,8 +1,16 @@
 ts	phase	decision	why	evidence	result
-2026-10-07T13:02:58Z	frame	routed the port to the Feature playbook	one coherent extension with a fixed module shape, not a multi-call-site migration	skills/poteto-mode/playbooks/feature.md	chosen
-2026-10-07T13:02:58Z	frame	skipped architect	faithful port of a concrete implementation; no novel design space (laziness-protocol)	decisions.tsv	skipped
 2026-10-07T12:31:00Z	probe	proved typebox, typebox/value, and pi-ai StringEnum resolve under pi 1.0.4	settle the blocking unknown before porting; the whole port depends on it	/tmp/pi1probe/probe.ts live run	VERIFIED
 2026-10-07T12:33:00Z	probe	settled that bun test and tsc need local node_modules symlinks; pi itself does not	packages live inside pi's own install; symlinks beat an install	node_modules/ symlinks	VERIFIED
 2026-10-07T12:36:00Z	core	delegated the pure core to an implementation subagent	review separation; the lead still verifies the artifact	delegate todos-port-core-1	60 pass, tsc clean
 2026-10-07T13:00:00Z	core	deleted 15 symbols the TUI view and /todo command orphaned	subtract-before-you-add; zero callers in the kept tree	grep proof, state.ts 686 to 476 lines	VERIFIED
-2026-10-07T13:35:00Z	lever	built verify.mjs so a reviewer reruns the port checks	build-the-lever: a rerunnable artifact beats a self-report	.pi/agent/todos-port/verify.mjs	10/10 pass
+2026-10-07T13:20:00Z	shell	delegated the pi-wired shell (index/config/tracker + tests) to a subagent	review separation; lead verifies the artifact	delegate todos-port-shell-1	118 pass, tsc clean
+2026-10-07T13:22:00Z	shell	verified the port on the real pi surface, not just tests	prove-it-works: a live run and a resumed session are the real artifact	pi live init/start/done; resumed session replays phases	VERIFIED
+2026-10-07T13:30:00Z	comments	ran the no-comments pass; applied all 19 findings	every finding cited decoration or a dropped consumer	delegate todos-port-nocomments-1	19 fixed
+2026-10-07T13:31:00Z	comments	moved the deleted knip suppression's intent into package.json peerDependencies	encode-lessons-in-structure: a declaration beats a comment	package.json peerDependencies	committed
+2026-10-07T13:35:00Z	lever	built verify.mjs so a reviewer reruns the port checks	build-the-lever: a rerunnable artifact beats a self-report	.pi/agent/todos-port/verify.mjs	12/12 pass
+2026-10-07T13:50:00Z	review	ran an independent trail review; it found real gaps	show-me-your-work requires fresh eyes on the trail	delegate todos-port-trail-review-1	5 findings accepted, 1 dismissed
+2026-10-07T13:52:00Z	review	fixed tracker MUTATING_TOOLS: eval to codemode	pi 1.0.4 has no eval tool; codemode is the JS tool and this repo enables it	probe: codemode tool_result fires; tracker.ts:30	VERIFIED
+2026-10-07T13:53:00Z	review	strengthened verify.mjs to assert the tool ran and to test branch replay	the old live check passed on a sentinel alone	verify.mjs checks 5 and 6	VERIFIED
+2026-10-07T13:54:00Z	review	corrected two comment justifications the no-comments pass got wrong	they cited formatSummary String.replace and the Markdown round-trip, both absent	state.ts, test/state.test.ts	fixed
+2026-10-07T13:55:00Z	review	dismissed the dead-export flag on TodoStatus	the reviewer missed its use at types.ts:28	grep TodoStatus	dismissed
+2026-10-07T13:56:00Z	ship	committed four ordered units (core, shell, comments, lever)	sequence-verifiable-units: each commit is green on its own	git log main..HEAD	4 commits

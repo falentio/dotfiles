@@ -4,7 +4,8 @@
 // unit suite is green. Run: node .pi/agent/todos-port/verify.mjs
 
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const REPO = "/home/kevin/Repositories/dotfiles";
@@ -23,6 +24,13 @@ function pi(args) {
     stdio: ["ignore", "pipe", "pipe"],
     timeout: 180000,
   });
+}
+
+// pi resolves extension tools through codemode in this repo, so a plain-text
+// --print run shows only the final assistant text. Read the JSON transcript,
+// which carries the nested tool calls and their results.
+function piTranscript(args) {
+  return pi(["--print", "--no-session", "--mode", "json", ...args]);
 }
 
 // 1. Every expected module is present.
@@ -52,7 +60,6 @@ check("index.ts registers no command", !/registerCommand/.test(indexSrc));
 check("index.ts has no render hooks", !/renderCall|renderResult/.test(indexSrc));
 check("index.ts has no desktop-notify emission", !/desktop-notify|deriveTodoNotifications/.test(indexSrc));
 
-// 3. The unit suite is green.
 // 3. The unit suite is green. bun writes its summary to stderr, so use
 //    spawnSync to capture both streams regardless of exit code.
 const testRun = spawnSync("bun", ["test"], { cwd: EXT, encoding: "utf8" });
@@ -71,23 +78,43 @@ try {
 }
 check("tsc --noEmit clean", tscOk);
 
-// 5. Live pi run: the tool executes init/start/done end to end.
+// 5. Live pi run: the tool executes init/done end to end. Assert the tool
+//    result in the transcript, not a sentinel the model could echo without
+//    calling the tool.
 let liveOut = "";
 try {
-  liveOut = pi([
-    "--print", "--no-session",
-    "Call the todo tool with op=init and items=[\"alpha\",\"beta\"], then op=start task \"alpha\", then op=done task \"alpha\". Reply with exactly PORT_VERIFY_OK.",
+  liveOut = piTranscript([
+    "Call the todo tool with op=init and items=[\"alpha\",\"beta\"], then op=done task \"alpha\". Reply with exactly PORT_VERIFY_OK.",
   ]);
 } catch (error) {
   liveOut = String(error.stdout ?? error);
 }
 check("live pi: no load failure", !/Failed to load extension/.test(liveOut));
-check("live pi: tool ran", /PORT_VERIFY_OK/.test(liveOut));
+check("live pi: tool ran", /"name": ?"todo"/.test(liveOut));
+check("live pi: completed a task", /\[X\] alpha/.test(liveOut));
 
-// 6. The bundled skill is advertised in the system prompt.
+// 6. Branch replay: init in one session, then resume and view it. The resumed
+//    run must rebuild the list from the branch, not from memory. Read the
+//    transcript, since --print shows only the final text.
+const sessionDir = mkdtempSync(join(tmpdir(), "todos-verify-"));
+let replayOk = false;
+try {
+  pi(["--session-dir", sessionDir, "--print", "Call the todo tool with op=init and items=[\"replay probe\"]. Reply with exactly SEED_OK."]);
+  const sessionFile = join(
+    sessionDir,
+    readdirSync(sessionDir).filter((f) => f.endsWith(".jsonl")).sort().pop() ?? "",
+  );
+  const resumed = pi(["--session", sessionFile, "--print", "--mode", "json", "Call the todo tool with op=view. Reply with exactly REPLAY_PROBE_OK."]);
+  replayOk = /replay probe/.test(resumed);
+} finally {
+  rmSync(sessionDir, { recursive: true, force: true });
+}
+check("branch replay restores the list on resume", replayOk);
+
+// 7. The bundled skill is advertised in the system prompt.
 let jsonOut = "";
 try {
-  jsonOut = pi(["--print", "--no-session", "--mode", "json", "Reply with exactly SKILL_OK"]);
+  jsonOut = piTranscript(["Reply with exactly SKILL_OK"]);
 } catch (error) {
   jsonOut = String(error.stdout ?? error);
 }

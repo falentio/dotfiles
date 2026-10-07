@@ -119,8 +119,8 @@ export function isTodoPhase(value: unknown): value is TodoPhase {
 		)
 			return false;
 		// An optional blocker that is present but wrongly typed (legacy or
-		// hand-edited snapshot) would otherwise reach `formatSummary` and
-		// `String.replace`, so validate instead of trusting the file.
+		// hand-edited snapshot) is external data, so validate its shape before
+		// trusting it rather than letting a bad value through.
 		return (
 			candidate.blocker === undefined ||
 			typeof candidate.blocker === "string"
@@ -198,11 +198,9 @@ const DEFAULT_INIT_PHASE = "Tasks";
 /**
  * Collapse whitespace runs (incl. newlines) to single spaces — the same
  * one-line guarantee the `block` op gives `reason`. Task content and phase
- * names ride on single lines everywhere downstream: the summary text and the
- * Markdown round-trip (a raw newline splits one task into two input lines and
- * breaks re-import). Normalizing at this boundary keeps every consumer
- * one-line-safe without touching identity (targeting ops reference the stored,
- * normalized text).
+ * names ride on single lines everywhere downstream: the summary text, and the
+ * task identity that targeting ops match by. Normalizing at this boundary
+ * keeps every consumer one-line-safe without touching identity.
  */
 function normalizeSingleLine(value: string): string {
 	return value.replace(/\s+/g, " ").trim();

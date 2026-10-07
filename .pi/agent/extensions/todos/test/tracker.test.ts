@@ -223,6 +223,14 @@ describe("takeMidRunNudge", () => {
 		for (let i = 0; i < 12; i++) tracker.onToolResult("edit", true);
 		expect(tracker.takeMidRunNudge(makeContext())).toBeNull();
 	});
+
+	it("counts codemode mutations (pi's name for omp's eval)", () => {
+		const { tracker } = makeTracker({
+			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
+		});
+		for (let i = 0; i < 12; i++) tracker.onToolResult("codemode", false);
+		expect(tracker.takeMidRunNudge(makeContext())).not.toBeNull();
+	});
 });
 
 describe("checkCompletion", () => {
