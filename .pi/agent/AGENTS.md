@@ -4,6 +4,10 @@
 
 A tool pi does not declare is still callable from a codemode script as `tools.<name>(args)`: `tools.bash({ command })`, `tools.read({ path })`, `tools.mcp__t3_code__delegate_task({ task })`. The name uses underscores where the tool's name has hyphens. With `codemode.mode: "only"`, only `codemode` and `todo` are declared, so reach every other tool this way.
 
+## Todos
+
+Todo multi-step work (3+ steps): `init` the list with `todo` first, then work it.
+
 ## Lookups
 
 Context7 owns library documentation; TinyFish owns everything else, a library's changelog included. A named library's API surface, configuration, and code examples go to the `find-docs` skill. Release notes, migration announcements, news, papers, and general facts go to the `tinyfish-search-fetch` skill.
