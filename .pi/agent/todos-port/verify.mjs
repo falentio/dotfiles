@@ -40,10 +40,14 @@ const MODULES = [
   "package.json", "tsconfig.json",
   "test/state.test.ts", "test/persistence.test.ts", "test/tracker.test.ts",
   "test/config.test.ts", "test/smoke.test.ts", "test/helpers.ts",
-  "skills/todo-discipline/SKILL.md",
 ];
 const missing = MODULES.filter((m) => !existsSync(join(EXT, m)));
 check("all port modules present", missing.length === 0, missing.join(", "));
+
+// 1b. The todo-discipline skill lives in the agent skills dir, not the extension.
+const SKILL = join(REPO, ".pi/agent/skills/todo-discipline/SKILL.md");
+check("todo-discipline skill in .pi/agent/skills", existsSync(SKILL));
+check("extension no longer bundles skills/", !existsSync(join(EXT, "skills")));
 
 // 2. The dropped surfaces are gone: no TUI/render/command module, no
 //    registerCommand, no render hooks, no notification emission.
@@ -59,6 +63,7 @@ const indexSrc = readFileSync(join(EXT, "index.ts"), "utf8");
 check("index.ts registers no command", !/registerCommand/.test(indexSrc));
 check("index.ts has no render hooks", !/renderCall|renderResult/.test(indexSrc));
 check("index.ts has no desktop-notify emission", !/desktop-notify|deriveTodoNotifications/.test(indexSrc));
+check("index.ts no longer contributes a skill path", !/resources_discover|BUNDLED_SKILLS_DIR/.test(indexSrc));
 check("todo tool is model-only", /exposure: ?"model-only"/.test(indexSrc));
 check("reminder runs on the actionable boundary", /agent_before_settle/.test(indexSrc) && !/agent_settled/.test(indexSrc));
 check("execute writes a snapshot entry", /appendEntry\(TODO_SNAPSHOT_CUSTOM_TYPE/.test(indexSrc));
@@ -129,7 +134,7 @@ try {
 check("branch replay restores the list on resume", replayOk);
 check("snapshot entry alone restores the list (no toolResult)", snapshotOnlyOk);
 
-// 7. The bundled skill is advertised in the system prompt.
+// 7. The skill is advertised in the system prompt, from the agent skills dir.
 let jsonOut = "";
 try {
   jsonOut = piTranscript(["Reply with exactly SKILL_OK"]);
@@ -137,6 +142,10 @@ try {
   jsonOut = String(error.stdout ?? error);
 }
 check("todo-discipline skill advertised", /todo-discipline/.test(jsonOut));
+check(
+  "advertised from .pi/agent/skills",
+  /skills\/todo-discipline\/SKILL\.md/.test(jsonOut) && !/extensions\/todos\/skills/.test(jsonOut),
+);
 
 const failed = results.filter((r) => !r.ok);
 console.log(`\n${results.length - failed.length}/${results.length} checks passed`);

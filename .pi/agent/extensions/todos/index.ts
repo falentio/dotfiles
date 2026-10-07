@@ -15,10 +15,10 @@
  *   turn, a hidden reminder asks the model to lay out a phased plan with a
  *   single `init` call before working. pi's extension API cannot force a
  *   `tool_choice`, so `"always"` injects a MUST-call reminder instead.
- * - **Bundled `todo-discipline` skill**: contributed via `resources_discover`
- *   whenever the tool is enabled, so every model gets a load-on-demand skill
- *   that mandates phased `init` before work and per-task `done` marking as
- *   each task finishes (not retro-batched at the end).
+ * - **`todo-discipline` skill**: a load-on-demand skill at
+ *   `<agent dir>/skills/todo-discipline` that mandates phased `init` before
+ *   work and per-task `done` marking as each task finishes (not retro-batched
+ *   at the end).
  * - **Mid-run nudge**: after 12 mutating tool results, a hidden steer
  *   message asks the agent to mark finished tasks done (≤2 per prompt
  *   cycle).
@@ -34,7 +34,6 @@
  * @module todos
  */
 
-import { fileURLToPath } from "node:url";
 import type {
 	AgentToolResult,
 	AgentToolUpdateCallback,
@@ -66,9 +65,6 @@ import {
 	type TodoPhase,
 	type TodoToolDetails,
 } from "./types.ts";
-
-/** Bundled skill directory shipped with the package (skills/todo-discipline). */
-const BUNDLED_SKILLS_DIR = fileURLToPath(new URL("./skills", import.meta.url));
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -186,13 +182,6 @@ export default function todosExtension(pi: ExtensionAPI): void {
 	});
 
 	pi.registerTool(todoTool);
-
-	// session_start runs before resources_discover (pi emits them back-to-back
-	// at startup and on /reload), so `config` is already resolved here.
-	pi.on("resources_discover", async (_event, _ctx) => {
-		if (!config.enabled) return undefined;
-		return { skillPaths: [BUNDLED_SKILLS_DIR] };
-	});
 
 	pi.on("session_start", async (_event, ctx) => {
 		const loaded = resolveTodoConfig(

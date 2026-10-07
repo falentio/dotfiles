@@ -47,9 +47,9 @@ The extension adds three nudges around the tool, each gated on config:
   with open tasks and is not waiting on an answer. It appends a hidden message
   and continues the turn once, up to the reminder budget.
 
-A bundled `todo-discipline` skill, advertised through `resources_discover`,
-tells the model to plan before working and to mark each task done as it
-finishes.
+A `todo-discipline` skill at `<agent dir>/skills/todo-discipline` tells the
+model to plan before working and to mark each task done as it finishes. It is
+not part of this extension; it is discovered like any other agent skill.
 
 ## Config
 
