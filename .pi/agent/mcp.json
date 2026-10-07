@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "tinyfish": {
+      "url": "https://agent.tinyfish.ai/mcp",
+      "description": "Web search and content extraction",
+      "exposure": "hidden",
+      "toolExposure": {
+        "search": "direct",
+        "fetch_content": "direct"
+      }
+    },
+    "context7": {
+      "url": "https://mcp.context7.com/mcp/oauth",
+      "exposure": "direct"
+    }
+  }
+}

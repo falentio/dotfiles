@@ -1,0 +1,18 @@
+# pi runtime state: session transcripts, machine-local, large
+.pi/agent/sessions/
+
+# credentials / secrets: never commit these
+.pi/agent/auth.json
+.pi/agent/mcp-auth.json
+.pi/agent/models.json
+.pi/agent/models-store.json
+
+# OS / editor noise
+.DS_Store
+*.log
+*~
+
+# future-proof: never commit env files or private keys anywhere in the repo
+.env
+.env.*
+*.pem
