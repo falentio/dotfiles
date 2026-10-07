@@ -1,0 +1,187 @@
+/**
+ * Persistence: branch replay of todo state.
+ * Ported from omp's `getLatestTodoPhasesFromEntries` semantics.
+ */
+
+import { describe, expect, it } from "bun:test";
+import type { SessionEntry } from "@earendil-works/pi-coding-agent";
+import {
+	getLatestTodoPhasesFromEntries,
+	USER_TODO_EDIT_CUSTOM_TYPE,
+} from "../persistence.ts";
+import type { TodoPhase } from "../types.ts";
+
+function messageEntry(
+	role: string,
+	toolName: string | undefined,
+	details: unknown,
+	isError = false,
+): SessionEntry {
+	return {
+		id: `m${Math.random()}`,
+		parentId: null,
+		timestamp: new Date().toISOString(),
+		type: "message",
+		message: {
+			role,
+			...(toolName ? { toolName } : {}),
+			...(details !== undefined ? { details } : {}),
+			...(isError ? { isError: true } : {}),
+		},
+	} as unknown as SessionEntry;
+}
+
+function customEntry(customType: string, data: unknown): SessionEntry {
+	return {
+		id: `c${Math.random()}`,
+		parentId: null,
+		timestamp: new Date().toISOString(),
+		type: "custom",
+		customType,
+		data,
+	} as unknown as SessionEntry;
+}
+
+const phasesA: TodoPhase[] = [
+	{ name: "Work", tasks: [{ content: "a", status: "pending" }] },
+];
+const phasesB: TodoPhase[] = [
+	{ name: "Work", tasks: [{ content: "b", status: "completed" }] },
+];
+const phasesC: TodoPhase[] = [
+	{ name: "Cleanup", tasks: [{ content: "c", status: "in_progress" }] },
+];
+
+describe("getLatestTodoPhasesFromEntries", () => {
+	it("returns [] for an empty branch", () => {
+		expect(getLatestTodoPhasesFromEntries([])).toBeUndefined();
+	});
+
+	it("picks the latest successful todo toolResult details", () => {
+		const entries = [
+			messageEntry("toolResult", "todo", { phases: phasesA }),
+			messageEntry("toolResult", "todo", { phases: phasesB }),
+			messageEntry("user", undefined, undefined),
+		];
+		expect(getLatestTodoPhasesFromEntries(entries)).toEqual(phasesB);
+	});
+
+	it("skips error toolResults and unrelated messages", () => {
+		const entries = [
+			messageEntry("toolResult", "todo", { phases: phasesA }),
+			messageEntry("toolResult", "todo", { phases: phasesB }, true),
+			messageEntry("toolResult", "bash", { phases: phasesC }),
+		];
+		expect(getLatestTodoPhasesFromEntries(entries)).toEqual(phasesA);
+	});
+
+	it("prefers the newest user_todo_edit custom entry over toolResults", () => {
+		const entries = [
+			messageEntry("toolResult", "todo", { phases: phasesA }),
+			customEntry(USER_TODO_EDIT_CUSTOM_TYPE, { phases: phasesB }),
+		];
+		expect(getLatestTodoPhasesFromEntries(entries)).toEqual(phasesB);
+	});
+
+	it("falls back to the older toolResult when the custom entry is older", () => {
+		const entries = [
+			customEntry(USER_TODO_EDIT_CUSTOM_TYPE, { phases: phasesB }),
+			messageEntry("toolResult", "todo", { phases: phasesA }),
+		];
+		expect(getLatestTodoPhasesFromEntries(entries)).toEqual(phasesA);
+	});
+
+	it("ignores malformed custom entries and continues scanning", () => {
+		const entries = [
+			customEntry(USER_TODO_EDIT_CUSTOM_TYPE, { phases: "nope" }),
+			messageEntry("toolResult", "todo", { phases: phasesC }),
+		];
+		expect(getLatestTodoPhasesFromEntries(entries)).toEqual(phasesC);
+	});
+
+	it("ignores custom entries of other types", () => {
+		const entries = [
+			customEntry("plan-mode", { phases: phasesC }),
+			messageEntry("toolResult", "todo", { phases: phasesA }),
+		];
+		expect(getLatestTodoPhasesFromEntries(entries)).toEqual(phasesA);
+	});
+
+	it("returns a defensive clone (mutating the result does not affect the source)", () => {
+		const entries = [messageEntry("toolResult", "todo", { phases: phasesA })];
+		const restored = getLatestTodoPhasesFromEntries(entries);
+		restored![0]!.tasks[0]!.status = "completed";
+		expect(phasesA[0]?.tasks[0]?.status).toBe("pending");
+	});
+
+	it("skips structurally invalid phases instead of crashing, custom entry", () => {
+		// A hand-edited/corrupt session file must not take the extension down:
+		// fall through to the previous durable record.
+		const corrupt = [{ name: "X", tasks: "not-an-array" }];
+		const entries = [
+			messageEntry("toolResult", "todo", { phases: phasesC }),
+			customEntry(USER_TODO_EDIT_CUSTOM_TYPE, { phases: corrupt }),
+		];
+		expect(getLatestTodoPhasesFromEntries(entries)).toEqual(phasesC);
+	});
+
+	it("skips structurally invalid phases in toolResult details", () => {
+		const corrupt = [{ name: 42, tasks: [{ content: "x", status: "pending" }] }];
+		const entries = [
+			messageEntry("toolResult", "todo", { phases: phasesA }),
+			messageEntry("toolResult", "todo", { phases: corrupt }),
+		];
+		expect(getLatestTodoPhasesFromEntries(entries)).toEqual(phasesA);
+	});
+
+	it("rejects wrongly-typed blocker fields (object, array, number)", () => {
+		for (const blocker of [123, { note: "x" }, ["x"]]) {
+			const corrupt = [
+				{
+					name: "X",
+					tasks: [{ content: "x", status: "blocked", blocker }],
+				},
+			];
+			const entries = [
+				customEntry(USER_TODO_EDIT_CUSTOM_TYPE, { phases: corrupt }),
+			];
+			expect(getLatestTodoPhasesFromEntries(entries)).toBeUndefined();
+		}
+	});
+
+	it("accepts string and absent blocker fields", () => {
+		const valid: TodoPhase[] = [
+			{
+				name: "X",
+				tasks: [
+					{ content: "a", status: "blocked", blocker: "waiting on user" },
+					{ content: "b", status: "pending" },
+				],
+			},
+		];
+		const entries = [
+			customEntry(USER_TODO_EDIT_CUSTOM_TYPE, { phases: valid }),
+		];
+		expect(getLatestTodoPhasesFromEntries(entries)).toEqual(valid);
+	});
+
+	it("rejects tasks with unknown statuses", () => {
+		const corrupt = [
+			{ name: "X", tasks: [{ content: "x", status: "weird" }] },
+		];
+		const entries = [
+			customEntry(USER_TODO_EDIT_CUSTOM_TYPE, { phases: corrupt }),
+		];
+		expect(getLatestTodoPhasesFromEntries(entries)).toBeUndefined();
+	});
+
+	it("honors a valid empty phases array as a cleared list ([] !== undefined)", () => {
+		const entries = [
+			messageEntry("toolResult", "todo", { phases: phasesA }),
+			customEntry(USER_TODO_EDIT_CUSTOM_TYPE, { phases: [] }),
+		];
+		const restored = getLatestTodoPhasesFromEntries(entries);
+		expect(restored).toEqual([]);
+		expect(restored).not.toBeUndefined();
+	});
+});
