@@ -45,7 +45,7 @@ The right decomposition depends on the question. Use your judgment. Narrow quest
 Spawn all explorers in a single message:
 
 - `role`: `general`
-- Omit `mcp__t3-code__delegate_task`'s `target` so the explorer inherits the parent chat model.
+- Omit `tools.mcp__t3_code__delegate_task`'s `target` so the explorer inherits the parent chat model.
 
 Each explorer gets the same base prompt from `references/explorer-prompt.md` plus a specific exploration angle naming its slice. Each explorer should:
 - Start broad: find for relevant directories, grep for key types/interfaces/class names
@@ -60,10 +60,10 @@ Then proceed to Step 3.
 
 ### Step 2b. Direct Explain (simple questions)
 
-Spawn a single `mcp__t3-code__delegate_task` subagent that explores and explains in one pass:
+Spawn a single subagent via `tools.mcp__t3_code__delegate_task` that explores and explains in one pass:
 
 - `role`: `general`
-- Omit `mcp__t3-code__delegate_task`'s `target` so the explainer inherits the parent chat model.
+- Omit `tools.mcp__t3_code__delegate_task`'s `target` so the explainer inherits the parent chat model.
 
 The agent does its own exploration (find, grep, read) and writes the explanation directly. Read `references/explainer-prompt.md` for the communication style and output format. Same structure, just no explorer findings as input.
 
@@ -71,10 +71,10 @@ Proceed to Step 4.
 
 ### Step 3. Synthesize (complex questions only)
 
-Once all explorers return, spawn a single `mcp__t3-code__delegate_task` subagent to synthesize their findings into one coherent explanation:
+Once all explorers return, spawn a single subagent via `tools.mcp__t3_code__delegate_task` to synthesize their findings into one coherent explanation:
 
 - `role`: `general`
-- Omit `mcp__t3-code__delegate_task`'s `target` so the explainer inherits the parent chat model.
+- Omit `tools.mcp__t3_code__delegate_task`'s `target` so the explainer inherits the parent chat model.
 
 The explainer gets all explorers' findings and writes the human-facing explanation (output format below). Read `references/explainer-prompt.md` for the full prompt template. The explainer reconciles overlapping findings, resolves contradictions, and weaves the slices into a unified picture.
 
@@ -106,7 +106,7 @@ Run the full explain flow above (Steps 1-4). You must understand the architectur
 
 ### Step 2. Spawn Critics
 
-After the explanation is complete, spawn the required number of independent architectural critics in a single message. Every critic inherits the parent chat model. Omit `mcp__t3-code__delegate_task`'s `target` from each call.
+After the explanation is complete, spawn the required number of independent architectural critics in a single message. Every critic inherits the parent chat model. Omit `tools.mcp__t3_code__delegate_task`'s `target` from each call.
 
 For each critic:
 - `role`: `general`

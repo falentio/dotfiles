@@ -21,12 +21,12 @@ Open a todolist with one entry per phase before launching anything.
 1. State the done predicate and the artifact or report the swarm must return.
 2. Choose the shape. Partition into slices, race N workers on identical briefs, or mix both. For a race or mixed shape, declare `first pass`, `rank all`, or `best-of` before spawning.
 3. Set N from the user or derive it from the shape. N is total workers, not a concurrency limit.
-4. Every worker inherits the parent chat model. Omit `mcp__t3-code__delegate_task`'s `target` from every call. Use separate workers for independent coverage or race arms, not for model selection.
+4. Every worker inherits the parent chat model. Omit `tools.mcp__t3_code__delegate_task`'s `target` from every call. Use separate workers for independent coverage or race arms, not for model selection.
 5. Give each worker its own writable output when it writes. Use a worktree, branch, or `/tmp/swarm-<slug>/worker-<n>/`.
 
 ## Phase B: Fan out
 
-Spawn all N workers in one message with `role: "general"`. Omit `mcp__t3-code__delegate_task`'s `target` so every worker inherits the parent chat model.
+Spawn all N workers in one message with `role: "general"`. Omit `tools.mcp__t3_code__delegate_task`'s `target` so every worker inherits the parent chat model.
 
 Every brief stands alone. Include the goal, scope, exact slice or race arm, how to verify, and what to report. Reports use `PASS`, `ISSUES`, or `BLOCKED` with evidence.
 

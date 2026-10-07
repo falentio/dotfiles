@@ -117,7 +117,7 @@ Launch all matching investigators in a single message so they run concurrently. 
 
 Subagent config (each):
 - `role`: `general`
-- Omit `mcp__t3-code__delegate_task`'s `target` so the investigator inherits the parent chat model.
+- Omit `tools.mcp__t3_code__delegate_task`'s `target` so the investigator inherits the parent chat model.
 
 Each investigator gets:
 1. The base prompt from `references/investigator-prompt.md`
@@ -162,7 +162,7 @@ If your scope assessment suggests a single-commit trivial target where the PR de
 Spawn one synthesizer subagent:
 
 - `role`: `general`
-- Omit `mcp__t3-code__delegate_task`'s `target` so the synthesizer inherits the parent chat model.
+- Omit `tools.mcp__t3_code__delegate_task`'s `target` so the synthesizer inherits the parent chat model.
 
 The synthesizer gets:
 1. The investigator findings, including any null results and any categories skipped with justification

@@ -32,7 +32,7 @@ Write one clear paragraph. Reviewers challenge whether the work achieves the int
 
 ## Step 3, Spawn Reviewers
 
-Launch all reviewers in a single message using the `mcp__t3-code__delegate_task` tool. Omit `mcp__t3-code__delegate_task`'s `target` from every call so each reviewer inherits the parent chat model. Extend or shrink the Reviewer A/B/C/D labels below to match how many reviewers you spawn.
+Launch all reviewers in a single message using `tools.mcp__t3_code__delegate_task`. Omit `tools.mcp__t3_code__delegate_task`'s `target` from every call so each reviewer inherits the parent chat model. Extend or shrink the Reviewer A/B/C/D labels below to match how many reviewers you spawn.
 
 For each reviewer:
 - `role`: `general`

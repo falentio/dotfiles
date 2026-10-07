@@ -8,7 +8,8 @@ import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
 const AGENT = "/home/kevin/.pi/agent";
-const EXPECTED_SKILLS = 51;
+// 49 source skills + 2 generated persona skills + todo-discipline.
+const EXPECTED_SKILLS = 52;
 const EXPECTED_POTETO_TOOLS = 25;
 
 const results = [];
@@ -59,11 +60,11 @@ check(
   `${idioms} occurrences across ${IDIOM_PATTERNS.length} patterns`,
 );
 
-// 3b. delegate_task is named exactly as the live T3 tool declares it. A bare
-// `delegate_task` call returns "Tool delegate_task not found", so any skill
-// prose that still says it is broken. The hyphen form is the model-facing
-// declaration; the underscore form is the API name. Both resolve; the bare one
-// does not. Checks 6 in pstack-port/TO-TEST.md proved this live.
+// 3b. delegate_task is named exactly as the live T3 tool declares it. Skills
+// reach it from a codemode script, so the name must be the underscore form
+// inside a `tools.` access: `tools.mcp__t3_code__delegate_task`. Hyphens are
+// illegal in a JS identifier, and with `codemode.mode: "only"` no top-level
+// tool of that name exists. A bare `delegate_task` is not a tool at all.
 let bareDelegate = 0;
 for (const f of execFileSync("find", [join(AGENT, "skills"), "-name", "*.md"], { encoding: "utf8" })
   .trim()

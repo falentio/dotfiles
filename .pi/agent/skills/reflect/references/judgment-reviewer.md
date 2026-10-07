@@ -20,7 +20,7 @@ Scan for:
 Findings must point to skills, tools, or MCPs invoked in this transcript. Speculative routings to skills the parent never opened do not count. To check whether a skill was used, scan the transcript for:
 
 - `Read` tool calls against any `SKILL.md` file (workspace `.agents/skills/`, user-level `~/.agents/skills/`, or plugin-bundled `skills/` directories)
-- `mcp__t3-code__delegate_task` prompts that name a skill path
+- `tools.mcp__t3_code__delegate_task` prompts that name a skill path
 - Tool calls (bash, grep, MCP, etc.) that match a skill's documented commands
 
 Two valid finding shapes:

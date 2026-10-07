@@ -26,12 +26,12 @@ The N candidates will receive the same prompt, so the prompt is the contract. Ge
 
 1. State the artifact each candidate is producing.
 2. Derive the rubric. State what success looks like for *this* task, then turn it into 3-6 concrete gradeable criteria. Concrete: `Adds a --dry-run flag that skips writes`. Vague: `code is correct`. The rubric is the picker's tool in Phase D; candidates only see the task.
-3. Every runner inherits the parent chat model. Omit `mcp__t3-code__delegate_task`'s `target` from every call. Spawn more when the arena covers multiple design directions. Independent runners provide coverage even though they use the same model.
+3. Every runner inherits the parent chat model. Omit `tools.mcp__t3_code__delegate_task`'s `target` from every call. Spawn more when the arena covers multiple design directions. Independent runners provide coverage even though they use the same model.
 4. Assign output paths. Each candidate writes to its own location (a git worktree where possible, otherwise `/tmp/arena-<slug>/candidate-<n>/`). N candidates writing to the same path is shared mutable state and fails the the **separate-before-serializing-shared-state** principle skill test.
 
 ## Phase B: Fan out
 
-Spawn all N subagents in one message with `role: "general"`, each with the task, the path to the shared grounding, its own output path, and instructions to produce both the artifact and a short rationale. Omit `mcp__t3-code__delegate_task`'s `target` so every runner inherits the parent chat model.
+Spawn all N subagents in one message with `role: "general"`, each with the task, the path to the shared grounding, its own output path, and instructions to produce both the artifact and a short rationale. Omit `tools.mcp__t3_code__delegate_task`'s `target` so every runner inherits the parent chat model.
 
 The rationale is mandatory. Without it, the parent cannot tell whether a candidate's structure is principled or accidental, which makes Phase E grafting unreliable. Each rationale names the alternatives the candidate considered and what it rejected.
 
@@ -39,7 +39,7 @@ If a candidate fails to produce output, proceed with N-1 and note the dropout in
 
 ## Phase C: Cross-judge
 
-After all Phase B candidates complete, spawn one cross-judge with `role: "general"` on the inherited parent model. Omit `mcp__t3-code__delegate_task`'s `target`. It sees the rubric and the candidates by path label, scores each criterion, and recommends a base with rationale. It runs in parallel with the parent's reading in Phase D, not with the candidates themselves. Spawning while candidates are still writing means the judge sees partial or empty outputs and reports them as dropouts.
+After all Phase B candidates complete, spawn one cross-judge with `role: "general"` on the inherited parent model. Omit `tools.mcp__t3_code__delegate_task`'s `target`. It sees the rubric and the candidates by path label, scores each criterion, and recommends a base with rationale. It runs in parallel with the parent's reading in Phase D, not with the candidates themselves. Spawning while candidates are still writing means the judge sees partial or empty outputs and reports them as dropouts.
 
 ## Phase D: Pick a base
 

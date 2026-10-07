@@ -33,7 +33,7 @@ For each candidate, read the JSONL file and check that a user message's text con
 
 ### 2. Spawn three reviewers in parallel
 
-One message, three `mcp__t3-code__delegate_task` calls, `role: "general"`, with `mcp__t3-code__delegate_task`'s `target` omitted so every reviewer inherits the parent chat model. The prompt forbids file writes; the parent applies edits.
+One message, three `tools.mcp__t3_code__delegate_task` calls, `role: "general"`, with `tools.mcp__t3_code__delegate_task`'s `target` omitted so every reviewer inherits the parent chat model. The prompt forbids file writes; the parent applies edits.
 
 | Lens | Prompt template |
 |---|---|
@@ -41,11 +41,11 @@ One message, three `mcp__t3-code__delegate_task` calls, `role: "general"`, with 
 | Tooling | `references/tooling-reviewer.md` |
 | Divergent | `references/divergent-reviewer.md` |
 
-Pass each template verbatim, substituting the transcript path or digest where marked. Reviewers return findings in the `mcp__t3-code__delegate_task` result body.
+Pass each template verbatim, substituting the transcript path or digest where marked. Reviewers return findings in the `tools.mcp__t3_code__delegate_task` result body.
 
 ### 3. Synthesize
 
-One `mcp__t3-code__delegate_task` call, `role: "general"`, with `mcp__t3-code__delegate_task`'s `target` omitted so the synthesizer inherits the parent chat model. Use `references/synthesizer.md` verbatim, with each reviewer's full output inlined where marked. The synthesizer returns a structured Accepted / Rejected / Backlog list.
+One `tools.mcp__t3_code__delegate_task` call, `role: "general"`, with `tools.mcp__t3_code__delegate_task`'s `target` omitted so the synthesizer inherits the parent chat model. Use `references/synthesizer.md` verbatim, with each reviewer's full output inlined where marked. The synthesizer returns a structured Accepted / Rejected / Backlog list.
 
 ### 4. Structural enforcement check
 

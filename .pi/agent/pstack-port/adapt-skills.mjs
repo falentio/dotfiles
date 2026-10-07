@@ -51,7 +51,7 @@ const GLOBAL = [
   ["spawn a single Task subagent", "spawn a single `delegate_task` subagent"],
   ["as a background Task with sleep plus poll", "as a background `delegate_task` in `mode: 'async'`, which wakes this thread on completion"],
   ["Repeat the predicate check in a background Task and poll on a heartbeat.", "Repeat the predicate check with a background `delegate_task` in `mode: 'async'` and end your turn; the completion wakes this thread."],
-  ["An event to watch (CI, a merge, a ref advancing) gets a watcher subagent that wakes you on the event, with a long time-based heartbeat as fallback.", "An event to watch (CI, a merge, a ref advancing) is watched by this thread itself, which owns the watch: arm T3's `mcp__t3-code__watch_pull_request` on the PR and let its wake arrive here. A subagent cannot watch, so the watch never moves off the parent. Keep a long time-based heartbeat as fallback."],
+  ["An event to watch (CI, a merge, a ref advancing) gets a watcher subagent that wakes you on the event, with a long time-based heartbeat as fallback.", "An event to watch (CI, a merge, a ref advancing) is watched by this thread itself, which owns the watch: arm T3's `tools.mcp__t3_code__watch_pull_request` on the PR and let its wake arrive here. A subagent cannot watch, so the watch never moves off the parent. Keep a long time-based heartbeat as fallback."],
   ["confirm intent with `question`", "confirm intent with a direct question"],
   ["Do not park reversible work for the human or use `question`.", "Do not park reversible work for the human or raise it as a question."],
   ["Use Glob to find directories and files, Grep to find key symbols, Read to understand the actual implementation.", "Use find to locate directories and files, grep to find key symbols, read to understand the actual implementation."],
@@ -63,7 +63,13 @@ const GLOBAL = [
   ["Before spawning investigators, list the available MCPs. Use the available-tools map when present.", "Before spawning investigators, list the available MCP servers from pi's tools block in the system prompt (or the `/mcp` command)."],
   ["disable-model-invocation: true\n", ""],
   ["Routing target for `/poteto-mode` and requests", "Routing target for `/skill:poteto-mode` and requests"],
-  ["`delegate_task`", "`mcp__t3-code__delegate_task`"],
+  ["`delegate_task`", "`tools.mcp__t3_code__delegate_task`"],
+  // The rename lands the token in noun slots that expect a subagent or a call,
+  // not a tool name. Smooth those so the sentence still reads. Order matters:
+  // these match the renamed token, so they run after the rule above.
+  ["a `tools.mcp__t3_code__delegate_task` with `role:", "a subagent with `tools.mcp__t3_code__delegate_task` and `role:"],
+  ["a single `tools.mcp__t3_code__delegate_task` subagent", "a single subagent via `tools.mcp__t3_code__delegate_task`"],
+  ["the `tools.mcp__t3_code__delegate_task` tool", "`tools.mcp__t3_code__delegate_task`"],
 ];
 
 // Per-file exact-string rules for lines with no global equivalent.
