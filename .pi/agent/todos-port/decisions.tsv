@@ -1,1 +1,8 @@
 ts	phase	decision	why	evidence	result
+2026-10-07T13:02:58Z	frame	routed the port to the Feature playbook	one coherent extension with a fixed module shape, not a multi-call-site migration	skills/poteto-mode/playbooks/feature.md	chosen
+2026-10-07T13:02:58Z	frame	skipped architect	faithful port of a concrete implementation; no novel design space (laziness-protocol)	decisions.tsv	skipped
+2026-10-07T12:31:00Z	probe	proved typebox, typebox/value, and pi-ai StringEnum resolve under pi 1.0.4	settle the blocking unknown before porting; the whole port depends on it	/tmp/pi1probe/probe.ts live run	VERIFIED
+2026-10-07T12:33:00Z	probe	settled that bun test and tsc need local node_modules symlinks; pi itself does not	packages live inside pi's own install; symlinks beat an install	node_modules/ symlinks	VERIFIED
+2026-10-07T12:36:00Z	core	delegated the pure core to an implementation subagent	review separation; the lead still verifies the artifact	delegate todos-port-core-1	60 pass, tsc clean
+2026-10-07T13:00:00Z	core	deleted 15 symbols the TUI view and /todo command orphaned	subtract-before-you-add; zero callers in the kept tree	grep proof, state.ts 686 to 476 lines	VERIFIED
+2026-10-07T13:35:00Z	lever	built verify.mjs so a reviewer reruns the port checks	build-the-lever: a rerunnable artifact beats a self-report	.pi/agent/todos-port/verify.mjs	10/10 pass
