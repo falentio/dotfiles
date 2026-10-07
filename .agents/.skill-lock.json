@@ -37,15 +37,6 @@
       "installedAt": "2026-04-13T15:41:32.649Z",
       "updatedAt": "2026-04-13T15:41:32.649Z"
     },
-    "herdr": {
-      "source": "ogulcancelik/herdr",
-      "sourceType": "github",
-      "sourceUrl": "https://github.com/ogulcancelik/herdr.git",
-      "skillPath": "SKILL.md",
-      "skillFolderHash": "d6c358d18b658c2768cad4d65a3a723402014d88",
-      "installedAt": "2026-05-31T13:23:55.183Z",
-      "updatedAt": "2026-05-31T13:23:55.183Z"
-    },
     "using-git-worktrees": {
       "source": "obra/superpowers",
       "sourceType": "github",
