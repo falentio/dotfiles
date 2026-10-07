@@ -165,10 +165,12 @@ export class TodoTracker {
 		);
 	}
 
-	/** Resets per-prompt reminder and mutation budgets. */
+	/** Resets the per-prompt mutation and nudge budgets. The reminder's
+	 *  awaiting-progress flag is deliberately NOT reset here: a reminder pauses
+	 *  reminders until a real tool result, so clearing it on every
+	 *  before_agent_start would re-arm a continuation and loop. */
 	resetCycle(): void {
 		this.#reminderCount = 0;
-		this.#reminderAwaitingProgress = false;
 		this.#mutationsSinceLastTouch = 0;
 		this.#midRunNudgeCount = 0;
 	}

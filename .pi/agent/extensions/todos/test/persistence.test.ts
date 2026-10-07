@@ -86,7 +86,7 @@ describe("getLatestTodoPhasesFromEntries", () => {
 		expect(getLatestTodoPhasesFromEntries(entries)).toEqual(phasesC);
 	});
 
-	it("prefers the newest snapshot over an older toolResult", () => {
+	it("prefers the newest record when a snapshot entry is newer", () => {
 		const entries = [
 			messageEntry("toolResult", "todo", { phases: phasesB }),
 			customEntry(TODO_SNAPSHOT_CUSTOM_TYPE, { phases: phasesA }),

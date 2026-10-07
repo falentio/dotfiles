@@ -130,8 +130,9 @@ export default function todosExtension(pi: ExtensionAPI): void {
 		],
 		parameters: todoSchema,
 		executionMode: "sequential",
-		// Kept out of the codemode callable set: a codemode-wrapped call records
-		// only the outer codemode result, so todo state would not survive resume.
+		// model-only keeps the tool out of the codemode callable set (and out of
+		// ctx.executeTool for any caller), so a wrapped call cannot drop the
+		// durable record. The cost: a script cannot batch todo updates.
 		exposure: "model-only",
 
 		// Repairs a missing `op` (models routinely send `{list:[...]}` with no
@@ -164,7 +165,10 @@ export default function todosExtension(pi: ExtensionAPI): void {
 			if (outcome.failed) throw new Error(outcome.summary);
 			if (!outcome.readOnly) {
 				setPhases(outcome.phases);
-				pi.appendEntry(TODO_SNAPSHOT_CUSTOM_TYPE, { phases: outcome.phases });
+				// appendEntry is a no-op without a session file, so only persist then.
+				if (outcome.storage === "session") {
+					pi.appendEntry(TODO_SNAPSHOT_CUSTOM_TYPE, { phases: outcome.phases });
+				}
 			}
 			const details: TodoToolDetails = {
 				op: outcome.op,

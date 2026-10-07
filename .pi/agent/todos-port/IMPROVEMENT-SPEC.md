@@ -38,14 +38,14 @@ In `persistence.ts`:
 - Keep the message-toolResult branch as a fallback for sessions written before
   this change and for any direct call whose custom entry is missing.
 
-In `index.ts`, in `execute`, after a successful non-read-only op, write the
-snapshot: `pi.appendEntry(TODO_SNAPSHOT_CUSTOM_TYPE, { phases: outcome.phases })`.
-`appendEntry` from `execute` lands on the branch before the toolResult (proven
-by probe), so the reader's backward scan finds the newest snapshot first.
-
-Ordering note: the reader scans newest-first and takes the first valid record.
-Both writers (the custom entry and the toolResult) carry the same phases, so
-order between them does not matter; the newest of either wins.
+In `index.ts`, in `execute`, after a successful non-read-only op with session
+storage, write the snapshot:
+`pi.appendEntry(TODO_SNAPSHOT_CUSTOM_TYPE, { phases: outcome.phases })`.
+`appendEntry` from `execute` lands on the branch before the toolResult, so the
+toolResult is newer. The reader scans newest-first, so in normal operation it
+reads the toolResult; the snapshot is the record that survives a wrapper that
+drops the toolResult (the codemode failure mode). A no-session run writes
+nothing, since `appendEntry` is a no-op without a session file.
 
 ## Change 3: reminder on the actionable boundary (index.ts + tracker.ts)
 
@@ -87,7 +87,7 @@ prune set.
 
 1. `cd .pi/agent/extensions/todos && bun test` all pass.
 2. `cd .pi/agent/extensions/todos && tsc --noEmit` clean.
-3. `node .pi/agent/todos-port/verify.mjs` still 12/12.
+3. `node .pi/agent/todos-port/verify.mjs` all checks pass.
 
 ## Rules
 

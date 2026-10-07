@@ -4,7 +4,7 @@
 // unit suite is green. Run: node .pi/agent/todos-port/verify.mjs
 
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -96,28 +96,38 @@ check("live pi: no load failure", !/Failed to load extension/.test(liveOut));
 check("live pi: tool ran", /"name": ?"todo"/.test(liveOut));
 check("live pi: completed a task", /\[X\] alpha/.test(liveOut));
 
-// 6. Branch replay: init in one session, then resume and view it. The resumed
-//    run must rebuild the list from the branch, not from memory. Read the
-//    transcript, since --print shows only the final text. Also assert the
-//    durable todo_snapshot entry landed, which is what makes replay survive a
-//    codemode-wrapped call.
+// 6. Branch replay. The snapshot entry is the durable record that survives a
+//    wrapper, so prove it in isolation: seed a session, strip every toolResult
+//    from the transcript, keep only the header and the todo_snapshot entries,
+//    then resume. If the list still returns, the snapshot alone restored it.
 const sessionDir = mkdtempSync(join(tmpdir(), "todos-verify-"));
 let replayOk = false;
-let snapshotOk = false;
+let snapshotOnlyOk = false;
 try {
   pi(["--session-dir", sessionDir, "--print", "Call the todo tool with op=init and items=[\"replay probe\"]. Reply with exactly SEED_OK."]);
   const sessionFile = join(
     sessionDir,
     readdirSync(sessionDir).filter((f) => f.endsWith(".jsonl")).sort().pop() ?? "",
   );
-  snapshotOk = readFileSync(sessionFile, "utf8").includes("todo_snapshot");
   const resumed = pi(["--session", sessionFile, "--print", "--mode", "json", "Call the todo tool with op=view. Reply with exactly REPLAY_PROBE_OK."]);
   replayOk = /replay probe/.test(resumed);
+
+  const stripped = join(sessionDir, "snapshot-only.jsonl");
+  const kept = readFileSync(sessionFile, "utf8")
+    .split("\n")
+    .filter((line) => line.trim())
+    .filter((line) => {
+      const entry = JSON.parse(line);
+      return entry.type === "session" || (entry.type === "custom" && entry.customType === "todo_snapshot");
+    });
+  writeFileSync(stripped, `${kept.join("\n")}\n`);
+  const snapshotOnly = pi(["--session", stripped, "--print", "--mode", "json", "Call the todo tool with op=view. Reply with exactly SNAPSHOT_ONLY_OK."]);
+  snapshotOnlyOk = /replay probe/.test(snapshotOnly);
 } finally {
   rmSync(sessionDir, { recursive: true, force: true });
 }
-check("durable todo_snapshot entry written", snapshotOk);
 check("branch replay restores the list on resume", replayOk);
+check("snapshot entry alone restores the list (no toolResult)", snapshotOnlyOk);
 
 // 7. The bundled skill is advertised in the system prompt.
 let jsonOut = "";

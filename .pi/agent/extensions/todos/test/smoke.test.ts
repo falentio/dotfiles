@@ -470,6 +470,33 @@ describe("todos extension factory", () => {
 		});
 	});
 
+	it("writes no snapshot without a session file", async () => {
+		const { api, handlers, tools } = makeRecordingAPI();
+		const entries = await makeEntryCapture(api);
+		todosExtension(api);
+		sandboxAgentDir();
+		const ctx = makeContext(
+			{ cwd: "/tmp/project" },
+			{ getBranch: () => [], getCwd: () => "/tmp/project", getSessionFile: () => undefined },
+		);
+		await dispatch(
+			handlers,
+			"session_start",
+			{ type: "session_start", reason: "startup" },
+			ctx,
+		);
+		const tool = tools.find((t) => t.name === "todo");
+		if (!tool) throw new Error("todo tool missing");
+		await tool.execute!(
+			"init",
+			{ op: "init", items: ["Wire workspace"] },
+			undefined,
+			undefined,
+			ctx as ExtensionToolContext,
+		);
+		expect(entries).toEqual([]);
+	});
+
 	it("writes nothing on a view or a failed mutation", async () => {
 		const { api, handlers, tools } = makeRecordingAPI();
 		const entries = await makeEntryCapture(api);

@@ -293,6 +293,28 @@ describe("checkCompletion", () => {
 		).not.toBeNull();
 	});
 
+	it("a boundary continuation cannot loop the reminder", async () => {
+		const { tracker } = makeTracker({
+			config: { remindersMax: 3 },
+			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
+		});
+		expect(
+			await tracker.checkCompletion(makeContext(), assistantMessage("Stop.")),
+		).not.toBeNull();
+		// resetCycle runs on every before_agent_start. If it re-armed the
+		// awaiting-progress flag, each continuation would reset the budget and
+		// the reminder would loop. It must stay silent until a tool result.
+		for (let i = 0; i < 5; i++) {
+			tracker.resetCycle();
+			expect(
+				await tracker.checkCompletion(
+					makeContext(),
+					assistantMessage("Stop again."),
+				),
+			).toBeNull();
+		}
+	});
+
 	it("respects remindersMax", async () => {
 		const { tracker } = makeTracker({
 			config: { remindersMax: 2 },
