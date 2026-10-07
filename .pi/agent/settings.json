@@ -4,5 +4,8 @@
   "defaultModel": "balanced",
   "defaultTools": [
     "+codemode"
-  ]
+  ],
+  "codemode": {
+    "mode": "only"
+  }
 }
