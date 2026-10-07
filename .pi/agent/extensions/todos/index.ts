@@ -5,11 +5,12 @@
  *
  * - **`todo` tool** (`init|start|done|rm|drop|block|unblock|append|view`)
  *   with phased lists, auto-promotion of the next task, completion
- *   transitions, and strict batch semantics. Persistence is the tool result
- *   itself: every successful result carries `details.phases`, and state is
- *   reconstructed by scanning the session branch (the same durable-record
- *   pattern OMP and pi's example extensions use — branching/rewinding always
- *   shows the correct todo state).
+ *   transitions, and strict batch semantics. Every successful mutation writes
+ *   a `todo_snapshot` session entry, and state is reconstructed from the
+ *   newest snapshot on the session branch (the same durable-record pattern OMP
+ *   and pi's example extensions use — branching/rewinding always shows the
+ *   correct todo state). The tool is `model-only`, so a codemode script cannot
+ *   wrap the call and drop the record.
  * - **Eager prelude** (`todo.eager: "preferred" | "always"`): on the first
  *   turn, a hidden reminder asks the model to lay out a phased plan with a
  *   single `init` call before working. pi's extension API cannot force a
@@ -21,9 +22,10 @@
  * - **Mid-run nudge**: after 12 mutating tool results, a hidden steer
  *   message asks the agent to mark finished tasks done (≤2 per prompt
  *   cycle).
- * - **Completion reminder**: when the agent settles with incomplete todos
- *   and isn't waiting on the user, a reminder is injected and a fresh turn
- *   is triggered (`todo.reminders`, `todo.remindersMax`).
+ * - **Completion reminder**: when the agent stops with incomplete todos and
+ *   isn't waiting on the user, `agent_before_settle` appends a hidden message
+ *   and continues the turn once, up to the reminder budget
+ *   (`todo.reminders`, `todo.remindersMax`).
  *
  * Config lives in `<agent dir>/todo.json` (global) and `<cwd>/.pi/todo.json`
  * (project, trusted only): `enabled`, `reminders`, `remindersMax`, `eager`.

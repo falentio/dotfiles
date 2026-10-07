@@ -72,8 +72,6 @@ describe("todos extension factory", () => {
 		expect(tool).toBeDefined();
 		expect(tool?.label).toBe("Todo");
 		expect(tool?.executionMode).toBe("sequential");
-		// Excluded from the codemode callable set so a wrapped call still records
-		// the durable todo state, not just the outer codemode result.
 		expect(tool?.exposure).toBe("model-only");
 		expect(tool?.promptSnippet).toContain("structured todo list");
 	});
@@ -184,7 +182,7 @@ describe("todos extension factory", () => {
 		const text =
 			result.content.find((part) => part.type === "text")?.text ?? "";
 		expect(text).toContain("from branch");
-		// The branch result itself is the durable record.
+		// The result carries the phases; the snapshot entry is what a resume reads.
 		expect((result.details as { phases: unknown }).phases).toEqual(phases);
 	});
 

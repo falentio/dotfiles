@@ -16,7 +16,6 @@ import type {
 import { clonePhases, isTodoPhase } from "./state.ts";
 import type { TodoPhase } from "./types.ts";
 
-/** What the todo tool writes now, from `execute`. */
 export const TODO_SNAPSHOT_CUSTOM_TYPE = "todo_snapshot";
 /** Legacy type written by `@gamaraan/todos-tool`; the reader still replays it. */
 export const USER_TODO_EDIT_CUSTOM_TYPE = "user_todo_edit";

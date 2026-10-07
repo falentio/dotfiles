@@ -27,10 +27,14 @@ Tasks are referenced by their exact content, never by an id. A missing `op` is
 inferred when the arguments are unambiguous, so `{list: [...]}` becomes an
 `init`.
 
-State lives in the tool result. Every successful call returns
-`details.phases`, and the extension rebuilds the list from the newest such
-result on the session branch. Branching and rewinding show the list correct
-for that point in history.
+State lives in the tool result and in a session snapshot. Every successful
+call returns `details.phases` and writes a `todo_snapshot` session entry; the
+extension rebuilds the list from the newest of either on the session branch.
+Branching and rewinding show the list correct for that point in history.
+
+The tool is registered `model-only`, so the model calls it directly and a
+`codemode` script cannot. A wrapped call would record only the outer `codemode`
+result and the list would not survive a resume.
 
 ## Session behavior
 
@@ -39,8 +43,9 @@ The extension adds three nudges around the tool, each gated on config:
 - An eager prelude on the first turn asks for a phased `init` before work.
 - A mid-run nudge after 12 mutating tool results asks the agent to mark
   finished tasks done.
-- A completion reminder fires when the agent stops with open tasks and is not
-  waiting on an answer.
+- A completion reminder fires on `agent_before_settle` when the agent stops
+  with open tasks and is not waiting on an answer. It appends a hidden message
+  and continues the turn once, up to the reminder budget.
 
 A bundled `todo-discipline` skill, advertised through `resources_discover`,
 tells the model to plan before working and to mark each task done as it
