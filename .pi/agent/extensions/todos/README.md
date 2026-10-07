@@ -89,10 +89,6 @@ under its `node_modules/@types/bun`).
 Then run the checks:
 
 ```sh
-bun test          # 118 tests
+bun test          # 126 tests
 tsc --noEmit
 ```
-
-`.pi/agent/todos-port/verify.mjs` runs those plus a live pi boot, and checks
-that the dropped surfaces stay gone. Run it from the repo root with
-`node .pi/agent/todos-port/verify.mjs`.
