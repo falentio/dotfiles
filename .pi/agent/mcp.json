@@ -5,13 +5,13 @@
       "description": "Web search and content extraction",
       "exposure": "hidden",
       "toolExposure": {
-        "search": "direct",
-        "fetch_content": "direct"
+        "search": "codemode",
+        "fetch_content": "codemode"
       }
     },
     "context7": {
       "url": "https://mcp.context7.com/mcp/oauth",
-      "exposure": "direct"
+      "exposure": "codemode"
     }
   }
 }
