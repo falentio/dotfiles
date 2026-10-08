@@ -56,19 +56,32 @@ arena/swarm: N workers [1]
 
 ## What S returns
 
-S's reply is the parent's whole view of the codebase, so it carries findings, not the crawl. Return only:
+**Report only. Name the answer, findings with `path:line` anchors, gaps with probes, and blockers.** S's reply is A's whole view of the codebase: A forked S to keep the crawl out of its window, so every line S returns spends the budget the fork was meant to save.
 
 ```text
 S reply [1]
-├── answer  ← the finding, direct, no preamble [1a]
-├── evidence  ← file:line per claim, one line each [1b]
-├── source  ← when C fetched one: path, repo, ref, sha [1c]
-└── open  ← what S could not find, and why [1d]
+├── answer  ← direct, no preamble [1a]
+├── findings [1b]  ← ≤ 15, one claim each
+│   ├── id  ← F<n>, addressable so A can cite it [1b1]
+│   ├── claim  ← one falsifiable assertion [1b2]
+│   ├── anchor  ← `path:line` or `path:symbol` [1b3]
+│   └── status  ← VERIFIED | INFERRED | STALE | UNVERIFIED [1b4]
+├── gaps [1c]  ← ≤ 5, what S could not settle
+│   ├── what  ← the claim left open [1c1]
+│   ├── why  ← absent, unreadable, ambiguous, out of scope [1c2]
+│   └── probe  ← the check that would settle it [1c3]
+├── blockers  ← ≤ 3, and who resolves each [1d]
+└── source  ← when C fetched one: path, repo, ref, sha [1e]
 ```
 
-- **Answer.** The question, answered. Name the symbol and the file it lives in. No "I searched for…" narration.
-- **Evidence.** `path/to/file.ts:42` per claim. A claim without a pointer is dropped.
-- **Source.** The cloner's path, repo, ref, and sha when the answer needed a dependency's source.
-- **Open.** What S could not find, or a claim it could not verify. Empty when the crawl was complete.
+| Field | Holds | Must not hold |
+|---|---|---|
+| answer | the finding, direct | narration, restated task |
+| claim | one assertion | multiple claims, hedging |
+| anchor | `path:line` | file contents, grep output, directory listings, diffs |
+| status | one tag | prose justification |
+| gaps | missing item + probe | silence, invented claims |
 
-Never paste file contents, grep output, or directory listings — the pointers stand in for them. Never restate the task. Keep it under a screen; the parent forked S to save its window, so a long reply defeats the fork.
+**Hard limits.** ≤ 400 words, ≤ 60 lines. Pointers only — no file contents, grep output, directory listings, diffs, or command transcripts. A pointer may quote one line, and only when that line is the finding.
+
+**Missing or unverifiable.** A claim with no anchor is `UNVERIFIED`; with no probe it is a gap, not a finding. Evidence older than the file's last change is `STALE`. A finding S could not produce goes under gaps — never omitted, never invented. Empty gaps means the crawl was complete: write `none`, do not drop the heading.

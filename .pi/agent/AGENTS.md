@@ -55,7 +55,7 @@ A: main agent [1]
     └── S crawls  ← reads what C returned [1a2]
 ```
 
-Ask the scout for findings, not the crawl: the answer, `file:line` evidence per claim, the cloner's path when source was fetched, and what it could not find. No file dumps, no narration.
+Ask the scout for findings, not the crawl: the answer, findings anchored to `path:line` with a status, gaps with a probe, and the cloner's source when fetched. No file dumps, no narration.
 
 Reuse a scout's `childThreadId` across the subagents that follow — implementer, researcher, reviewer — so they ask it instead of re-reading. Fork the scout once per receiver with `t3_thread_fork` and hand each its own `targetThreadId`, so every subagent has a dedicated crawler. Arena, swarm, and any fan-out fork N times, one per worker. The `codebase-scout` skill holds the steps and the reply shape.
 
