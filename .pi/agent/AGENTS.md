@@ -16,7 +16,7 @@ TypeScript, lint, and format errors wait until implementation is done. While imp
 2. Delegate one `tools.mcp__t3_code__delegate_task` to clear the errors. Name the changed files as Unix globs (`app/**/*.ts`, not prose); the child edits only those. Give it the `fix-checks` skill.
 3. Read the report: each rule as a commit sha, or a reason it stayed.
 
-Every rule fix is its own commit, subject keyed by the rule id so `git log --grep` finds it. The `fix-checks` skill holds the child's steps.
+Every rule fix is its own commit: an imperative subject that reads on its own, with the rule id in a `Rule:` trailer for `git log --grep`. The `fix-checks` skill holds the child's steps.
 
 ## Long-running processes
 

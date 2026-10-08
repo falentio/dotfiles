@@ -15,7 +15,13 @@ The parent names your files as Unix globs. Those globs are your only writable se
 
 A **rule** is one check identity: a TypeScript code (`TS2345`), an ESLint rule id (`@typescript-eslint/no-explicit-any`), or `prettier` for format. Fix one rule, commit it alone, then the next.
 
-Subject: `fix(<ts|lint|fmt>): <rule>` — for example `fix(lint): @typescript-eslint/no-explicit-any`. The rule id in the subject is what makes the fix findable.
+The subject says what the fix does, in the imperative — a reader learns the change without decoding a rule id. The rule id rides a `Rule:` trailer, which `git log --grep` still finds.
+
+```
+fix(lint): type the seat argument as SeatIdentity
+
+Rule: @typescript-eslint/no-explicit-any
+```
 
 ## Search before you solve
 
@@ -33,5 +39,5 @@ git log -F --grep='<rule>' --oneline
 
 1. Run the repo's typecheck, lint, and format commands. Collect every error as file, rule, and position.
 2. Group the errors by rule. Each group is one commit.
-3. Per group: search the log, resolve, re-run that one check to confirm it clears, commit.
+3. Per group: search the log, resolve, re-run that one check to confirm it clears, commit with the subject-plus-`Rule:`-trailer shape.
 4. Report each rule with its commit sha, the files touched, and any rule left with its reason.
