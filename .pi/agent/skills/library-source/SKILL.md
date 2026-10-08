@@ -1,45 +1,35 @@
 ---
 name: library-source
-description: "Read a dependency's real source by shallow-cloning it to ~/source. Use when the answer lives in a library's code rather than its docs, when grep of node_modules or build output is the wrong surface, or when asked to clone a library at a version."
+description: "Resolve a dependency's source repo at a version and return its ~/source checkout path, cloning it shallowly when absent. Use when spawned as the source cloner, given a token like npm zod@4.0.7."
 ---
 
 # Library source
 
-When the answer is in a dependency's source, read the source — not `node_modules`, not a bundle, not a build artifact. Those are transformed, deduped, or minified; the source is the truth.
+You are the source cloner. The scout spawns you with one token — `npm zod@4.0.7`, `pypi requests@2.32.3` — and you return where the source is. You clone directly; you do not spawn anyone.
 
-## Delegate the clone
+## Steps
 
-Do not clone in the parent context. Delegate it: the search ceremony stays in the child, the parent keeps the path.
-
-Pass the child three things and nothing else:
-
-- the registry (`npm`, `pypi`, `crates`, `go`)
-- the library name
-- the version
-
-One token: `npm zod@4.0.7`, `pypi requests@2.32.3`, `crates serde@1.0.200`.
-
-## The child's steps
-
-1. Resolve the source repo and its ref for that version.
+1. Split the token into registry, name, and version.
+2. Resolve the repo URL and ref for that version.
    - `npm view <name>@<version> repository.url gitHead` → repo URL, commit SHA.
    - `curl https://pypi.org/pypi/<name>/<version>/json` → `info.project_urls.Source`.
    - `curl https://crates.io/api/v1/crates/<name>/<version>` → `crate.repository`.
    - The ref is the tag for the version — `v<version>`, else `<version>` — or the `gitHead` SHA when no tag matches.
-2. Build the path. Normalise the repo URL (drop scheme, `.git`, and the `git@host:` prefix) to `host/path`, then encode: `-` → `--` first, then `/` → `-`; append `@<ref>`.
+3. Normalise the URL once: drop `git+`, the scheme, and a trailing `.git`. Use this for both the clone and the path.
+4. Build the path. From `host/path`, encode: `-` → `--` first, then `/` → `-`; append `@<ref>`.
 
    ```bash
-   base=$(printf '%s' "$url" | sed -E 's#^git\+##; s#^[a-z]+://##; s#^git@##; s#:#/#; s#\.git$##')
-   slug=$(printf '%s@%s' "$base" "$ref" | sed -e 's/-/--/g' -e 's#/#-#g')
+   clean=$(printf '%s' "$url" | sed -E 's#^git\+##; s#^[a-z]+://##; s#^git@##; s#:#/#; s#\.git$##')
+   slug=$(printf '%s@%s' "$clean" "$ref" | sed -e 's/-/--/g' -e 's#/#-#g')
+   path="$HOME/source/$slug"
    ```
 
-   `https://github.com/colinhacks/zod` at `v4.0.7` → `github.com-colinhacks-zod@v4.0.7`. Doubling the dashes first is what makes the encoding reversible: a real `-` becomes `--`, so a lone `-` can only be a path separator.
-3. Shallow-clone to `~/source`:
+   `https://github.com/colinhacks/zod` at `v4.0.7` → `~/source/github.com-colinhacks-zod@v4.0.7`. Doubling the dashes first is what makes the encoding reversible: a real `-` becomes `--`, so a lone `-` can only be a path separator.
+5. If `$path` exists, reuse it. Else clone shallowly:
 
    ```bash
    mkdir -p ~/source
-   git clone --depth 1 --branch "$ref" "$url" "$HOME/source/$slug"
+   [ -d "$path" ] || git clone --depth 1 --branch "$ref" "https://$clean" "$path"
    ```
 
-   Reuse the checkout when `~/source/$slug` already exists.
-4. Report the path. The parent reads the source from there.
+6. Return the path, the repo URL, the ref, and the commit SHA (`git -C "$path" rev-parse HEAD`). The scout reads the source from there.

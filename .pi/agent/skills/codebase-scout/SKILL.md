@@ -7,6 +7,14 @@ description: "Read and search a codebase through a delegated scout thread, not i
 
 Never crawl the codebase in the main context. A crawl is file reads and grep output; it crowds the window and buries the answer. Send a **scout** — a delegated thread that reads the codebase and reports — and reuse it.
 
+## The scout's first move: spawn the cloner
+
+When the answer needs a dependency's source, the scout does not fetch it. It spawns a **cloner** child first, and reads what the cloner returns.
+
+`tools.mcp__t3_code__delegate_task` with a one-line task: `use the library-source skill, do npm zod@v4.0.7`. The cloner checks `~/source`, clones there when absent, and returns the path, repo URL, ref, and SHA. Only then does the scout crawl.
+
+Spawn the cloner regardless of whether `~/source` looks populated — the cloner owns that check.
+
 ## Delegate the crawl
 
 `tools.mcp__t3_code__delegate_task` one scout per area: where a symbol lives, how a flow works, which files a change touches. Record the returned `childThreadId`. The parent keeps the scout's answer, not its file reads.
@@ -35,5 +43,6 @@ Arena, swarm, and any parallel fan-out spawn N receivers, so fork N times — on
 ## Steps
 
 1. Delegate the crawl. One scout per area. Record `childThreadId`.
-2. Fork per consumer. Before handing the id to any other subagent, fork it and pass `targetThreadId`.
-3. Follow up. A consumer messages its forked id with `tools.mcp__t3_code__t3_thread_send`; the fork still knows what the scout read.
+2. Spawn the cloner first when the answer needs a dependency's source.
+3. Fork per receiver. Before handing the id to any other subagent, fork it and pass `targetThreadId`.
+4. Follow up. A receiver messages its forked id with `tools.mcp__t3_code__t3_thread_send`; the fork still knows what the scout read.
