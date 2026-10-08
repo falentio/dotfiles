@@ -85,3 +85,31 @@ S reply [1]
 **Hard limits.** ≤ 400 words, ≤ 60 lines. Pointers only — no file contents, grep output, directory listings, diffs, or command transcripts. A pointer may quote one line, and only when that line is the finding.
 
 **Missing or unverifiable.** A claim with no anchor is `UNVERIFIED`; with no probe it is a gap, not a finding. Evidence older than the file's last change is `STALE`. A finding S could not produce goes under gaps — never omitted, never invented. Empty gaps means the crawl was complete: write `none`, do not drop the heading.
+
+## Example reply
+
+A scout asked *where request JWTs are validated*. Its reply, verbatim — illustration only, not a template to fill:
+
+```text
+answer
+JWT validation lives in the requireAuth middleware, which verifies the signature and attaches the decoded user. Route handlers never check tokens themselves.
+
+findings
+F1  requireAuth() verifies the JWT signature.                               src/middleware/auth.ts:24    VERIFIED
+F2  An expired token throws 401 before the handler runs.                    src/middleware/auth.ts:31    VERIFIED
+F3  The signing secret is read from env at load; rotation needs a restart.  src/config/env.ts:12         INFERRED
+F4  Session cookies are checked on a separate path from JWTs.               src/middleware/session.ts:8  STALE
+
+gaps
+what   whether refresh tokens are validated on this path
+why    no refresh handler in the crawled area
+probe  grep -rn refresh src/routes
+
+blockers
+none
+
+source
+none
+```
+
+Note the shape: `answer` answers in two sentences with no preamble; every finding is one claim with a `path:line` anchor and a status; the one thing the crawl could not settle sits under `gaps` with a probe A can run; `blockers` and `source` are present and say `none`. No file contents, no grep output, no narration — A pulls any file it wants from the anchors.
