@@ -8,6 +8,12 @@ A tool pi does not declare is still callable from a codemode script as `tools.<n
 
 Todo multi-step work (3+ steps): `init` the list with `todo` first, then work it.
 
+## Long-running processes
+
+A dev server, watcher, worker, or tunnel — anything outliving the command that starts it — runs as a tmux **DEV session** via `devproc`, one per worktree. Its name, `DEV <repo> <branch> <port>`, is the registry: `tmux ls` alone tells you what runs, where, and on which port.
+
+Read [tmux-processes.md](/home/kevin/.pi/agent/docs/tmux-processes.md) before starting, reading, stopping, or cleaning up one.
+
 ## Lookups
 
 Context7 owns library documentation; TinyFish owns everything else, a library's changelog included. A named library's API surface, configuration, and code examples go to the `find-docs` skill. Release notes, migration announcements, news, papers, and general facts go to the `tinyfish-search-fetch` skill.

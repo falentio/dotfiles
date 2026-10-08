@@ -1,0 +1,152 @@
+#!/bin/sh
+# devproc — run and inspect long-running dev processes (dev server, watcher,
+# worker, tunnel) as tmux DEV sessions, one per worktree.
+#
+# Session name: DEV <repo> <branch> <port>
+# The name is the registry: it survives across agents, shells, and machines,
+# so `tmux ls` alone says what runs, where, and on which port.
+set -eu
+
+DEFAULT_PORT=3000
+MAX_PORT=3999
+
+die() { echo "devproc: $*" >&2; exit 1; }
+
+# --- identity ---------------------------------------------------------------
+
+# repo = parent dir of the git common dir; resolves in a worktree and the main
+# checkout alike. Dots become _ because tmux rewrites . and : to _ in names.
+repo_name() {
+  common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
+    || die "not inside a git repository"
+  basename "$(dirname "$common")" | tr . _
+}
+
+branch_name() {
+  git branch --show-current | tr . _
+}
+
+# lowest free TCP port in [DEFAULT_PORT, MAX_PORT]
+free_port() {
+  p=$DEFAULT_PORT
+  while [ "$p" -le "$MAX_PORT" ]; do
+    ss -ltnH "sport = :$p" 2>/dev/null | grep -q . || { echo "$p"; return; }
+    p=$((p + 1))
+  done
+  die "no free port in $DEFAULT_PORT-$MAX_PORT"
+}
+
+# full session name for this worktree, with a freshly chosen port
+session_name() {
+  r=$(repo_name)
+  b=$(branch_name)
+  p=$(free_port)
+  echo "DEV $r $b $p"
+}
+
+# --- commands ---------------------------------------------------------------
+
+cmd_name() {
+  session_name
+}
+
+# {port} in the command is replaced with the chosen port, so the name and the
+# process agree on one number.
+cmd_start() {
+  [ $# -ge 1 ] || die "usage: devproc start <command with {port}...>"
+  existing=$(sessions_here)
+  if [ -n "$existing" ]; then
+    printf 'devproc: this worktree already runs a DEV session:\n%s\n       read it with '\''devproc read <name>'\'', restart it with '\''tmux respawn-pane -k -t =<name>: <command>'\'', or '\''devproc stop <name>'\'' first\n' "$existing" >&2
+    exit 1
+  fi
+  name=$(session_name)
+  port=$(echo "$name" | awk '{print $NF}')
+  cmd=$(echo "$*" | sed "s/{port}/$port/g")
+  slug=$(echo "$name" | tr ' /' '__')
+  log="/tmp/devproc-$slug.log"
+  tmux new-session -d -s "$name" -c "$PWD" "$cmd 2>&1 | tee '$log'"
+  tmux set-option -w -t "=$name:" remain-on-exit on
+  echo "$name"
+}
+
+# inventory, decoded: one line per DEV session
+cmd_list() {
+  tmux ls -F '#{session_name}' 2>/dev/null \
+    | awk '$1=="DEV" && NF>=4 && $NF~/^[0-9]+$/ {b=$3; for(i=4;i<NF;i++) b=b"/"$i; printf "%-46s repo=%s branch=%s port=%s\n", $0, $2, b, $NF}' \
+    || true
+}
+
+# every DEV session whose pane sits in this worktree, whatever its name
+sessions_here() {
+  tmux ls -F '#{session_name}' 2>/dev/null | grep '^DEV ' | while IFS= read -r s; do
+    # pane_current_path empties when the process dies; pane_start_path survives,
+    # which is what keeps a crashed session findable.
+    p=$(tmux display-message -p -t "=$s:" '#{pane_current_path}' 2>/dev/null)
+    [ -n "$p" ] || p=$(tmux display-message -p -t "=$s:" '#{pane_start_path}' 2>/dev/null)
+    if [ "$p" = "$PWD" ]; then echo "$s"; fi
+  done || true
+}
+
+# this worktree's session name, if one is running
+cmd_here() {
+  sessions_here | head -1
+}
+
+# port -> repo, branch, and worktree of the process behind it
+cmd_infer() {
+  [ $# -ge 1 ] || die "usage: devproc infer <port>"
+  port=$1
+  pid=$(fuser -n tcp "$port" 2>/dev/null | tr -d ' ' | cut -d: -f2) \
+    || die "nothing listening on $port"
+  [ -n "$pid" ] || die "nothing listening on $port"
+  cwd=$(readlink "/proc/$pid/cwd") || die "cannot read cwd of pid $pid"
+  common=$(git -C "$cwd" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
+    || die "pid $pid (cwd $cwd) is not in a git repository"
+  echo "repo=$(basename "$(dirname "$common")" | tr . _) branch=$(git -C "$cwd" branch --show-current | tr . _) worktree=$cwd pid=$pid"
+}
+
+# resolve a target argument, or this worktree's session
+target() {
+  if [ $# -ge 1 ]; then echo "$1"; else cmd_here | head -1; fi
+}
+
+cmd_read() {
+  t=$(target "$@")
+  [ -n "$t" ] || die "no session for this worktree; pass a name or run devproc list"
+  tmux capture-pane -p -S -200 -t "=$t:"
+}
+
+cmd_stop() {
+  t=$(target "$@")
+  [ -n "$t" ] || die "no session for this worktree; pass a name or run devproc list"
+  tmux kill-session -t "=$t"
+  echo "stopped $t"
+}
+
+usage() {
+  cat <<'EOF'
+devproc — long-running dev processes as tmux DEV sessions.
+
+  devproc name              print the DEV session name for this worktree
+  devproc start <cmd>       start <cmd> in a DEV session ({port} -> chosen port)
+  devproc list              inventory every DEV session, decoded
+  devproc here              this worktree's running session, if any
+  devproc read [target]     tail a session (default: this worktree's)
+  devproc stop [target]     kill a session (default: this worktree's)
+  devproc infer <port>      port -> repo, branch, worktree, pid
+
+Session name: DEV <repo> <branch> <port>. One per worktree.
+EOF
+}
+
+case "${1:-}" in
+  name)  shift; cmd_name "$@" ;;
+  start) shift; cmd_start "$@" ;;
+  list)  shift; cmd_list "$@" ;;
+  here)  shift; cmd_here "$@" ;;
+  read)  shift; cmd_read "$@" ;;
+  stop)  shift; cmd_stop "$@" ;;
+  infer) shift; cmd_infer "$@" ;;
+  ""|-h|--help|help) usage ;;
+  *) usage >&2; die "unknown command: $1" ;;
+esac
