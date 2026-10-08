@@ -26,7 +26,7 @@ A lookup that needs one query runs here. Anything wider, such as several queries
 
 ## Delegated subagents
 
-Call `tools.mcp__t3_code__delegate_task` through a codemode script. It returns two handles. `taskId` covers one run and freezes at its terminal state. `childThreadId` is the child's whole conversation and stays resumable.
+Call `tools.mcp__t3_code__delegate_task` through a codemode script. It **creates a T3 thread** and returns two handles. `taskId` covers one run and freezes at its terminal state. `childThreadId` is that thread — a full T3 thread, so the thread ops act on it, `tools.mcp__t3_code__t3_thread_wait` among them.
 
 Reach for an op by intent:
 
