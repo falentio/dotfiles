@@ -31,7 +31,7 @@ The N candidates will receive the same prompt, so the prompt is the contract. Ge
 
 ## Phase B: Fan out
 
-Spawn all N subagents in one message with `role: "general"`, each with the task, the path to the shared grounding, its own output path, and instructions to produce both the artifact and a short rationale. Omit `tools.mcp__t3_code__delegate_task`'s `target` so every runner inherits the parent chat model.
+Spawn all N subagents in one message with `role: "general"`, each with the task, the path to the shared grounding, its own output path, and instructions to produce both the artifact and a short rationale. When a candidate needs the codebase, give it a dedicated crawler: fork the scout once per candidate and pass the fork id, per the **codebase-scout** skill. Omit `tools.mcp__t3_code__delegate_task`'s `target` so every runner inherits the parent chat model.
 
 The rationale is mandatory. Without it, the parent cannot tell whether a candidate's structure is principled or accidental, which makes Phase E grafting unreliable. Each rationale names the alternatives the candidate considered and what it rejected.
 

@@ -45,6 +45,6 @@ A lookup that needs one query runs here. Anything wider — several queries, or 
 
 `delegate_task` **creates a T3 thread** and returns two handles: `taskId` for one run, frozen at its terminal state (read with `task_status`, cancel with `task_cancel`), and `childThreadId` for the thread itself, a full T3 thread the thread ops act on (`t3_thread_wait`, `t3_thread_send`, `t3_thread_interrupt`).
 
-Crawl the codebase through a scout, never in this context. Reuse a scout's `childThreadId` across the subagents that follow — implementer, researcher, reviewer — so they ask it instead of re-reading. Fork the scout per consumer with `t3_thread_fork` and hand off `targetThreadId`; a fork keeps the scout's knowledge and its own conversation. The `codebase-scout` skill holds the steps.
+Crawl the codebase through a scout, never in this context. Reuse a scout's `childThreadId` across the subagents that follow — implementer, researcher, reviewer — so they ask it instead of re-reading. Fork the scout once per receiver with `t3_thread_fork` and hand each its own `targetThreadId`, so every subagent has a dedicated crawler. Arena, swarm, and any fan-out fork N times, one per worker. The `codebase-scout` skill holds the steps.
 
 Read [delegated-subagents.md](/home/kevin/.pi/agent/docs/delegated-subagents.md) for the call shapes, the status fields, and the gotchas.

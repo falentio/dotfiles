@@ -15,7 +15,7 @@ Never crawl the codebase in the main context. A crawl is file reads and grep out
 
 A scout that has read the codebase knows more than a fresh subagent. Hand its thread id to the subagents that follow — an implementer, a researcher, a reviewer — so they ask the scout instead of re-reading.
 
-**Fork before handoff.** A thread is one conversation: two consumers sending to one id queue into one timeline and see each other's turns. Fork first, hand off the fork, so each consumer follows up in its own copy.
+**Fork one per receiver, before handoff.** A thread is one conversation: two consumers sending to one id queue into one timeline and see each other's turns. Fork once for each subagent that will use the scout, and hand each its own `targetThreadId`, so every receiver has a dedicated crawler and follows up in its own copy.
 
 ```js
 const fork = JSON.parse(await tools.mcp__t3_code__t3_thread_fork({
@@ -26,7 +26,11 @@ const fork = JSON.parse(await tools.mcp__t3_code__t3_thread_fork({
 // hand fork.targetThreadId to the consumer
 ```
 
-The fork inherits everything the scout learned and is independent: a consumer's follow-ups land in its own copy, and the scout's thread stays clean.
+The fork inherits everything the scout learned and is independent: a receiver's follow-ups land in its own copy, and the scout's thread stays clean.
+
+## Fan-out
+
+Arena, swarm, and any parallel fan-out spawn N receivers, so fork N times — one dedicated scout per worker. Each worker asks its own fork, so no two share a timeline and the scout's thread stays clean.
 
 ## Steps
 
