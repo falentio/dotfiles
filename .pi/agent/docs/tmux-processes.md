@@ -16,13 +16,15 @@ The name is the registry. `tmux ls` alone then says what runs, where, and on whi
 
 Dots become `_` in repo and branch: tmux rewrites `.` and `:` in session names on its own, and normalising up front keeps the name you wrote the name you target.
 
-`devproc start` picks the port, so pass `{port}` where the command takes one and the name and the process agree on one number:
+`devproc start` substitutes two placeholders in the command: `{port}`, the free port it picked, so the name and the process agree on one number; and `{host}`, the address to bind — the tailnet IPv4 when Tailscale is up, else `0.0.0.0`.
 
 ```bash
-devproc start 'pnpm dev --host 0.0.0.0 --port {port}'
+devproc start 'pnpm dev --host {host} --port {port}'
 ```
 
-`devproc --help` lists the rest (list, here, read, stop, infer).
+Bind `{host}`: a dev server on the tailnet reaches your other devices without exposing the port on every network the machine joins, and `devproc host` prints the same address. When Tailscale is down, `{host}` falls back to `0.0.0.0` so the server still starts.
+
+`devproc --help` lists the rest (host, list, here, read, stop, infer).
 
 ## Infer
 

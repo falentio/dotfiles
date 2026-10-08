@@ -12,6 +12,8 @@ Todo multi-step work (3+ steps): `init` the list with `todo` first, then work it
 
 A dev server, watcher, worker, or tunnel — anything outliving the command that starts it — runs as a tmux **DEV session** via `devproc`, one per worktree. Its name, `DEV <repo> <branch> <port>`, is the registry: `tmux ls` alone tells you what runs, where, and on which port.
 
+Every dev server binds the tailnet: pass `--host {host}` and `devproc` fills in the Tailscale address when Tailscale is up, else `0.0.0.0`. Never hand-write `--host 0.0.0.0`.
+
 Read [tmux-processes.md](/home/kevin/.pi/agent/docs/tmux-processes.md) before starting, reading, stopping, or cleaning up one.
 
 ## Lookups
