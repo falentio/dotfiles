@@ -26,6 +26,13 @@ Every dev server binds the tailnet: pass `--host {host}` and `devproc` fills in 
 
 Read [tmux-processes.md](/home/kevin/.pi/agent/docs/tmux-processes.md) before starting, reading, stopping, or cleaning up one.
 
+## Dev server handoff
+
+Work that touches a frontend page, with a dev server up, ends its reply with a **Dev server** section, so the change is one click from being seen:
+
+- **The server.** Its session name (`devproc here`) and URL, `http://<host>:<port>` from `devproc host` and the session's port.
+- **Try it.** The route to open and the clicks or input that show the change.
+
 ## Lookups
 
 Context7 owns library documentation; TinyFish owns everything else, a library's changelog included. A named library's API surface, configuration, and code examples go to the `find-docs` skill. Release notes, migration announcements, news, papers, and general facts go to the `tinyfish-search-fetch` skill.
