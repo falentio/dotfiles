@@ -1,6 +1,6 @@
 ---
 name: library-source
-description: "Resolve a dependency's source repo at a version and return its ~/source checkout path, cloning it shallowly when absent. Use when spawned as the source cloner, given a token like npm zod@4.0.7."
+description: "Resolve a dependency's source repo at a version and return its ~/.pi/source checkout path, cloning it shallowly when absent. Use when spawned as the source cloner, given a token like npm zod@4.0.7."
 ---
 
 # Library source
@@ -17,7 +17,7 @@ C: checkout source [1]
 │   ├── pypi: curl pypi.org/pypi/<name>/<version>/json → info.project_urls.Source [1b2]
 │   └── crates: curl crates.io/api/v1/crates/<name>/<version> → crate.repository [1b3]
 ├── normalise url → clean  ← drop git+, scheme, .git [1c]
-├── build path  ← ~/source/<slug> [1d]
+├── build path  ← ~/.pi/source/<slug> [1d]
 ├── path exists? [1e]
 │   ├── yes: reuse [1e1]
 │   └── no: ref is a tag? [1e2]
@@ -33,17 +33,17 @@ From `host/path`, encode: `-` → `--` first, then `/` → `-`; append `@<ref>`.
 ```bash
 clean=$(printf '%s' "$url" | sed -E 's#^git\+##; s#^[a-z]+://##; s#^git@##; s#:#/#; s#\.git$##')
 slug=$(printf '%s@%s' "$clean" "$ref" | sed -e 's/-/--/g' -e 's#/#-#g')
-path="$HOME/source/$slug"
+path="$HOME/.pi/source/$slug"
 ```
 
-`https://github.com/colinhacks/zod` at `v4.0.7` → `~/source/github.com-colinhacks-zod@v4.0.7`. Doubling the dashes first is what makes the encoding reversible: a real `-` becomes `--`, so a lone `-` can only be a path separator.
+`https://github.com/colinhacks/zod` at `v4.0.7` → `~/.pi/source/github.com-colinhacks-zod@v4.0.7`. Doubling the dashes first is what makes the encoding reversible: a real `-` becomes `--`, so a lone `-` can only be a path separator.
 
 ## Clone
 
 `git clone --branch` takes a tag but not a raw SHA, so branch when the ref is a tag and fetch it when it is a SHA:
 
 ```bash
-mkdir -p ~/source
+mkdir -p ~/.pi/source
 if [ ! -d "$path" ]; then
   if git ls-remote --tags "https://$clean" | sed 's#.*refs/tags/##' | grep -qx "$ref"; then
     git clone --depth 1 --branch "$ref" "https://$clean" "$path"

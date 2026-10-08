@@ -1,6 +1,9 @@
 # pi runtime state: session transcripts, machine-local, large
 .pi/agent/sessions/
 
+# pi runtime state: shallow library-source clones, machine-local, large
+.pi/source/
+
 # credentials / secrets: never commit these
 .pi/agent/auth.json
 .pi/agent/mcp-auth.json

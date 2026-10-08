@@ -14,14 +14,14 @@ A: main agent [1]
 └── spawn S: scout  ← delegate_task; A never crawls [1a]
     ├── S spawns C: cloner  ← first move when source is needed [1a1]
     │   └── C checks out source  ← "use the library-source skill, do npm zod@v4.0.7" [1a1a]
-    │       ├── path in ~/source? [1a1a1]
+    │       ├── path in ~/.pi/source? [1a1a1]
     │       │   ├── yes: reuse [1a1a1a]
     │       │   └── no: clone shallow [1a1a1b]
     │       └── return path, repo, ref, sha [1a1a2]
     └── S crawls the codebase  ← reads what C returned [1a2]
 ```
 
-Spawn the cloner regardless of whether `~/source` looks populated — the cloner owns that check. One scout per area; record the returned `childThreadId`.
+Spawn the cloner regardless of whether `~/.pi/source` looks populated — the cloner owns that check. One scout per area; record the returned `childThreadId`.
 
 ## Reuse the scout
 
@@ -110,7 +110,7 @@ blockers
 none
 
 source
-path  /home/kevin/source/github.com-colinhacks-zod@v4.0.7
+path  /home/kevin/.pi/source/github.com-colinhacks-zod@v4.0.7
 repo  https://github.com/colinhacks/zod
 ref   v4.0.7
 sha   34b400a5422bc30b48395cdd44007ff4e811fb71

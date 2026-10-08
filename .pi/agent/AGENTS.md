@@ -51,7 +51,7 @@ Crawl the codebase through a scout, never in this context:
 A: main agent [1]
 └── spawn S: scout  ← delegate_task; A never crawls [1a]
     ├── S spawns C: cloner  ← "use the library-source skill, do npm zod@4.0.7" [1a1]
-    │   └── C: check ~/source → clone if absent → return path, repo, ref, sha [1a1a]
+    │   └── C: check ~/.pi/source → clone if absent → return path, repo, ref, sha [1a1a]
     └── S crawls  ← reads what C returned [1a2]
 ```
 
