@@ -71,7 +71,7 @@ S reply [1]
 │   ├── why  ← absent, unreadable, ambiguous, out of scope [1c2]
 │   └── probe  ← the check that would settle it [1c3]
 ├── blockers  ← ≤ 6, and who resolves each [1d]
-└── source  ← when C fetched one: path, repo, ref, sha [1e]
+└── source  ← when C placed one: the absolute path it sits at, repo, ref, sha [1e]
 ```
 
 | Field | Holds | Must not hold |
@@ -81,6 +81,7 @@ S reply [1]
 | anchor | `path:line` | file contents, grep output, directory listings, diffs |
 | status | one tag | prose justification |
 | gaps | missing item + probe | silence, invented claims |
+| source | the placement path C returned, plus repo/ref/sha | file contents, the clone log |
 
 **Hard limits.** ≤ 800 words, ≤ 120 lines. Pointers only — no file contents, grep output, directory listings, diffs, or command transcripts. A pointer may quote one line, and only when that line is the finding.
 
@@ -113,3 +114,30 @@ none
 ```
 
 Note the shape: `answer` answers in two sentences with no preamble; every finding is one claim with a `path:line` anchor and a status; the one thing the crawl could not settle sits under `gaps` with a probe A can run; `blockers` and `source` are present and say `none`. No file contents, no grep output, no narration — A pulls any file it wants from the anchors.
+
+### Example with a dependency source
+
+A scout asked *how zod 4.0.7 parses a date string, and where that source lives*. Its reply:
+
+```text
+answer
+zod 4.0.7 parses date strings in the v4 core parser, which validates the format then constructs a Date. The source is checked out at the path under source.
+
+findings
+F1  zod.parse() dispatches to the v4 core, not the legacy v3 path.  packages/zod/src/index.ts:1             VERIFIED
+F2  Date parsing rejects a string that does not match ISO 8601.     packages/zod/src/v4/core/parse.ts:210   VERIFIED
+
+gaps
+none
+
+blockers
+none
+
+source
+path  /home/kevin/source/github.com-colinhacks-zod@v4.0.7
+repo  https://github.com/colinhacks/zod
+ref   v4.0.7
+sha   34b400a5422bc30b48395cdd44007ff4e811fb71
+```
+
+`source` is the placement path the cloner C returned — where the source sits on disk — so A or a later receiver can read it without re-cloning. Findings that reference the dependency anchor against that path.
