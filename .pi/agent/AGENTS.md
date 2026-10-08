@@ -8,6 +8,16 @@ A tool pi does not declare is still callable from a codemode script as `tools.<n
 
 Todo multi-step work (3+ steps): `init` the list with `todo` first, then work it.
 
+## Checks
+
+TypeScript, lint, and format errors wait until implementation is done. While implementing, ignore them: a fix mid-change is re-broken by the next edit. Clear them in one delegated pass after.
+
+1. Commit the implementation first, so the fixer's commits land on top and a bad fix reverts alone.
+2. Delegate one `tools.mcp__t3_code__delegate_task` to clear the errors. Name the changed files as Unix globs (`app/**/*.ts`, not prose); the child edits only those. Give it the `fix-checks` skill.
+3. Read the report: each rule as a commit sha, or a reason it stayed.
+
+Every rule fix is its own commit, subject keyed by the rule id so `git log --grep` finds it. The `fix-checks` skill holds the child's steps.
+
 ## Long-running processes
 
 A dev server, watcher, worker, or tunnel — anything outliving the command that starts it — runs as a tmux **DEV session** via `devproc`, one per worktree; its name, `DEV <repo> <branch> <port>`, is the registry.
