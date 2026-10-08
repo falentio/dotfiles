@@ -33,7 +33,7 @@ Read each target skill's `SKILL.md` with the read tool.
 - Before review → the **no-comments** skill.
 - Shipping a UI, IDE, or CLI → the matching control skill in this package (**control-cli** for CLIs and TUIs, **control-ui** for browser, Electron, and web). Reproduce a bug on the same surface before fixing.
 - A PR-status request ("babysit this", "get it green", "check on PR X", "anything outstanding on X") → the **Babysit** playbook (`playbooks/babysit.md`). Opening a PR does not trigger it. Declare the mode before polling.
-- Landing or shipping a green stack → the **Shipping** playbook (`playbooks/shipping.md`). Nothing merges before an independent per-PR verdict; only the contiguous verified run from the root lands.
+- Landing or shipping a green stack → the **Shipping** playbook (`playbooks/shipping.md`). Nothing merges before an independent per-PR verdict, and the merger never wrote the code; only the contiguous verified run from the root lands.
 - A review-bot comment → assess it on its merits. Fix a real finding; dismiss noise with the concrete disproof.
 - A broken skill mid-task → fix it in its own PR.
 - Long, autonomous, or multi-phase work, or work the user reviews later ("going to bed", "trust it when i'm back") → a decision trail via the **show-me-your-work** skill.
@@ -84,6 +84,8 @@ Scan every entry before implementation. When a trigger matches, read the leaf sk
 
 **Always pause** for irreversible writes: force-push to shared branches, deploys, data deletion, customer messages.
 
+**Never self-merge.** The actor that authored a PR never merges it, and the actor that merges a PR never authored it. Merging is a second party's decision: the operator, or a root or coordinator that did not write the change. This holds in both directions, and no autonomy grant below overrides it.
+
 **Session overrides:** "Don't stop" / "going to bed" / "run until done" / "be fully autonomous" → keep going.
 
 **No is an acceptable answer.** Asked whether to do something, invited to add scope, or shown an approach, reply with your real judgment. Decline, push back, or say "this doesn't earn its place" when true. A recommendation is a judgment, not a validation. Candor over agreement.
@@ -132,7 +134,7 @@ A large or cross-cutting effort (a migration across many call sites, an ambitiou
 - **Shipping.** The half after Babysit. Independently verifying a green stack, then landing the contiguous verified run from the root. `playbooks/shipping.md`.
 - **Autonomous run.** A long task to drive to completion without stopping ("run until done", "loop until X via the autonomous-run playbook"). `playbooks/autonomous-run.md`.
 - **Orchestrate.** A standing project handed to one coordinator chat: multi-day, many stacked PRs, dozens to hundreds of subagents, minimal human turns ("run this whole project", "own this migration until it lands"). Distinct from Autonomous run, which drives one task to a predicate; work one agent could finish inside the session's budget routes there, not here. `playbooks/orchestrate.md`.
-- **Autopilot-full.** A queue of independent PRs run to merged with full autonomy: one owner per PR carries build through merge, and the root swarm-verifies each merge-ready head before its owner merges ("autopilot this queue", "full autopilot", one-owner-per-PR programs). `playbooks/autopilot-full.md`.
+- **Autopilot-full.** A queue of independent PRs run to merged with full autonomy: one owner per PR carries build to merge-ready, the root swarm-verifies each merge-ready head, and an actor other than the owner merges ("autopilot this queue", "full autopilot", one-owner-per-PR programs). `playbooks/autopilot-full.md`.
 - **Autopilot-stack.** A queue of changes built and verified with full autonomy, delivered as one linear reviewed stack the operator lands herself ("autopilot-stack", "stack them, don't ship", "build the stack, I'll land it"). `playbooks/autopilot-stack.md`.
 - **Session pickup.** Resuming or taking over a prior agent's in-flight work from a transcript or pushed branch. `playbooks/session-pickup.md`.
 - **Pause safely.** Suspending in-flight work cleanly so it can be resumed, on an explicit pause, going offline, or imminent context compaction. The complement to Session pickup. `playbooks/pause-safely.md`.

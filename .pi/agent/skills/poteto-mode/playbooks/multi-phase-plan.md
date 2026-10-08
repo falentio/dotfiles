@@ -128,7 +128,7 @@ Each live lane runs at the PR head via `tools.mcp__t3_code__delegate_task`. Driv
 - [ ] Root's clean verdict at the exact head SHA.
 - [ ] Review triage done.
 - [ ] Rebased onto current trunk after the verdict, patch-id unchanged.
-- [ ] <The owner squash-merges its own PR, or the root appends the PR to the stack and the operator lands it.>
+- [ ] <A non-author merges, or the root appends the PR to the stack and the operator lands it. The owner never merges its own PR.>
 
 ## Close the program
 
