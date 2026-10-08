@@ -38,6 +38,10 @@ Every direction of the question resolves:
 
 Spell the target with `=` (exact session) and `:` (its pane): `-t "=DEV boardgame feat/x 3100"` for session commands, `-t "=DEV boardgame feat/x 3100:"` for pane commands. A bare name prefix-matches instead, and one DEV name is a prefix of another whenever their branch or port share a leading run (`3100` inside `31000`), so a bare name can silently hit the wrong session.
 
+## Reading output
+
+`devproc read` dumps the pane, not the byte stream: a terminal is a fixed-width grid, and tmux wraps anything wider than the pane into extra rows. A DEV session starts detached, so no client ever sizes it and it falls back to the global `default-size` (**80x24**), which would split every longer log line at column 80. `devproc read` passes `capture-pane -J` to rejoin those wrapped rows, so lines come back whole; tmux flags a row as wrapped only when it truly overflowed, so a line that lands exactly on the width is not fused to the next hard newline. The pane is still a grid, though: prefer `-J` output for reading, and the raw `/tmp/devproc-<slug>.log` when you need the untouched bytes.
+
 ## Crash retention
 
 `devproc start` sets `remain-on-exit`, so a process that dies leaves its pane — and its error — readable instead of vanishing with the session; `devproc read` still returns that output. Restart in place with `tmux respawn-pane -k -t "=<name>:" <command>`, or `devproc stop` to clear it.

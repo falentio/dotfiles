@@ -128,10 +128,14 @@ target() {
   if [ $# -ge 1 ]; then echo "$1"; else cmd_here | head -1; fi
 }
 
+# -J joins rows tmux wrapped at the pane width back into one line, so a log
+# line longer than the 80-column default pane comes back whole. tmux flags a
+# row as wrapped only when it actually overflowed, so a line that lands exactly
+# on the width is not joined to the next hard newline.
 cmd_read() {
   t=$(target "$@")
   [ -n "$t" ] || die "no session for this worktree; pass a name or run devproc list"
-  tmux capture-pane -p -S -200 -t "=$t:"
+  tmux capture-pane -p -J -S -200 -t "=$t:"
 }
 
 cmd_stop() {
@@ -220,7 +224,8 @@ devproc — long-running dev processes as tmux DEV sessions.
                             {host} -> 0.0.0.0, the wildcard)
   devproc list              inventory every DEV session, decoded
   devproc here              this worktree's running session, if any
-  devproc read [target]     tail a session (default: this worktree's)
+  devproc read [target]     tail a session, wrapped lines rejoined
+                            (default: this worktree's)
   devproc stop [target]     kill a session (default: this worktree's)
   devproc watch [target]    arm the idle watchdog on a session
   devproc infer <port>      port -> repo, branch, worktree, pid
