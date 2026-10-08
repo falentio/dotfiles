@@ -53,3 +53,22 @@ arena/swarm: N workers [1]
 └── fork S per worker → F1..FN  ← one dedicated crawler each [1a]
     └── worker i asks Fi  ← no two share a timeline [1a1]
 ```
+
+## What S returns
+
+S's reply is the parent's whole view of the codebase, so it carries findings, not the crawl. Return only:
+
+```text
+S reply [1]
+├── answer  ← the finding, direct, no preamble [1a]
+├── evidence  ← file:line per claim, one line each [1b]
+├── source  ← when C fetched one: path, repo, ref, sha [1c]
+└── open  ← what S could not find, and why [1d]
+```
+
+- **Answer.** The question, answered. Name the symbol and the file it lives in. No "I searched for…" narration.
+- **Evidence.** `path/to/file.ts:42` per claim. A claim without a pointer is dropped.
+- **Source.** The cloner's path, repo, ref, and sha when the answer needed a dependency's source.
+- **Open.** What S could not find, or a claim it could not verify. Empty when the crawl was complete.
+
+Never paste file contents, grep output, or directory listings — the pointers stand in for them. Never restate the task. Keep it under a screen; the parent forked S to save its window, so a long reply defeats the fork.
