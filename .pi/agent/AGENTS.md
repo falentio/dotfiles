@@ -22,16 +22,17 @@ Every rule fix is its own commit: an imperative subject that reads on its own, w
 
 A dev server, watcher, worker, or tunnel — anything outliving the command that starts it — runs as a tmux **DEV session** via `devproc`, one per worktree; its name, `DEV <repo> <branch> <port>`, is the registry.
 
-Every dev server binds the tailnet: pass `--host {host}` and `devproc` fills in the Tailscale address when Tailscale is up, else `0.0.0.0`. Never hand-write `--host 0.0.0.0`.
+Every dev server binds the wildcard: pass `--host {host}` and `devproc` fills in `0.0.0.0`, so the server listens on every interface — loopback, LAN, and tailnet — whether or not Tailscale is up. Never hand-write the host.
 
 Read [tmux-processes.md](/home/kevin/.pi/agent/docs/tmux-processes.md) before starting, reading, stopping, or cleaning up one.
 
 ## Dev server handoff
 
-Work that touches a frontend page, with a dev server up, ends its reply with a **Dev server** section, so the change is one click from being seen:
+Work that touches a frontend page, with a dev server up, ends its reply with a **Dev server** section, so the change is one click from being seen and proven:
 
 - **The server.** Its session name (`devproc here`) and URL, `http://<host>:<port>` from `devproc host` and the session's port.
 - **Try it.** The route to open and the clicks or input that show the change.
+- **The evidence.** Mandatory for any frontend change: a screenshot of the change, embedded as `![<flow> <state>](<path>)` so the reader sees it. Name the flow and the state in the alt (`![picker guest-challenge]`, `![checkout empty-cart]`), so several shots read apart. Capture it through the `control-ui` skill.
 
 ## Lookups
 

@@ -5,10 +5,16 @@
 # Session name: DEV <repo> <branch> <port>
 # The name is the registry: it survives across agents, shells, and machines,
 # so `tmux ls` alone says what runs, where, and on which port.
+#
+# A detached watchdog tears a session down after DEVPROC_IDLE_TIMEOUT seconds
+# (default 1800) with no output; see the idle watchdog section.
 set -eu
 
 DEFAULT_PORT=3000
 MAX_PORT=3999
+
+# Seconds a session may go without output before it is torn down; 0 disables.
+IDLE_TIMEOUT="${DEVPROC_IDLE_TIMEOUT:-1800}"
 
 die() { echo "devproc: $*" >&2; exit 1; }
 
@@ -36,11 +42,10 @@ free_port() {
   die "no free port in $DEFAULT_PORT-$MAX_PORT"
 }
 
-# the address a dev server should bind: the tailnet IPv4 when the tailnet is
-# up, else the wildcard. tailscale ip -4 exits non-zero when the daemon is down.
+# the address a dev server should bind: the wildcard, so it listens on every
+# interface at once — loopback, LAN, and tailnet alike.
 host_addr() {
-  ip=$(tailscale ip -4 2>/dev/null) || ip=""
-  if [ -n "$ip" ]; then echo "$ip"; else echo 0.0.0.0; fi
+  echo 0.0.0.0
 }
 
 # full session name for this worktree, with a freshly chosen port
@@ -78,6 +83,7 @@ cmd_start() {
   log="/tmp/devproc-$slug.log"
   tmux new-session -d -s "$name" -c "$PWD" "$cmd 2>&1 | tee '$log'"
   tmux set-option -w -t "=$name:" remain-on-exit on
+  start_watchdog "$name"
   echo "$name"
 }
 
@@ -131,8 +137,77 @@ cmd_read() {
 cmd_stop() {
   t=$(target "$@")
   [ -n "$t" ] || die "no session for this worktree; pass a name or run devproc list"
+  stop_watchdog "$t"
   tmux kill-session -t "=$t"
   echo "stopped $t"
+}
+
+# --- idle watchdog ----------------------------------------------------------
+
+# A session that writes nothing for IDLE_TIMEOUT seconds is torn down. Silence
+# is read from tmux's window_activity: the timestamp of the last change to the
+# window's content, i.e. the last byte the process wrote to the pane — exactly
+# "nothing on stdout/stderr". A server that keeps logging (or answers a
+# request) resets it; a finished, wedged, or crashed one does not.
+
+idle_enabled() {
+  case "$IDLE_TIMEOUT" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$IDLE_TIMEOUT" -gt 0 ]
+}
+
+watch_pidfile() {
+  echo "/tmp/devproc-$(echo "$1" | tr ' /' '__').watch"
+}
+
+# Detached one-per-session loop. It exits by itself once the session is gone,
+# so a normal `devproc stop` leaves no watchdog behind; stop_watchdog just
+# makes that immediate. On idle teardown it also removes the log, so an
+# unattended session leaves no residue at all.
+start_watchdog() {
+  name=$1
+  idle_enabled || return 0
+  pidfile=$(watch_pidfile "$name")
+  log="/tmp/devproc-$(echo "$name" | tr ' /' '__').log"
+  if [ -f "$pidfile" ]; then
+    old=$(cat "$pidfile" 2>/dev/null || echo)
+    if [ -n "$old" ] && kill -0 "$old" 2>/dev/null; then return 0; fi
+  fi
+  poll=$((IDLE_TIMEOUT / 4))
+  [ "$poll" -ge 1 ] || poll=1
+  [ "$poll" -le 30 ] || poll=30
+  setsid sh -c '
+    name=$1 idle=$2 poll=$3 pidfile=$4 log=$5
+    echo $$ > "$pidfile"
+    while tmux has-session -t "=$name" 2>/dev/null; do
+      act=$(tmux display-message -p -t "=$name:" "#{window_activity}" 2>/dev/null) || act=
+      [ -n "$act" ] || act=$(date +%s)
+      if [ $(( $(date +%s) - act )) -ge "$idle" ]; then
+        tmux kill-session -t "=$name" 2>/dev/null || true
+        rm -f "$log"
+        break
+      fi
+      sleep "$poll"
+    done
+    rm -f "$pidfile"
+  ' _ "$name" "$IDLE_TIMEOUT" "$poll" "$pidfile" "$log" >/dev/null 2>&1 &
+}
+
+stop_watchdog() {
+  pidfile=$(watch_pidfile "$1")
+  [ -f "$pidfile" ] || return 0
+  pid=$(cat "$pidfile" 2>/dev/null || echo)
+  [ -z "$pid" ] || kill "$pid" 2>/dev/null || true
+  rm -f "$pidfile"
+}
+
+# arm the watchdog on an already-running session
+cmd_watch() {
+  t=$(target "$@")
+  [ -n "$t" ] || die "no session for this worktree; pass a name or run devproc list"
+  tmux has-session -t "=$t" 2>/dev/null || die "no such session: $t"
+  idle_enabled || die "DEVPROC_IDLE_TIMEOUT=$IDLE_TIMEOUT disables the watchdog"
+  start_watchdog "$t"
+  echo "watching $t: teardown after ${IDLE_TIMEOUT}s with no output"
 }
 
 usage() {
@@ -140,14 +215,18 @@ usage() {
 devproc — long-running dev processes as tmux DEV sessions.
 
   devproc name              print the DEV session name for this worktree
-  devproc host              print the bind address ({host}: tailnet IP when up)
+  devproc host              print the bind address ({host}: always 0.0.0.0)
   devproc start <cmd>       start <cmd> in a DEV session ({port} -> chosen port,
-                            {host} -> tailnet IP when up, else 0.0.0.0)
+                            {host} -> 0.0.0.0, the wildcard)
   devproc list              inventory every DEV session, decoded
   devproc here              this worktree's running session, if any
   devproc read [target]     tail a session (default: this worktree's)
   devproc stop [target]     kill a session (default: this worktree's)
+  devproc watch [target]    arm the idle watchdog on a session
   devproc infer <port>      port -> repo, branch, worktree, pid
+
+A session is torn down after DEVPROC_IDLE_TIMEOUT seconds (default 1800) with
+no output on stdout/stderr; 0 disables it.
 
 Session name: DEV <repo> <branch> <port>. One per worktree.
 EOF
@@ -161,6 +240,7 @@ case "${1:-}" in
   here)  shift; cmd_here "$@" ;;
   read)  shift; cmd_read "$@" ;;
   stop)  shift; cmd_stop "$@" ;;
+  watch) shift; cmd_watch "$@" ;;
   infer) shift; cmd_infer "$@" ;;
   ""|-h|--help|help) usage ;;
   *) usage >&2; die "unknown command: $1" ;;

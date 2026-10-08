@@ -75,7 +75,8 @@ const shot = JSON.parse(
   (await tools.mcp__t3_code__preview_snapshot({ tabId: tab, includeImage: false, save: true }))
     .trim().split("\n").pop(),
 );
-// shot.screenshotPath -> embed as ![after](shot.screenshotPath) so the reader sees it
+// shot.screenshotPath -> embed as ![<flow> <state>](shot.screenshotPath) so the reader sees it
+//   alt names the flow and state (![picker guest-challenge]), so several shots read apart
 ```
 
 **Done when** before and after screenshots exist at named paths.
