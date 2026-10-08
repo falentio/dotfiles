@@ -37,7 +37,9 @@ Work that touches a frontend page, with a dev server up, ends its reply with a *
 
 Context7 owns library documentation; TinyFish owns everything else, a library's changelog included. A named library's API surface, configuration, and code examples go to the `find-docs` skill. Release notes, migration announcements, news, papers, and general facts go to the `tinyfish-search-fetch` skill.
 
-Read library code from the clone, never from a build artifact. `node_modules`, `target`, `.venv`, `.next`, `.nuxt`, `.output`, `dist`, `vendor`, `__pycache__`, and `~/.cargo/registry` hold transformed, deduped, or minified copies — the wrong surface, often stale, and a context hog. Crawl through the scout, which spawns the cloner; the source lands at `~/.pi/source` (see Subagents).
+Read library code from the clone, not a dependency's build artifact. `node_modules`, `target`, `.venv`, `vendor`, `__pycache__`, `~/.cargo/registry`, and `~/.m2` hold a dependency's transformed, deduped, or minified copy — the wrong surface, often stale, and a context hog. Crawl through the scout, which spawns the cloner; the source lands at `~/.pi/source` (see Subagents).
+
+Our own project's build output is fair game — `dist/` from our library, `.nuxt/`, `.next/`, `.output/` from our frontend. That is our code, and generated types or bundles are sometimes the only place a fact is observable.
 
 ## Subagents
 

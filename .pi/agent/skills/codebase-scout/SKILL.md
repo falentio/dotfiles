@@ -7,6 +7,8 @@ description: "Read and search a codebase through a delegated scout thread, not i
 
 Never crawl the codebase in the main context. A crawl is file reads and grep output; it crowds the window and buries the answer. Send a **scout** — a delegated thread that reads the codebase and reports — and reuse it.
 
+Read the right surface. A dependency's code comes from the clone C placed at `~/.pi/source`, never from `node_modules`, `target`, `vendor`, or the cargo registry — those are transformed, deduped, or minified. Our own project's build output is fair game: `dist/`, `.nuxt/`, `.next/`, `.output/` are our code, and generated types or bundles are sometimes the only place a fact is observable.
+
 ## The flow
 
 ```text
