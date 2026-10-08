@@ -32,7 +32,7 @@ Work that touches a frontend page, with a dev server up, ends its reply with a *
 
 - **The server.** Its session name (`devproc here`) and URL, `http://<host>:<port>` from `devproc host` and the session's port.
 - **Try it.** The route to open and the clicks or input that show the change.
-- **The evidence.** Mandatory for any frontend change: a screenshot of the change, embedded as `![<flow> <state>](<path>)` so the reader sees it. Name the flow and the state in the alt (`![picker guest-challenge]`, `![checkout empty-cart]`), so several shots read apart. Capture it through the `control-ui` skill.
+- **The evidence.** Mandatory for any frontend change: a screenshot of the change, embedded as `![<flow> <state>](<path>)` so the reader sees it. Name the flow and the state in the alt (`![picker guest-challenge]`, `![checkout empty-cart]`), so several shots read apart. Scroll and zoom until the changed component sits whole inside the viewport; when one shot cannot hold it, take shots until every part is shown. Capture it through the `control-ui` skill.
 
 ## Lookups
 
@@ -47,6 +47,8 @@ Our own project's build output is fair game — `dist/` from our library, `.nuxt
 A lookup that needs one query runs here. Anything wider — several queries, or sources you must read and reconcile — runs in a `tools.mcp__t3_code__delegate_task` subagent: this context keeps the answer, the child thread keeps the search ceremony.
 
 `delegate_task` **creates a T3 thread** and returns two handles: `taskId` for one run, frozen at its terminal state (read with `task_status`, cancel with `task_cancel`), and `childThreadId` for the thread itself, a full T3 thread the thread ops act on (`t3_thread_wait`, `t3_thread_send`, `t3_thread_interrupt`).
+
+Never wait on delegated work by estimation. A child is waited on exactly one way — `t3_thread_wait` with its `childThreadId` and a `timeoutMs`, re-called while the reply is `timedOut: true` — or not at all: end the turn and let the child's terminal state wake this thread. A `sleep`, a poll loop over `task_status`, and a long timeout picked to outlast a guess are all banned; `timeoutMs` bounds one wait call, it never estimates the child.
 
 Crawl the codebase through a scout, never in this context:
 
