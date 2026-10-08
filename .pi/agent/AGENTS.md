@@ -45,7 +45,15 @@ A lookup that needs one query runs here. Anything wider — several queries, or 
 
 `delegate_task` **creates a T3 thread** and returns two handles: `taskId` for one run, frozen at its terminal state (read with `task_status`, cancel with `task_cancel`), and `childThreadId` for the thread itself, a full T3 thread the thread ops act on (`t3_thread_wait`, `t3_thread_send`, `t3_thread_interrupt`).
 
-Crawl the codebase through a scout, never in this context. When the answer needs a dependency's source, the scout's first move is to spawn a cloner — task `use the library-source skill, do npm zod@4.0.7` — and read what it returns before crawling.
+Crawl the codebase through a scout, never in this context:
+
+```text
+A: main agent [1]
+└── spawn S: scout  ← delegate_task; A never crawls [1a]
+    ├── S spawns C: cloner  ← "use the library-source skill, do npm zod@4.0.7" [1a1]
+    │   └── C: check ~/source → clone if absent → return path, repo, ref, sha [1a1a]
+    └── S crawls  ← reads what C returned [1a2]
+```
 
 Reuse a scout's `childThreadId` across the subagents that follow — implementer, researcher, reviewer — so they ask it instead of re-reading. Fork the scout once per receiver with `t3_thread_fork` and hand each its own `targetThreadId`, so every subagent has a dedicated crawler. Arena, swarm, and any fan-out fork N times, one per worker. The `codebase-scout` skill holds the steps.
 
