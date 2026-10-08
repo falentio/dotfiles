@@ -61,16 +61,16 @@ arena/swarm: N workers [1]
 ```text
 S reply [1]
 ├── answer  ← direct, no preamble [1a]
-├── findings [1b]  ← ≤ 15, one claim each
+├── findings [1b]  ← ≤ 30, one claim each
 │   ├── id  ← F<n>, addressable so A can cite it [1b1]
 │   ├── claim  ← one falsifiable assertion [1b2]
 │   ├── anchor  ← `path:line` or `path:symbol` [1b3]
 │   └── status  ← VERIFIED | INFERRED | STALE | UNVERIFIED [1b4]
-├── gaps [1c]  ← ≤ 5, what S could not settle
+├── gaps [1c]  ← ≤ 10, what S could not settle
 │   ├── what  ← the claim left open [1c1]
 │   ├── why  ← absent, unreadable, ambiguous, out of scope [1c2]
 │   └── probe  ← the check that would settle it [1c3]
-├── blockers  ← ≤ 3, and who resolves each [1d]
+├── blockers  ← ≤ 6, and who resolves each [1d]
 └── source  ← when C fetched one: path, repo, ref, sha [1e]
 ```
 
@@ -82,7 +82,7 @@ S reply [1]
 | status | one tag | prose justification |
 | gaps | missing item + probe | silence, invented claims |
 
-**Hard limits.** ≤ 400 words, ≤ 60 lines. Pointers only — no file contents, grep output, directory listings, diffs, or command transcripts. A pointer may quote one line, and only when that line is the finding.
+**Hard limits.** ≤ 800 words, ≤ 120 lines. Pointers only — no file contents, grep output, directory listings, diffs, or command transcripts. A pointer may quote one line, and only when that line is the finding.
 
 **Missing or unverifiable.** A claim with no anchor is `UNVERIFIED`; with no probe it is a gap, not a finding. Evidence older than the file's last change is `STALE`. A finding S could not produce goes under gaps — never omitted, never invented. Empty gaps means the crawl was complete: write `none`, do not drop the heading.
 
