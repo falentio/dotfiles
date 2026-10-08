@@ -91,10 +91,10 @@
       "sourceType": "github",
       "sourceUrl": "https://github.com/mattpocock/skills.git",
       "skillPath": "skills/engineering/codebase-design/SKILL.md",
-      "skillFolderHash": "344e3efc88ee60663b2e989555c2efdb548fbd42",
+      "skillFolderHash": "07ba1cd60efc12d0d3a083005c1d9651cf15e39a",
       "pluginName": "mattpocock-skills",
       "installedAt": "2026-07-07T10:20:09.281Z",
-      "updatedAt": "2026-08-20T07:56:57.815Z"
+      "updatedAt": "2026-10-08T04:29:19.632Z"
     },
     "diagnosing-bugs": {
       "source": "mattpocock/skills",
@@ -453,6 +453,26 @@
       "skillFolderHash": "10e4d83f2f34cf226cf9819ab6b4dd6f8d7a0e6a",
       "installedAt": "2026-10-05T09:19:44.816Z",
       "updatedAt": "2026-10-05T09:19:44.816Z"
+    },
+    "teach": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/mattpocock/skills.git",
+      "skillPath": "skills/productivity/teach/SKILL.md",
+      "skillFolderHash": "3fd617b610e59acbb99644de1ef37e394ff53cd1",
+      "pluginName": "mattpocock-skills",
+      "installedAt": "2026-10-08T04:29:19.629Z",
+      "updatedAt": "2026-10-08T04:29:19.629Z"
+    },
+    "research": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/mattpocock/skills.git",
+      "skillPath": "skills/engineering/research/SKILL.md",
+      "skillFolderHash": "0a6796c5667e95ed2301ba7381c123b4acb2ae1a",
+      "pluginName": "mattpocock-skills",
+      "installedAt": "2026-10-08T04:29:19.634Z",
+      "updatedAt": "2026-10-08T04:29:19.634Z"
     }
   },
   "dismissed": {
@@ -469,6 +489,7 @@
     "kilo",
     "kimi-code-cli",
     "opencode",
+    "pi",
     "warp",
     "zed"
   ]
