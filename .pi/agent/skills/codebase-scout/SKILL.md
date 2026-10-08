@@ -89,46 +89,22 @@ S reply [1]
 
 ## Example reply
 
-A scout asked *where request JWTs are validated*. Its reply, verbatim — illustration only, not a template to fill:
+A scout asked *how zod 4.0.7 validates a date-time string, and where that source sits*. Its reply — illustration only, not a template to fill:
 
 ```text
 answer
-JWT validation lives in the requireAuth middleware, which verifies the signature and attaches the decoded user. Route handlers never check tokens themselves.
+zod 4.0.7 validates a date-time string in the v4 core: the ISO date-time schema builds a regex and the string format check runs it. The dependency source is checked out at the path under source.
 
 findings
-F1  requireAuth() verifies the JWT signature.                               src/middleware/auth.ts:24    VERIFIED
-F2  An expired token throws 401 before the handler runs.                    src/middleware/auth.ts:31    VERIFIED
-F3  The signing secret is read from env at load; rotation needs a restart.  src/config/env.ts:12         INFERRED
-F4  Session cookies are checked on a separate path from JWTs.               src/middleware/session.ts:8  STALE
+F1  _isoDateTime() builds the schema with format "datetime".         packages/zod/src/v4/core/api.ts:454        VERIFIED
+F2  datetime() compiles the regex the format check runs.            packages/zod/src/v4/core/regexes.ts:104    VERIFIED
+F3  Parsing dispatches to the v4 core, not the legacy v3 path.      packages/zod/src/index.ts:1                INFERRED
+F4  A def-level pattern overrides the compiled datetime regex.      packages/zod/src/v4/core/schemas.ts:620    STALE
 
 gaps
-what   whether refresh tokens are validated on this path
-why    no refresh handler in the crawled area
-probe  grep -rn refresh src/routes
-
-blockers
-none
-
-source
-none
-```
-
-Note the shape: `answer` answers in two sentences with no preamble; every finding is one claim with a `path:line` anchor and a status; the one thing the crawl could not settle sits under `gaps` with a probe A can run; `blockers` and `source` are present and say `none`. No file contents, no grep output, no narration — A pulls any file it wants from the anchors.
-
-### Example with a dependency source
-
-A scout asked *how zod 4.0.7 parses a date string, and where that source lives*. Its reply:
-
-```text
-answer
-zod 4.0.7 parses date strings in the v4 core parser, which validates the format then constructs a Date. The source is checked out at the path under source.
-
-findings
-F1  zod.parse() dispatches to the v4 core, not the legacy v3 path.  packages/zod/src/index.ts:1             VERIFIED
-F2  Date parsing rejects a string that does not match ISO 8601.     packages/zod/src/v4/core/parse.ts:210   VERIFIED
-
-gaps
-none
+what   whether an invalid date-time throws or returns a result object
+why    the error path lives outside the crawled area
+probe  grep -rn 'ZodError' packages/zod/src/v4/core/errors.ts
 
 blockers
 none
@@ -140,4 +116,4 @@ ref   v4.0.7
 sha   34b400a5422bc30b48395cdd44007ff4e811fb71
 ```
 
-`source` is the placement path the cloner C returned — where the source sits on disk — so A or a later receiver can read it without re-cloning. Findings that reference the dependency anchor against that path.
+Note the shape. `answer` answers in two sentences with no preamble. Every finding is one claim with a `path:line` anchor and a status (`VERIFIED`, `INFERRED`, `STALE`). The one thing the crawl could not settle sits under `gaps` with a probe A can run. `blockers` says `none`. `source` gives the placement path the cloner returned — where the source sits on disk — so A or a later receiver reads it without re-cloning, and the dependency findings anchor against it. No file contents, no grep output, no narration.
