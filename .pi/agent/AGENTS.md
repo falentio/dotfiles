@@ -37,6 +37,8 @@ Work that touches a frontend page, with a dev server up, ends its reply with a *
 
 Context7 owns library documentation; TinyFish owns everything else, a library's changelog included. A named library's API surface, configuration, and code examples go to the `find-docs` skill. Release notes, migration announcements, news, papers, and general facts go to the `tinyfish-search-fetch` skill.
 
+When the answer is in a library's code, read the source, not `node_modules` or a build artifact: delegate a shallow clone to `~/source`, naming only the registry, library, and version (`npm zod@4.0.7`). The `library-source` skill holds the resolve and clone steps.
+
 ## Subagents
 
 A lookup that needs one query runs here. Anything wider — several queries, or sources you must read and reconcile — runs in a `tools.mcp__t3_code__delegate_task` subagent: this context keeps the answer, the child thread keeps the search ceremony.
