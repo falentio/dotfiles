@@ -48,7 +48,7 @@ A lookup that needs one query runs here. Anything wider — several queries, or 
 
 `delegate_task` **creates a T3 thread** and returns two handles: `taskId` for one run, frozen at its terminal state (read with `task_status`, cancel with `task_cancel`), and `childThreadId` for the thread itself, a full T3 thread the thread ops act on (`t3_thread_wait`, `t3_thread_send`, `t3_thread_interrupt`).
 
-Never wait on delegated work by estimation. A child is waited on exactly one way — `t3_thread_wait` with its `childThreadId` and a `timeoutMs`, re-called while the reply is `timedOut: true` — or not at all: end the turn and let the child's terminal state wake this thread. A `sleep`, a poll loop over `task_status`, and a long timeout picked to outlast a guess are all banned; `timeoutMs` bounds one wait call, it never estimates the child.
+An async child notifies this thread when it reaches a terminal state — steered into an active turn, queued otherwise — so the default is to **end the turn** and let that notification arrive; read the result with `task_status` when you need it mid-turn. Reach for `t3_thread_wait` only when the result is needed before the turn can continue: `childThreadId` plus a `timeoutMs`, re-called while the reply is `timedOut: true`. `timeoutMs` bounds one wait call; it never estimates the child, so a `sleep`, a `task_status` poll loop, and a long timeout picked to outlast a guess stay banned.
 
 Crawl the codebase through a scout, never in this context:
 
