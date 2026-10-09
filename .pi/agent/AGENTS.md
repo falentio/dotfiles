@@ -24,7 +24,7 @@ A dev server, watcher, worker, or tunnel — anything outliving the command that
 
 Every dev server binds the wildcard: pass `--host {host}` and `devproc` fills in `0.0.0.0`, so the server listens on every interface — loopback, LAN, and tailnet — whether or not Tailscale is up. Never hand-write the host.
 
-Read [tmux-processes.md](/home/kevin/.pi/agent/docs/tmux-processes.md) before starting, reading, stopping, or cleaning up one.
+Read [tmux-processes.md](docs/tmux-processes.md) before starting, reading, stopping, or cleaning up one.
 
 ## Dev server handoff
 
@@ -64,4 +64,4 @@ Ask the scout for findings, not the crawl: the answer, findings anchored to `pat
 
 Reuse a scout's `childThreadId` across the subagents that follow — implementer, researcher, reviewer — so they ask it instead of re-reading. Fork the scout once per receiver with `t3_thread_fork` and hand each its own `targetThreadId`, so every subagent has a dedicated crawler. Arena, swarm, and any fan-out fork N times, one per worker. The `codebase-scout` skill holds the steps and the reply shape.
 
-Read [delegated-subagents.md](/home/kevin/.pi/agent/docs/delegated-subagents.md) for the call shapes, the status fields, and the gotchas.
+Read [delegated-subagents.md](docs/delegated-subagents.md) for the call shapes, the status fields, and the gotchas.
