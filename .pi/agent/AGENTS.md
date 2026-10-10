@@ -22,20 +22,21 @@ Every rule fix is its own commit: an imperative subject that reads on its own, w
 
 Opening a PR starts a review gate, and the gate is mandatory: a second agent reviews the PR, then a third fixes every finding. The author does not review its own PR.
 
-1. **Review.** Spawn one `tools.mcp__t3_code__delegate_task` whose prompt is this line, verbatim:
+Each prompt may be worded freely; it must carry the instructions below, so the child does the same job every time.
+
+1. **Review.** Spawn one `tools.mcp__t3_code__delegate_task` to review the PR. Its prompt must name the PR number, name `/skill:code-review` and `/skill:poteto-mode` as skills to read, and ask for the findings, each with evidence, written to a markdown file under `/tmp`. A working prompt:
 
    ```text
    review pr #<n> using /skill:code-review /skill:poteto-mode write down evidence to /tmp with format markdown
    ```
 
-   Replace `<n>` with the PR number. The child reads both skills and writes its findings, each with evidence, to a markdown file under `/tmp`.
-2. **Fix.** When the review's terminal notification arrives, spawn a second `tools.mcp__t3_code__delegate_task` whose prompt is this line, verbatim, with `<path>` replaced by the review's `/tmp` evidence file:
+2. **Fix.** When the review's terminal notification arrives, spawn a second `tools.mcp__t3_code__delegate_task` to fix every finding, handing it the review's `/tmp` file as the worklist. Its prompt must name that file, name `/skill:poteto-mode`, and ask for every finding fixed. A working prompt:
 
    ```text
    fix all findings in <path> using /skill:poteto-mode
    ```
 
-Both prompts spell `/skill:poteto-mode` out, so each child reads the persona before any work. A persona travels as a skill the child reads, never as the `role` line.
+Naming `/skill:poteto-mode` in each prompt is what loads the persona: it travels as a skill the child reads, never as the `role` line.
 
 ## Long-running processes
 
