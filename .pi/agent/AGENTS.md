@@ -54,9 +54,13 @@ Work that touches a frontend page, with a dev server up, ends its reply with a *
 - **Try it.** The route to open and the clicks or input that show the change.
 - **The evidence.** Screenshots of the change, reported per [Evidence](#evidence).
 
+## File references
+
+A repo or project file you name in a reply is written as a path from the repo root, prefixed `./`: `./src/index.ts`, never the bare `index.ts`. A bare filename is ambiguous the moment two files share it, and it does not resolve from the repo or travel with the branch. This holds wherever a path appears, in prose and in evidence alike.
+
 ## Evidence
 
-Report every evidence path relative to the working directory, prefixed `./` (`![picker guest-challenge](./.audit/proof/picker.png)`, `./.audit/proof/run.log`), so it resolves from the repo and travels with the branch. A capture the tool saved outside the workspace is copied in first.
+Report every evidence path per [File references](#file-references): relative to the repo root, prefixed `./` (`![picker guest-challenge](./.audit/proof/picker.png)`, `./.audit/proof/run.log`). A capture the tool saved outside the workspace is copied in first.
 
 Every frontend change is proven with a screenshot of the change, embedded as `![<flow> <state>](<path>)` so the reader sees it. Name the flow and the state in the alt (`![picker guest-challenge]`, `![checkout empty-cart]`), so several shots read apart. One capture per image, each embedded on its own at its own `./` path: a before/after pair, or shots of several pages, stay separate embeds — never stitched into one image, so every shot reads as the real surface. Scroll and zoom until the changed component sits whole inside the viewport; when one shot cannot hold it, take shots until every part is shown. Capture it through the `control-ui` skill.
 
