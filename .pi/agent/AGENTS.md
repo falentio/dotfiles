@@ -32,7 +32,11 @@ Work that touches a frontend page, with a dev server up, ends its reply with a *
 
 - **The server.** Its session name (`devproc here`) and URL, `http://<host>:<port>` from `devproc host` and the session's port.
 - **Try it.** The route to open and the clicks or input that show the change.
-- **The evidence.** Mandatory for any frontend change: a screenshot of the change, embedded as `![<flow> <state>](<path>)` so the reader sees it. Name the flow and the state in the alt (`![picker guest-challenge]`, `![checkout empty-cart]`), so several shots read apart. Scroll and zoom until the changed component sits whole inside the viewport; when one shot cannot hold it, take shots until every part is shown. Capture it through the `control-ui` skill.
+- **The evidence.** Screenshots of the change, reported per [Evidence](#evidence).
+
+## Evidence
+
+Every frontend change is proven with a screenshot of the change, embedded as `![<flow> <state>](<path>)` so the reader sees it. Name the flow and the state in the alt (`![picker guest-challenge]`, `![checkout empty-cart]`), so several shots read apart. One capture per image, each embedded on its own: a before/after pair, or shots of several pages, stay separate embeds at their captured paths — never stitched into one image, so every shot reads as the real surface. Scroll and zoom until the changed component sits whole inside the viewport; when one shot cannot hold it, take shots until every part is shown. Capture it through the `control-ui` skill.
 
 ## Lookups
 
@@ -46,7 +50,9 @@ Our own project's build output is fair game — `dist/` from our library, `.nuxt
 
 A lookup that needs one query runs here. Anything wider — several queries, or sources you must read and reconcile — runs in a `tools.mcp__t3_code__delegate_task` subagent: this context keeps the answer, the child thread keeps the search ceremony.
 
-`delegate_task` **creates a T3 thread** and returns two handles: `taskId` for one run, frozen at its terminal state (read with `task_status`, cancel with `task_cancel`), and `childThreadId` for the thread itself, a full T3 thread the thread ops act on (`t3_thread_wait`, `t3_thread_send`, `t3_thread_interrupt`).
+**Delegating spawns a subagent** — an agent of this thread, scoped to the one task in its prompt. `delegate_task` returns two handles: `taskId` for that run, frozen at its terminal state (read with `task_status`, cancel with `task_cancel`), and `childThreadId` for the child's session, a full T3 thread the thread ops act on (`t3_thread_wait`, `t3_thread_send`, `t3_thread_interrupt`).
+
+**Work leaves this context as a subagent.** `tools.mcp__t3_code__create_threads` and `tools.mcp__t3_code__t3_thread_launch` open ordinary top-level conversations — peers of this chat, and the user's call: open one when the user asks for a separate, new, or top-level thread, and name it in your reply.
 
 An async child notifies this thread when it reaches a terminal state — steered into an active turn, queued otherwise — so the default is to **end the turn** and let that notification arrive; read the result with `task_status` when you need it mid-turn. Reach for `t3_thread_wait` only when the result is needed before the turn can continue: `childThreadId` plus a `timeoutMs`, re-called while the reply is `timedOut: true`. `timeoutMs` bounds one wait call; it never estimates the child, so a `sleep`, a `task_status` poll loop, and a long timeout picked to outlast a guess stay banned.
 
