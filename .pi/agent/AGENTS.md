@@ -18,6 +18,25 @@ TypeScript, lint, and format errors wait until implementation is done. While imp
 
 Every rule fix is its own commit: an imperative subject that reads on its own, with the rule id in a `Rule:` trailer for `git log --grep`. The `fix-checks` skill holds the child's steps.
 
+## After a PR
+
+Opening a PR starts a review gate, and the gate is mandatory: a second agent reviews the PR, then a third fixes every finding. The author does not review its own PR.
+
+1. **Review.** Spawn one `tools.mcp__t3_code__delegate_task` whose prompt is this line, verbatim:
+
+   ```text
+   review pr #<n> using /skill:code-review /skill:poteto-mode write down evidence to /tmp with format markdown
+   ```
+
+   Replace `<n>` with the PR number. The child reads both skills and writes its findings, each with evidence, to a markdown file under `/tmp`.
+2. **Fix.** When the review's terminal notification arrives, spawn a second `tools.mcp__t3_code__delegate_task` whose prompt is this line, verbatim, with `<path>` replaced by the review's `/tmp` evidence file:
+
+   ```text
+   fix all findings in <path> using /skill:poteto-mode
+   ```
+
+Both prompts spell `/skill:poteto-mode` out, so each child reads the persona before any work. A persona travels as a skill the child reads, never as the `role` line.
+
 ## Long-running processes
 
 A dev server, watcher, worker, or tunnel — anything outliving the command that starts it — runs as a tmux **DEV session** via `devproc`, one per worktree; its name, `DEV <repo> <branch> <port>`, is the registry.
