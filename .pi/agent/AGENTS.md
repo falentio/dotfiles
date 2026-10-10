@@ -36,7 +36,9 @@ Work that touches a frontend page, with a dev server up, ends its reply with a *
 
 ## Evidence
 
-Every frontend change is proven with a screenshot of the change, embedded as `![<flow> <state>](<path>)` so the reader sees it. Name the flow and the state in the alt (`![picker guest-challenge]`, `![checkout empty-cart]`), so several shots read apart. One capture per image, each embedded on its own: a before/after pair, or shots of several pages, stay separate embeds at their captured paths — never stitched into one image, so every shot reads as the real surface. Scroll and zoom until the changed component sits whole inside the viewport; when one shot cannot hold it, take shots until every part is shown. Capture it through the `control-ui` skill.
+Report every evidence path relative to the working directory, prefixed `./` (`![picker guest-challenge](./.audit/proof/picker.png)`, `./.audit/proof/run.log`), so it resolves from the repo and travels with the branch. A capture the tool saved outside the workspace is copied in first.
+
+Every frontend change is proven with a screenshot of the change, embedded as `![<flow> <state>](<path>)` so the reader sees it. Name the flow and the state in the alt (`![picker guest-challenge]`, `![checkout empty-cart]`), so several shots read apart. One capture per image, each embedded on its own at its own `./` path: a before/after pair, or shots of several pages, stay separate embeds — never stitched into one image, so every shot reads as the real surface. Scroll and zoom until the changed component sits whole inside the viewport; when one shot cannot hold it, take shots until every part is shown. Capture it through the `control-ui` skill.
 
 ## Lookups
 

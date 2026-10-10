@@ -75,7 +75,9 @@ const shot = JSON.parse(
   (await tools.mcp__t3_code__preview_snapshot({ tabId: tab, includeImage: false, save: true }))
     .trim().split("\n").pop(),
 );
-// shot.screenshotPath -> embed as ![<flow> <state>](shot.screenshotPath) so the reader sees it
+// shot.screenshotPath is absolute; copy the PNG into the workspace, then embed it
+//   by its path relative to the working directory, prefixed ./:
+//   ![<flow> <state>](./.audit/proof/picker.png)
 //   alt names the flow and state (![picker guest-challenge]), so several shots read apart
 ```
 
