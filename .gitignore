@@ -10,10 +10,24 @@
 .pi/agent/models.json
 .pi/agent/models-store.json
 
+# fish runtime state: universal variables and daemon temps, machine-local, large
+config/fish/fish_variables*
+config/fish/fishd.*
+
+# fish secret: live EXA_API_KEY and any editor backup of it. This repo is public.
+config/fish/conf.d/apikey*
+
+# hand-edited backups kept beside their originals, not config
+config/fish/*.bak.*
+
+# generated tide rollback snapshots, machine-local
+config/fish/tide-backup/
+
 # OS / editor noise
 .DS_Store
 *.log
 *~
+*.swp
 
 # future-proof: never commit env files or private keys anywhere in the repo
 .env
