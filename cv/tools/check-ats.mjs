@@ -30,7 +30,6 @@ const sh = (cmd, args) => {
 };
 
 const plain = sh("pdftotext", [out, "-"]);
-const layout = sh("pdftotext", ["-layout", out, "-"]);
 const info = sh("pdfinfo", [out]);
 const fonts = sh("pdffonts", [out]);
 const lines = plain.split("\n").map((l) => l.trim());
