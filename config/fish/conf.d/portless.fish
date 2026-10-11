@@ -1,0 +1,4 @@
+set -gx PORTLESS_TAILSCALE 0
+set -gx PORTLESS_TLD "falentio"
+set -gx PORTLESS_SYNC_HOSTS 1
+set -gx PORTLESS_PORT 1108
