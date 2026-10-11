@@ -1,0 +1,175 @@
+{
+  "schema": "cv/1",
+  "generated_at": "2026-10-11",
+  "profile": {
+    "name": "Kevin Falentio",
+    "headline": "Software engineer",
+    "email": "kfalentio@proton.me",
+    "phone": null,
+    "location": null,
+    "urls": [
+      {
+        "label": "github",
+        "value": "github.com/falentio",
+        "url": "https://github.com/falentio"
+      }
+    ],
+    "summary": "I build developer tooling and web services, mostly in TypeScript and Go. My work spans editor and CLI plugins, OpenAI-compatible gateways, Svelte front ends, and published libraries. I like typed modules and checks a reviewer can rerun."
+  },
+  "sections": [
+    {
+      "kind": "skills",
+      "heading": "Skills",
+      "groups": [
+        {
+          "label": "Languages",
+          "items": [
+            "TypeScript",
+            "Go",
+            "JavaScript",
+            "Python",
+            "Rust",
+            "SQL"
+          ]
+        },
+        {
+          "label": "Front end",
+          "items": [
+            "Svelte",
+            "SvelteKit",
+            "Astro",
+            "Tailwind CSS",
+            "HTML",
+            "CSS"
+          ]
+        },
+        {
+          "label": "Back end",
+          "items": [
+            "Node.js",
+            "Go net/http",
+            "Fiber",
+            "Hono",
+            "Drizzle ORM",
+            "SQLite",
+            "libSQL"
+          ]
+        },
+        {
+          "label": "Tooling",
+          "items": [
+            "Vitest",
+            "Playwright",
+            "Docker",
+            "Cloudflare Workers",
+            "Fly.io",
+            "pnpm"
+          ]
+        }
+      ]
+    },
+    {
+      "kind": "projects",
+      "heading": "Projects",
+      "projects": [
+        {
+          "name": "meowvie",
+          "role": null,
+          "url": "https://github.com/falentio/meowvie",
+          "homepage": "https://meowvie.falentio.com",
+          "stack": [
+            "Go",
+            "TypeScript",
+            "Deno"
+          ],
+          "start": "2023-05",
+          "end": "2023-06",
+          "stars": 28,
+          "bullets": [
+            "Built a three-repository movie and anime download service: a Go API on Fiber, a Node crawler monorepo with six site scrapers, and a Deno Fresh front end.",
+            "Added Bleve full-text search, GORM over SQLite, and an LRU cache in front of the movie repository so repeated queries skip the database.",
+            "Measured 30 concurrent queries on a 256 MB Fly.io instance: 29.8 requests per second over 10 seconds, slowest response 500 ms."
+          ]
+        },
+        {
+          "name": "commandcode",
+          "role": null,
+          "url": "https://github.com/falentio/commandcode-api",
+          "stack": [
+            "Go",
+            "TypeScript"
+          ],
+          "start": "2026-07",
+          "end": null,
+          "stars": 0,
+          "bullets": [
+            "Wrote an OpenAI-compatible gateway in Go with the standard library, serving /v1/chat/completions and /v1/models behind CORS and request-logging middleware, rotating upstream keys round-robin.",
+            "Built an OpenCode v2 plugin that fetches the model catalog, generates provider model configs, and starts a local proxy; six test files run under vitest.",
+            "Shipped a second OpenCode plugin that ports the pstack agent-workflow skill set into OpenCode, 201 files with 8 test files."
+          ],
+          "homepage": null
+        },
+        {
+          "name": "ty",
+          "role": null,
+          "url": "https://github.com/falentio/ty",
+          "stack": [
+            "TypeScript"
+          ],
+          "start": "2025-07",
+          "end": "2025-08",
+          "stars": 0,
+          "bullets": [
+            "Published a typed event emitter to JSR as jsr:@falentio/ty, with Deno and npm entry points and no dependencies.",
+            "Typed event names and payloads at the library boundary so a mismatched listener fails at compile time rather than at runtime."
+          ],
+          "homepage": null
+        },
+        {
+          "name": "art-trace",
+          "role": null,
+          "url": "https://github.com/falentio/art-trace",
+          "stack": [
+            "SvelteKit",
+            "TypeScript"
+          ],
+          "start": "2025-09",
+          "end": null,
+          "stars": 1,
+          "bullets": [
+            "Built a SvelteKit app on Cloudflare Workers that traces artwork styles through Gemini, using Drizzle ORM over libSQL for storage.",
+            "Set up Playwright and vitest browser-mode tests alongside svelte-check and valibot schema validation."
+          ],
+          "homepage": null
+        },
+        {
+          "name": "dotfiles",
+          "role": null,
+          "url": "https://github.com/falentio/dotfiles",
+          "stack": [
+            "Shell"
+          ],
+          "start": "2026-10",
+          "end": null,
+          "stars": 0,
+          "bullets": [
+            "Wrote an idempotent POSIX shell installer that symlinks ~/.pi and ~/.agents into the repo, timestamp-backs up any real file it replaces, and leaves foreign symlinks untouched.",
+            "Keeps the agent skills, prompts, and editor config the whole workflow runs on under version control and rerunnable from a fresh machine."
+          ],
+          "homepage": null
+        }
+      ]
+    },
+    {
+      "kind": "open_source",
+      "heading": "Open source",
+      "items": [
+        {
+          "label": "GitHub",
+          "value": "104 public repositories, 33 followers",
+          "url": "https://github.com/falentio"
+        }
+      ]
+    }
+  ]
+}
