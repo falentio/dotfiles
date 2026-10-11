@@ -21,7 +21,7 @@
   #rule
 ]
 
-#let dates(start, end) = if end == none { start } else { start + " to " + end }
+#let dates(start, end) = start + if end == none { " to present" } else { " to " + end }
 
 #let links-for(project) = {
   let parts = ()
@@ -66,17 +66,7 @@
 #section-heading("Projects")
 #for project in cv.sections.at(1).projects {
   block(width: 100%, above: 5pt, below: 1pt)[
-    #grid(
-      columns: (1fr, auto),
-      gutter: 3mm,
-      align: (left, right),
-      [
-        #strong(project.name)
-        #h(2mm)
-        #text(size: 8pt, fill: luma(110))[#links-for(project)]
-      ],
-      text(size: 8.5pt, fill: luma(70))[#dates(project.start, project.end)],
-    )
+    #strong(project.name) · #text(size: 8.5pt, fill: luma(70))[#dates(project.start, project.end)] · #text(size: 8pt, fill: luma(110))[#links-for(project)]
   ]
   if project.stack != none and project.stack.len() > 0 {
     text(size: 8pt, fill: luma(110))[#project.stack.join(" · ")]
