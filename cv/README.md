@@ -18,7 +18,7 @@ node tools/check-ats.mjs
 ```
 
 The check script rebuilds the PDF and asserts the properties a plain-text
-applicant tracking system depends on. It exits non-zero on the first failure.
+applicant tracking system depends on. It exits non-zero if any check fails.
 
 | Check | Why it matters |
 | --- | --- |
@@ -27,6 +27,10 @@ applicant tracking system depends on. It exits non-zero on the first failure.
 | Every required token extracts | If the parser cannot find the name or the email, the rest never loads |
 | Sections in reading order | A parser that reads columns out of order scrambles the CV |
 | Every bullet survives extraction | Wrapped lines must rejoin, not break mid-word |
+| Each date sits on its name line | A parser needs the date attached to the entry |
+| Source emits the documented headings | A renamed heading fails the gate, not just review |
+| Layout uses no column-breaking constructs | grid, table, place, tracking, and small caps are banned |
+| Every URL on the CV resolves | A dead link is a dead proof point |
 | Dates parse as text | Decorative date formats do not map to a start or end field |
 | Contact line is not mangled | Letter-spacing or small caps can split the email into separate glyphs |
 | Page is well filled | A near-empty page usually means a broken layout |
