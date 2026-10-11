@@ -76,7 +76,7 @@
           "name": "meowvie",
           "role": null,
           "url": "https://github.com/falentio/meowvie",
-          "homepage": "https://meowvie.falentio.com",
+          "homepage": null,
           "stack": [
             "Go",
             "TypeScript",
@@ -88,7 +88,7 @@
           "bullets": [
             "Built a three-repository movie and anime download service: a Go API on Fiber, a Node crawler monorepo with six site scrapers, and a Deno Fresh front end.",
             "Added Bleve full-text search, GORM over SQLite, and an LRU cache in front of the movie repository so repeated queries skip the database.",
-            "Measured 30 concurrent queries on a 256 MB Fly.io instance: 29.8 requests per second over 10 seconds, slowest response 500 ms."
+            "Ran one oha load test recorded in the project README: 30 concurrent queries against a 256 MB instance, 29.8 requests per second over 10 seconds, slowest response 502 ms."
           ]
         },
         {
@@ -154,7 +154,7 @@
           "stars": 0,
           "bullets": [
             "Wrote an idempotent POSIX shell installer that symlinks ~/.pi and ~/.agents into the repo, timestamp-backs up any real file it replaces, and leaves foreign symlinks untouched.",
-            "Keeps the agent skills, prompts, and editor config the whole workflow runs on under version control and rerunnable from a fresh machine."
+            "Keeps the agent skills and prompts the whole workflow runs on under version control and rerunnable from a fresh machine."
           ],
           "homepage": null
         }

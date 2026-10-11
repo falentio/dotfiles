@@ -4,7 +4,7 @@ Every fact below was read from a file or a live GitHub API call on 2026-10-11.
 Local clones live at /home/kevin/Repositories/<repo>. Repos with no local clone
 were read through `gh api`.
 
-## meowvie (Go, 28 stars, deployed at https://meowvie.falentio.com)
+## meowvie (Go, 28 stars)
 
 Three repositories form one product:
 - meowvie (Go backend), meowvie-collector (Node/TS crawler monorepo),
@@ -21,9 +21,11 @@ Facts:
   signer, and main.
   evidence: internal/internalfakes/fake_search.go, internal/search_test.go,
   internal/movie_service_test.go (same tree listing)
-- The README documents a load test: 30 concurrent queries against a 256 MB
-  instance, slowest response around 500 ms, 29.8 req/s over 10 s using oha.
-  evidence: README.md, Performance section (read via `gh api .../contents/README.md`)
+- The README documents one oha run: 30 concurrent queries against a 256 MB
+  instance, slowest response 502 ms, 29.8 req/s over 10 s. The README opens
+  that section with "No benchmark was done", so the CV words the bullet as a
+  README-recorded run rather than a measurement.
+  evidence: README.md lines 28-39 (read via `gh api .../contents/README.md`)
 - The crawler is an npm workspaces monorepo with six site scrapers.
   evidence: meowvie-collector package.json workspaces array lists apps/oploverz,
   apps/otakudesu, apps/kazefuri, apps/melong, apps/samehadaku, apps/kusonime and
@@ -104,13 +106,47 @@ Facts:
   `sv` scaffold text, so there is no product description to quote.
   evidence: sinnau/package.json dependencies; tree count 66 test files
 
-## dotfiles (460 files)
+## dotfiles (350 tracked files)
 
 - An idempotent POSIX shell installer that symlinks ~/.pi and ~/.agents into the
   repo, backs up real files with a timestamp, and leaves foreign symlinks alone.
   evidence: dotfiles/link.sh link_one function and header comment
 - Hosts the agent skills the workflow uses.
   evidence: .agents/skills directory listing
+- The repo tracks 350 files: link.sh, .gitignore, and the .agents and .pi trees.
+  It holds no editor config; the fish and kitty work lives on another branch.
+  evidence: git ls-files at the PR head, and the branch list
+
+## Skills, summary, and open source
+
+The skills list, the summary paragraph, and the open-source figures are the only
+claims that do not trace to a single file, so they are documented here.
+
+- Language names come from the per-repository language breakdown in
+  cv/data/github.json, which fetch-github.mjs derives from the GitHub
+  languages API. TypeScript leads at 63 repositories, then JavaScript 34,
+  Svelte 15, Dockerfile 11, HTML 8, Shell 8, Go 8, Astro 6.
+  evidence: cv/data/github.json, the languages array of each repo entry
+- Framework names trace to package.json files read while researching the
+  project entries above: Svelte, SvelteKit, Astro, Tailwind, Node.js, Fiber,
+  Hono, Drizzle ORM, SQLite, libSQL, Vitest, Playwright, Docker, Cloudflare
+  Workers, Fly.io, pnpm.
+  evidence: meowvie go.mod (Fiber), commandcode-api tree (Dockerfile, fly.toml),
+  art-trace package.json (SvelteKit, adapter-cloudflare, drizzle-orm,
+  @libsql/client, vitest, playwright), image-storage package.json (Hono,
+  wrangler), llm package.json (Drizzle, pnpm, oxlint)
+- Rust appears once and Python twice in the language breakdown. Both are
+  listed as skills rather than omitted, because the repos exist and the
+  languages are the primary language of those repos.
+  evidence: cv/data/github.json, repo lamp (Rust) and markidown-svc (Python)
+- The summary describes the shape of the work: CLI and editor plugins, an
+  OpenAI-compatible gateway, Svelte front ends, and a published library. Each
+  clause maps to a project entry above.
+  evidence: opencode-commandcode, opencode-pstack, opencode-todo (plugins),
+  commandcode-api (gateway), art-trace and sinnau.com (Svelte), ty (library)
+- The open-source figures come from the GitHub profile API and are stored
+  verbatim in cv/data/github.json: 104 public repositories, 33 followers.
+  evidence: cv/data/github.json profile block, from gh api users/falentio
 
 ## Cut from the CV
 
