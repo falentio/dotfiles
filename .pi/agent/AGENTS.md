@@ -20,7 +20,7 @@ Every rule fix is its own commit: an imperative subject that reads on its own, w
 
 ## After a PR
 
-Opening a PR starts a review gate, and the gate is mandatory: a second agent reviews the PR, then a third fixes every finding. The author does not review its own PR.
+Opening a PR starts a review gate, and the gate is mandatory: a second agent reviews the PR, a third fixes every finding, and a fourth babysits it green. The author does not review its own PR.
 
 Each prompt may be worded freely; it must carry the instructions below, so the child does the same job every time.
 
@@ -34,6 +34,12 @@ Each prompt may be worded freely; it must carry the instructions below, so the c
 
    ```text
    fix all findings in <path> using /skill:poteto-mode
+   ```
+
+3. **Babysit.** When the fix's terminal notification arrives, spawn a third `tools.mcp__t3_code__delegate_task` to babysit the PR until it is green. Its prompt must name the PR number and `/skill:poteto-mode`, whose **Babysit** playbook (`playbooks/babysit.md`) drives the PR to merge-ready in `drive` mode. A working prompt:
+
+   ```text
+   babysit pr #<n> until green using /skill:poteto-mode
    ```
 
 Naming `/skill:poteto-mode` in each prompt is what loads the persona: it travels as a skill the child reads, never as the `role` line.

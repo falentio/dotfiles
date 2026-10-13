@@ -7,5 +7,12 @@
   ],
   "codemode": {
     "mode": "only"
+  },
+  "retry": {
+    "provider": {
+      "timeoutMs": 60000,
+      "maxRetries": 3,
+      "maxRetryDelayMs": 120000
+    }
   }
 }
