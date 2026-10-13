@@ -1,5 +1,5 @@
 {
-  "lastChangelogVersion": "1.1.0",
+  "lastChangelogVersion": "1.2.0",
   "defaultProvider": "radius",
   "defaultModel": "balanced",
   "defaultTools": [
@@ -10,7 +10,7 @@
   },
   "retry": {
     "provider": {
-      "timeoutMs": 60000,
+      "timeoutMs": 20000,
       "maxRetries": 3,
       "maxRetryDelayMs": 120000
     }
