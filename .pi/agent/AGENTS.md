@@ -72,7 +72,7 @@ Every frontend change is proven with a screenshot of the change, embedded as `![
 
 ## Lookups
 
-Context7 owns library documentation; TinyFish owns everything else, a library's changelog included. A named library's API surface, configuration, and code examples go to the `find-docs` skill. Release notes, migration announcements, news, papers, and general facts go to the `tinyfish-search-fetch` skill.
+Context7 owns library documentation; TinyFish owns everything else, a library's changelog included. A named library's API surface, configuration, and code examples go to the `context7` MCP server. Release notes, migration announcements, news, papers, and general facts go to the `tinyfish-search-fetch` skill.
 
 Read library code from the clone, not a dependency's build artifact. `node_modules`, `target`, `.venv`, `vendor`, `__pycache__`, `~/.cargo/registry`, and `~/.m2` hold a dependency's transformed, deduped, or minified copy — the wrong surface, often stale, and a context hog. Crawl through the scout, which spawns the cloner; the source lands at `~/.pi/source` (see Subagents).
 
