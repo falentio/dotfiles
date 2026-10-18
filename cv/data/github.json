@@ -1,0 +1,1366 @@
+{
+  "generated_at": "2026-10-11T10:05:20.469Z",
+  "owner": "falentio",
+  "profile": {
+    "created_at": "2020-11-28T05:58:15Z",
+    "followers": 33,
+    "following": 47,
+    "html_url": "https://github.com/falentio",
+    "login": "falentio",
+    "name": "Kevin Falentio",
+    "public_repos": 104
+  },
+  "repos": [
+    {
+      "name": "boardgame",
+      "url": "https://github.com/falentio/boardgame",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2026-10-09",
+      "pushed_at": "2026-10-11",
+      "topics": [],
+      "languages": [
+        "TypeScript",
+        "JavaScript",
+        "HTML"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "cimi",
+      "url": "https://github.com/falentio/cimi",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2026-08-22",
+      "pushed_at": "2026-10-11",
+      "topics": [],
+      "languages": [
+        "TypeScript",
+        "Vue",
+        "Python"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "dotfiles",
+      "url": "https://github.com/falentio/dotfiles",
+      "description": "",
+      "primary_language": "Shell",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2026-10-07",
+      "pushed_at": "2026-10-11",
+      "topics": [],
+      "languages": [
+        "Shell",
+        "TypeScript",
+        "JavaScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "opencode-pstack",
+      "url": "https://github.com/falentio/opencode-pstack",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2026-09-03",
+      "pushed_at": "2026-10-08",
+      "topics": [],
+      "languages": [
+        "TypeScript",
+        "Shell",
+        "JavaScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "opencode-todo",
+      "url": "https://github.com/falentio/opencode-todo",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2026-10-02",
+      "pushed_at": "2026-10-02",
+      "topics": [],
+      "languages": [
+        "TypeScript",
+        "JavaScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "sinnau.com",
+      "url": "https://github.com/falentio/sinnau.com",
+      "description": "Sinnau",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2026-06-01",
+      "pushed_at": "2026-10-01",
+      "topics": [],
+      "languages": [
+        "TypeScript",
+        "Svelte",
+        "Shell"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "opencode-commandcode",
+      "url": "https://github.com/falentio/opencode-commandcode",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2026-09-12",
+      "pushed_at": "2026-09-22",
+      "topics": [],
+      "languages": [
+        "TypeScript",
+        "JavaScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "opencode-zedokai",
+      "url": "https://github.com/falentio/opencode-zedokai",
+      "description": "",
+      "primary_language": "JavaScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2026-09-11",
+      "pushed_at": "2026-09-22",
+      "topics": [],
+      "languages": [
+        "JavaScript",
+        "TypeScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "deport",
+      "url": "https://github.com/falentio/deport",
+      "description": "",
+      "primary_language": "",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2026-08-20",
+      "pushed_at": "2026-08-20",
+      "topics": [],
+      "languages": [],
+      "readme": ""
+    },
+    {
+      "name": "commandcode-api",
+      "url": "https://github.com/falentio/commandcode-api",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2026-07-28",
+      "pushed_at": "2026-07-28",
+      "topics": [],
+      "languages": [
+        "TypeScript",
+        "Go",
+        "Dockerfile"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "rin",
+      "url": "https://github.com/falentio/rin",
+      "description": "",
+      "primary_language": "",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2026-07-28",
+      "pushed_at": "2026-07-28",
+      "topics": [],
+      "languages": [],
+      "readme": ""
+    },
+    {
+      "name": "llm",
+      "url": "https://github.com/falentio/llm",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2026-07-25",
+      "pushed_at": "2026-07-25",
+      "topics": [],
+      "languages": [
+        "TypeScript",
+        "JavaScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "lomba-scrapper",
+      "url": "https://github.com/falentio/lomba-scrapper",
+      "description": "",
+      "primary_language": "JavaScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2026-07-24",
+      "pushed_at": "2026-07-24",
+      "topics": [],
+      "languages": [
+        "JavaScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "anaid",
+      "url": "https://github.com/falentio/anaid",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2024-04-07",
+      "pushed_at": "2026-07-21",
+      "topics": [],
+      "languages": [
+        "TypeScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "better-sqlite3-test",
+      "url": "https://github.com/falentio/better-sqlite3-test",
+      "description": "",
+      "primary_language": "JavaScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2025-07-29",
+      "pushed_at": "2026-07-21",
+      "topics": [],
+      "languages": [
+        "JavaScript",
+        "Dockerfile"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "lamp-fe",
+      "url": "https://github.com/falentio/lamp-fe",
+      "description": "",
+      "primary_language": "Svelte",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2025-05-23",
+      "pushed_at": "2026-07-21",
+      "topics": [],
+      "languages": [
+        "Svelte",
+        "TypeScript",
+        "HTML"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "quizpoc",
+      "url": "https://github.com/falentio/quizpoc",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2025-10-03",
+      "pushed_at": "2026-07-21",
+      "topics": [],
+      "languages": [
+        "TypeScript",
+        "JavaScript",
+        "Svelte"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "rng",
+      "url": "https://github.com/falentio/rng",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2025-05-08",
+      "pushed_at": "2026-07-21",
+      "topics": [],
+      "languages": [
+        "TypeScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "url",
+      "url": "https://github.com/falentio/url",
+      "description": "",
+      "primary_language": "Astro",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2025-04-10",
+      "pushed_at": "2026-07-21",
+      "topics": [],
+      "languages": [
+        "Astro",
+        "TypeScript",
+        "CSS"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "liteparse-hono",
+      "url": "https://github.com/falentio/liteparse-hono",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2026-06-16",
+      "pushed_at": "2026-06-17",
+      "topics": [],
+      "languages": [
+        "TypeScript",
+        "JavaScript",
+        "Shell"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "markidown-svc",
+      "url": "https://github.com/falentio/markidown-svc",
+      "description": "",
+      "primary_language": "Python",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2025-11-06",
+      "pushed_at": "2025-11-11",
+      "topics": [],
+      "languages": [
+        "Python",
+        "Dockerfile",
+        "TypeScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "art-trace",
+      "url": "https://github.com/falentio/art-trace",
+      "description": "Nano Banana powered ART style tracing.",
+      "primary_language": "Svelte",
+      "stars": 1,
+      "forks": 1,
+      "created_at": "2025-09-06",
+      "pushed_at": "2025-09-07",
+      "topics": [],
+      "languages": [
+        "Svelte",
+        "TypeScript",
+        "CSS"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "ty",
+      "url": "https://github.com/falentio/ty",
+      "description": "typed event emitter that not tie the typed into emitter instance",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2025-07-14",
+      "pushed_at": "2025-08-11",
+      "topics": [],
+      "languages": [
+        "TypeScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "image-storage",
+      "url": "https://github.com/falentio/image-storage",
+      "description": "image storage as api",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2025-07-03",
+      "pushed_at": "2025-08-02",
+      "topics": [],
+      "languages": [
+        "TypeScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "next-gemini",
+      "url": "https://github.com/falentio/next-gemini",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2025-06-30",
+      "pushed_at": "2025-06-30",
+      "topics": [],
+      "languages": [
+        "TypeScript",
+        "CSS",
+        "JavaScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "etheriashop",
+      "url": "https://github.com/falentio/etheriashop",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2025-06-10",
+      "pushed_at": "2025-06-10",
+      "topics": [],
+      "languages": [
+        "TypeScript",
+        "CSS",
+        "JavaScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "pfpa",
+      "url": "https://github.com/falentio/pfpa",
+      "description": "Jdenticon alternative that using ai",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2025-05-31",
+      "pushed_at": "2025-06-01",
+      "topics": [],
+      "languages": [
+        "TypeScript",
+        "Astro",
+        "CSS"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "dctx",
+      "url": "https://github.com/falentio/dctx",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2025-05-10",
+      "pushed_at": "2025-05-29",
+      "topics": [],
+      "languages": [
+        "TypeScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "lamp",
+      "url": "https://github.com/falentio/lamp",
+      "description": "",
+      "primary_language": "Rust",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2025-05-18",
+      "pushed_at": "2025-05-23",
+      "topics": [],
+      "languages": [
+        "Rust",
+        "Dockerfile",
+        "Shell"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "jadwal",
+      "url": "https://github.com/falentio/jadwal",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2025-05-07",
+      "pushed_at": "2025-05-08",
+      "topics": [],
+      "languages": [
+        "TypeScript",
+        "Svelte",
+        "HTML"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "nomero-uno",
+      "url": "https://github.com/falentio/nomero-uno",
+      "description": "",
+      "primary_language": "",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2025-05-08",
+      "pushed_at": "2025-05-08",
+      "topics": [],
+      "languages": [],
+      "readme": ""
+    },
+    {
+      "name": "context",
+      "url": "https://github.com/falentio/context",
+      "description": "",
+      "primary_language": "",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2025-05-07",
+      "pushed_at": "2025-05-07",
+      "topics": [],
+      "languages": [],
+      "readme": ""
+    },
+    {
+      "name": "home",
+      "url": "https://github.com/falentio/home",
+      "description": "",
+      "primary_language": "Astro",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2025-03-18",
+      "pushed_at": "2025-03-18",
+      "topics": [],
+      "languages": [
+        "Astro",
+        "MDX",
+        "JavaScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "ctx",
+      "url": "https://github.com/falentio/ctx",
+      "description": "ctx",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2024-11-04",
+      "pushed_at": "2024-11-04",
+      "topics": [],
+      "languages": [
+        "TypeScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "turso-test",
+      "url": "https://github.com/falentio/turso-test",
+      "description": "turso-test",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2024-09-13",
+      "pushed_at": "2024-09-13",
+      "topics": [],
+      "languages": [
+        "TypeScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "dicoding-submission",
+      "url": "https://github.com/falentio/dicoding-submission",
+      "description": "",
+      "primary_language": "JavaScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2024-07-04",
+      "pushed_at": "2024-07-04",
+      "topics": [],
+      "languages": [
+        "JavaScript",
+        "HTML",
+        "CSS"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "cf",
+      "url": "https://github.com/falentio/cf",
+      "description": "",
+      "primary_language": "JavaScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2024-06-11",
+      "pushed_at": "2024-06-11",
+      "topics": [],
+      "languages": [
+        "JavaScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "kevin",
+      "url": "https://github.com/falentio/kevin",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2024-05-18",
+      "pushed_at": "2024-05-18",
+      "topics": [],
+      "languages": [
+        "TypeScript",
+        "Svelte",
+        "JavaScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "tebak",
+      "url": "https://github.com/falentio/tebak",
+      "description": "",
+      "primary_language": "Svelte",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2024-05-17",
+      "pushed_at": "2024-05-17",
+      "topics": [],
+      "languages": [
+        "Svelte",
+        "JavaScript",
+        "TypeScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "qwik-starter",
+      "url": "https://github.com/falentio/qwik-starter",
+      "description": "",
+      "primary_language": "",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2023-12-18",
+      "pushed_at": "2023-12-18",
+      "topics": [],
+      "languages": [
+        "TypeScript",
+        "Dockerfile",
+        "JavaScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "pay",
+      "url": "https://github.com/falentio/pay",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 1,
+      "forks": 0,
+      "created_at": "2023-11-28",
+      "pushed_at": "2023-11-28",
+      "topics": [],
+      "languages": [
+        "TypeScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "uta",
+      "url": "https://github.com/falentio/uta",
+      "description": "",
+      "primary_language": "",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2023-11-16",
+      "pushed_at": "2023-11-16",
+      "topics": [],
+      "languages": [],
+      "readme": ""
+    },
+    {
+      "name": "slice-1",
+      "url": "https://github.com/falentio/slice-1",
+      "description": "",
+      "primary_language": "Astro",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2023-10-05",
+      "pushed_at": "2023-10-06",
+      "topics": [],
+      "languages": [
+        "Astro",
+        "JavaScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "landing-1",
+      "url": "https://github.com/falentio/landing-1",
+      "description": "",
+      "primary_language": "Astro",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2023-10-02",
+      "pushed_at": "2023-10-02",
+      "topics": [],
+      "languages": [
+        "Astro",
+        "JavaScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "menu-makan",
+      "url": "https://github.com/falentio/menu-makan",
+      "description": "",
+      "primary_language": "Astro",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2023-09-17",
+      "pushed_at": "2023-09-19",
+      "topics": [],
+      "languages": [
+        "Astro",
+        "TypeScript",
+        "JavaScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "sadean",
+      "url": "https://github.com/falentio/sadean",
+      "description": "",
+      "primary_language": "Svelte",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2023-08-20",
+      "pushed_at": "2023-08-20",
+      "topics": [],
+      "languages": [
+        "Svelte",
+        "TypeScript",
+        "JavaScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "wa",
+      "url": "https://github.com/falentio/wa",
+      "description": "",
+      "primary_language": "JavaScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2023-01-13",
+      "pushed_at": "2023-06-24",
+      "topics": [],
+      "languages": [
+        "JavaScript",
+        "Dockerfile",
+        "Procfile"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "raid-go",
+      "url": "https://github.com/falentio/raid-go",
+      "description": "",
+      "primary_language": "Go",
+      "stars": 1,
+      "forks": 1,
+      "created_at": "2022-12-03",
+      "pushed_at": "2023-06-22",
+      "topics": [],
+      "languages": [
+        "Go"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "meowvie",
+      "url": "https://github.com/falentio/meowvie",
+      "description": "another movie and anime scraper",
+      "primary_language": "Go",
+      "stars": 28,
+      "forks": 4,
+      "created_at": "2023-05-31",
+      "pushed_at": "2023-06-15",
+      "topics": [],
+      "languages": [
+        "Go",
+        "TypeScript",
+        "Dockerfile"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "meowvie-collector",
+      "url": "https://github.com/falentio/meowvie-collector",
+      "description": "collector for meowvie",
+      "primary_language": "TypeScript",
+      "stars": 6,
+      "forks": 0,
+      "created_at": "2023-05-31",
+      "pushed_at": "2023-06-13",
+      "topics": [],
+      "languages": [
+        "TypeScript",
+        "Dockerfile",
+        "JavaScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "meowvie-frontend",
+      "url": "https://github.com/falentio/meowvie-frontend",
+      "description": "Frontend of meowvie",
+      "primary_language": "TypeScript",
+      "stars": 1,
+      "forks": 0,
+      "created_at": "2023-06-01",
+      "pushed_at": "2023-06-12",
+      "topics": [],
+      "languages": [
+        "TypeScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "vote",
+      "url": "https://github.com/falentio/vote",
+      "description": "voting app",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2023-06-08",
+      "pushed_at": "2023-06-10",
+      "topics": [],
+      "languages": [
+        "TypeScript",
+        "Svelte",
+        "JavaScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "latency-test",
+      "url": "https://github.com/falentio/latency-test",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2023-06-02",
+      "pushed_at": "2023-06-02",
+      "topics": [],
+      "languages": [
+        "TypeScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "prux",
+      "url": "https://github.com/falentio/prux",
+      "description": "",
+      "primary_language": "Go",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2023-04-27",
+      "pushed_at": "2023-04-27",
+      "topics": [],
+      "languages": [
+        "Go"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "uno",
+      "url": "https://github.com/falentio/uno",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2023-03-03",
+      "pushed_at": "2023-03-26",
+      "topics": [],
+      "languages": [
+        "TypeScript",
+        "JavaScript",
+        "HTML"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "better-ygoapi",
+      "url": "https://github.com/falentio/better-ygoapi",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2023-03-23",
+      "pushed_at": "2023-03-24",
+      "topics": [],
+      "languages": [
+        "TypeScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "berlin-uhr",
+      "url": "https://github.com/falentio/berlin-uhr",
+      "description": "",
+      "primary_language": "HTML",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2023-03-20",
+      "pushed_at": "2023-03-20",
+      "topics": [],
+      "languages": [
+        "HTML",
+        "Svelte",
+        "JavaScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "koceng-jawab",
+      "url": "https://github.com/falentio/koceng-jawab",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2022-11-26",
+      "pushed_at": "2023-03-15",
+      "topics": [],
+      "languages": [
+        "TypeScript",
+        "HTML",
+        "JavaScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "math-png",
+      "url": "https://github.com/falentio/math-png",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2023-03-03",
+      "pushed_at": "2023-03-03",
+      "topics": [],
+      "languages": [
+        "TypeScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "aconf",
+      "url": "https://github.com/falentio/aconf",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2023-02-28",
+      "pushed_at": "2023-02-28",
+      "topics": [],
+      "languages": [
+        "TypeScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "movie",
+      "url": "https://github.com/falentio/movie",
+      "description": "",
+      "primary_language": "Go",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2023-02-19",
+      "pushed_at": "2023-02-19",
+      "topics": [],
+      "languages": [
+        "Go",
+        "Dockerfile",
+        "Shell"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "k",
+      "url": "https://github.com/falentio/k",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2023-02-06",
+      "pushed_at": "2023-02-06",
+      "topics": [],
+      "languages": [
+        "TypeScript",
+        "PLpgSQL"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "skul",
+      "url": "https://github.com/falentio/skul",
+      "description": "",
+      "primary_language": "Go",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2023-01-24",
+      "pushed_at": "2023-01-24",
+      "topics": [],
+      "languages": [
+        "Go",
+        "Svelte",
+        "TypeScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "poke",
+      "url": "https://github.com/falentio/poke",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2022-11-18",
+      "pushed_at": "2023-01-07",
+      "topics": [],
+      "languages": [
+        "TypeScript",
+        "Go"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "felascione",
+      "url": "https://github.com/falentio/felascione",
+      "description": "",
+      "primary_language": "Svelte",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2022-08-12",
+      "pushed_at": "2022-12-11",
+      "topics": [],
+      "languages": [
+        "Svelte",
+        "TypeScript",
+        "JavaScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "catsum",
+      "url": "https://github.com/falentio/catsum",
+      "description": "picsum.photo clone",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2022-04-26",
+      "pushed_at": "2022-12-06",
+      "topics": [],
+      "languages": [
+        "TypeScript",
+        "HTML"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "pokedex",
+      "url": "https://github.com/falentio/pokedex",
+      "description": "",
+      "primary_language": "",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2022-11-15",
+      "pushed_at": "2022-11-15",
+      "topics": [],
+      "languages": [],
+      "readme": ""
+    },
+    {
+      "name": "magical-cat",
+      "url": "https://github.com/falentio/magical-cat",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2022-11-12",
+      "pushed_at": "2022-11-12",
+      "topics": [],
+      "languages": [
+        "TypeScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "falentio.com",
+      "url": "https://github.com/falentio/falentio.com",
+      "description": "",
+      "primary_language": "Svelte",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2022-09-18",
+      "pushed_at": "2022-10-27",
+      "topics": [],
+      "languages": [
+        "Svelte",
+        "JavaScript",
+        "TypeScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "jadwal-smanta",
+      "url": "https://github.com/falentio/jadwal-smanta",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2022-09-11",
+      "pushed_at": "2022-10-20",
+      "topics": [],
+      "languages": [
+        "TypeScript",
+        "Svelte",
+        "JavaScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "pikari",
+      "url": "https://github.com/falentio/pikari",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2022-10-14",
+      "pushed_at": "2022-10-14",
+      "topics": [],
+      "languages": [
+        "TypeScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "meowvie-old",
+      "url": "https://github.com/falentio/meowvie-old",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2022-10-01",
+      "pushed_at": "2022-10-08",
+      "topics": [],
+      "languages": [
+        "TypeScript",
+        "Dockerfile"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "oi",
+      "url": "https://github.com/falentio/oi",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2022-09-21",
+      "pushed_at": "2022-09-21",
+      "topics": [],
+      "languages": [
+        "TypeScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "kepin-turu",
+      "url": "https://github.com/falentio/kepin-turu",
+      "description": "",
+      "primary_language": "Svelte",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2022-03-22",
+      "pushed_at": "2022-09-13",
+      "topics": [],
+      "languages": [
+        "Svelte",
+        "TypeScript",
+        "JavaScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "prkita",
+      "url": "https://github.com/falentio/prkita",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2022-08-19",
+      "pushed_at": "2022-09-03",
+      "topics": [],
+      "languages": [
+        "TypeScript",
+        "Shell"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "mengke",
+      "url": "https://github.com/falentio/mengke",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2022-06-28",
+      "pushed_at": "2022-06-29",
+      "topics": [],
+      "languages": [
+        "TypeScript",
+        "JavaScript",
+        "Shell"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "falentio",
+      "url": "https://github.com/falentio/falentio",
+      "description": "Config files for my GitHub profile.",
+      "primary_language": "",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2021-07-14",
+      "pushed_at": "2022-04-18",
+      "topics": [
+        "config",
+        "github-config"
+      ],
+      "languages": [],
+      "readme": ""
+    },
+    {
+      "name": "deta",
+      "url": "https://github.com/falentio/deta",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 1,
+      "forks": 0,
+      "created_at": "2022-03-16",
+      "pushed_at": "2022-03-17",
+      "topics": [],
+      "languages": [
+        "TypeScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "denodoc",
+      "url": "https://github.com/falentio/denodoc",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2022-02-12",
+      "pushed_at": "2022-02-12",
+      "topics": [],
+      "languages": [
+        "TypeScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "docrest",
+      "url": "https://github.com/falentio/docrest",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2022-02-11",
+      "pushed_at": "2022-02-11",
+      "topics": [],
+      "languages": [
+        "TypeScript",
+        "Dockerfile"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "bdsadd",
+      "url": "https://github.com/falentio/bdsadd",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2022-02-08",
+      "pushed_at": "2022-02-08",
+      "topics": [],
+      "languages": [
+        "TypeScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "bds",
+      "url": "https://github.com/falentio/bds",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2021-12-17",
+      "pushed_at": "2022-01-12",
+      "topics": [],
+      "languages": [
+        "TypeScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "kirimi",
+      "url": "https://github.com/falentio/kirimi",
+      "description": "",
+      "primary_language": "TypeScript",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2022-01-02",
+      "pushed_at": "2022-01-06",
+      "topics": [],
+      "languages": [
+        "TypeScript"
+      ],
+      "readme": ""
+    },
+    {
+      "name": "tes",
+      "url": "https://github.com/falentio/tes",
+      "description": "",
+      "primary_language": "",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2021-12-16",
+      "pushed_at": "2021-12-16",
+      "topics": [],
+      "languages": [],
+      "readme": ""
+    },
+    {
+      "name": "mcping",
+      "url": "https://github.com/falentio/mcping",
+      "description": "",
+      "primary_language": "Go",
+      "stars": 0,
+      "forks": 0,
+      "created_at": "2021-12-10",
+      "pushed_at": "2021-12-10",
+      "topics": [],
+      "languages": [
+        "Go"
+      ],
+      "readme": ""
+    }
+  ]
+}

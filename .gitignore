@@ -33,3 +33,4 @@ config/fish/tide-backup/
 .env
 .env.*
 *.pem
+cv/out/
