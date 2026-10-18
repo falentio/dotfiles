@@ -4,7 +4,7 @@ Shapes verified against `takumi-js@2.16.3`; each one runs as written. Option nam
 
 ## Serve from a route
 
-`ImageResponse` extends the web `Response`, so any runtime with `Request` and `Response` can return one, and the API matches `next/og`.
+`ImageResponse` extends the web `Response` and matches the `next/og` API, so any runtime with `Request` and `Response` can return one.
 
 ```tsx
 import { ImageResponse } from "takumi-js/response";
@@ -26,11 +26,7 @@ export function GET(request: Request) {
 }
 ```
 
-- Options are the render options plus `ResponseInit` (`status`, `headers`) and `onError`. `width` and `height` are required here, with no content sizing. A rejected render streams as an error response and calls `onError`.
-- Keep the returned response object, not the bytes: `await response.ready` resolves when the stream finishes.
-- For a request-scoped abort, pass `signal: request.signal`.
-- A bundler that prunes optional dependencies reports `Cannot find native binding` or a `core-<hash>` module error: [Troubleshooting](https://takumi.kane.tw/docs/troubleshooting) has the fix per bundler.
-- Framework wiring: [Next.js](https://takumi.kane.tw/docs/integration/nextjs), [Nuxt](https://takumi.kane.tw/docs/integration/nuxt), [SvelteKit](https://takumi.kane.tw/docs/integration/sveltekit), [Astro](https://takumi.kane.tw/docs/integration/astro), [Nitro](https://takumi.kane.tw/docs/integration/nitro), [TanStack Start](https://takumi.kane.tw/docs/integration/tanstack-start).
+Options are the render options plus `ResponseInit` (`status`, `headers`) and `onError`, and `width` and `height` are required. A rejected render streams as an error response and calls `onError`; keep the returned response object and `await response.ready`, and pass `signal: request.signal` for a request-scoped abort. A bundler that prunes optional dependencies reports `Cannot find native binding` or a `core-<hash>` module error: [Troubleshooting](https://takumi.kane.tw/docs/troubleshooting) has the fix per bundler, and [Next.js](https://takumi.kane.tw/docs/integration/nextjs) has the wiring.
 
 ## Force the WebAssembly backend
 
@@ -44,7 +40,7 @@ const renderer = new Renderer();
 const png = await renderer.render(node, { width: 1200, height: 630 });
 ```
 
-The wasm build carries the same built-in face and the same option names, and it renders without `init()` too. WebP on wasm is always lossless and `quality` applies to JPEG only.
+The wasm build carries the same built-in face and the same option names, and it renders without `init()` too. WebP on wasm is always lossless and `quality` applies to JPEG only. `takumi-js/wasm/no-init` re-exports `@takumi-rs/wasm` when you would rather skip the wrapper, and `takumi-js/wasm-url` default-exports the binary URL for a bundler that has to resolve it.
 
 ## Animation
 
@@ -75,7 +71,7 @@ await render(<div tw="w-full h-full grid place-items-center"><div tw="w-16 h-16 
 });
 ```
 
-Keyframes can come from a Tailwind arbitrary value, from a `<style>` tag in the tree, or from the `css` option, where the object form is type-checked instead of parsed:
+Keyframes can come from a Tailwind arbitrary value, a `<style>` tag in the tree, or the `css` option, whose object form is type-checked instead of parsed:
 
 ```tsx
 await render(card, {
@@ -92,7 +88,7 @@ await render(card, {
 });
 ```
 
-Offsets are `from`, `to`, or `"<n>%"`. Presets `animate-spin`, `animate-ping`, `animate-pulse`, and `animate-bounce` ship in the Tailwind parser. A `rotate()` keyframe step stayed static on 2.16.3 while `translateX()` animated ([details](pitfalls.md#animation-is-a-timeline-not-a-loop)).
+Offsets are `from`, `to`, or `"<n>%"`. Presets `animate-spin`, `animate-ping`, `animate-pulse`, and `animate-bounce` ship in the Tailwind parser. A `rotate()` keyframe moves along the shorter arc, so a 0 to 360 degree step renders as a still frame ([details](pitfalls.md#animation-is-a-timeline-not-a-loop)).
 
 For video, render frames with `format: "raw"` and feed RGBA buffers to ffmpeg: [Keyframe Animation](https://takumi.kane.tw/docs/keyframe-animation).
 
@@ -105,13 +101,24 @@ const svg = await renderSvg(card, { width: 1200, height: 630 });   // string, no
 const { width, height, children, runs } = await measure(card);     // layout, no encoding
 ```
 
-`measure` returns the laid-out tree: each node's box and transform, plus a `runs` entry per text run with its own `x`, `y`, `width`, and `height`. Lengths are device pixels, and a run's `x` and `y` are relative to the content box of the node that holds it. Use it to size a canvas from content, to check that a title fits before painting, or to place a highlight behind a specific line.
+`measure` reports the laid-out tree in device pixels, with one `runs` entry per text run ([api.md](api.md#node-tree-and-measure)). Use it to size a canvas from content, to check that a title fits before painting, or to place a highlight behind a line.
+
+## Tables and charts
+
+A chart arrives as SVG, generated by a library that runs without a DOM (ECharts has an SSR SVG renderer), then handed to an `<img>`:
+
+```tsx
+const svg = "<svg xmlns='http://www.w3.org/2000/svg' width='40' height='20'><rect width='40' height='20' fill='#0f0'/></svg>";
+await render(<img src={"data:image/svg+xml;base64," + Buffer.from(svg).toString("base64")} width={40} height={20} />, { width: 40, height: 20 });
+```
+
+Tables render as HTML or JSX elements, with the table rewritten to a grid. `<col>` and `<colgroup>` widths are ignored, so declare a width on the cell, a wide caption wraps to the table's width, and `border-spacing` defaults to 2px. Full setups: [charts](https://takumi.kane.tw/docs/charts) and [tables](https://takumi.kane.tw/docs/tables).
 
 ## Tailwind and CSS
 
-The `tw` prop runs Takumi's own Tailwind parser, so it needs no build step, no PostCSS, and no network. Arbitrary values work (`w-[42px]`, `bg-[linear-gradient(...)]`, `animate-[move_1s_linear_infinite]`), and `_` becomes a space inside brackets.
+The `tw` prop runs Takumi's own Tailwind parser: no build step, no PostCSS, no network. Arbitrary values work (`w-[42px]`, `bg-[linear-gradient(...)]`, `animate-[move_1s_linear_infinite]`), and `_` becomes a space inside brackets.
 
-An inline `style` beats a `tw` utility for the same property. A rule from the `css` option also beat the equivalent `tw` utility in the measured case, so rather than leaning on a precedence order, give a property to exactly one of the three.
+An inline `style` beats a `tw` utility for the same property, and in the measured case a rule from the `css` option also beat the equivalent utility, so rather than leaning on a precedence order, give a property to exactly one of the three.
 
 ```tsx
 await render(
@@ -120,9 +127,9 @@ await render(
 );
 ```
 
-A bare `div` is block, not flex. Every layout that satori templates wrote with an explicit `display: flex` still needs it here. An unknown property name in a style object is dropped silently; a known property with an unparsable value rejects the render and names the property.
+A bare `div` is block, not flex. An unknown property name in a style object is dropped silently, while a known property with an unparsable value rejects the render and names the property.
 
-A bundler can compile Tailwind as well: that stylesheet arrives through `css` and coexists with `tw`. Preflight stays off until a stylesheet imports `"tailwindcss"`, and utilities land in the last layer. Design tokens, the bundler setup, and where Takumi differs from Tailwind: [Styling](https://takumi.kane.tw/docs/styling) and the [CSS reference](https://takumi.kane.tw/docs/reference).
+A bundler can compile Tailwind as well, and that stylesheet arrives through `css` beside `tw`. Preflight stays off until a stylesheet imports `"tailwindcss"`, so elements keep their UA margins and an `h1` carries a 0.67em top offset, 21.4px at the default size, until you add `mt-0`; utilities land in the last layer. [Styling](https://takumi.kane.tw/docs/styling) and the [CSS reference](https://takumi.kane.tw/docs/reference) have the rest.
 
 ## Images and emoji
 
@@ -139,13 +146,11 @@ await render(card, {
 });
 ```
 
-A `src` with no prefetched entry is fetched during the render (30 s timeout, 32 MiB body cap, 8192x8192 decode). `data:` URLs are decoded inline. Raw RGBA in JSX goes through the `Bitmap` component from `takumi-js/helpers/jsx`; a node tree carries it as `{ type: "image", src: { width, height, data } }`.
-
-Emoji glyphs come from a CDN unless you say otherwise: `emoji: "from-font"` with an emoji font, or a prefetched image per emoji. Providers: `twemoji` (default), `blobmoji`, `noto`, `openmoji`, `fluent`, `fluentFlat`. Details: [Images & Emoji](https://takumi.kane.tw/docs/load-images).
+A `src` with no prefetched entry is fetched during the render (30 s timeout, 32 MiB body cap, 8192x8192 decode), and `data:` URLs are decoded inline. Raw RGBA in JSX goes through the `Bitmap` component from `takumi-js/helpers/jsx`; a node tree carries it as `{ type: "image", src: { width, height, data } }`. Emoji providers and the offline path are in [fonts.md](fonts.md#emoji).
 
 ## Reuse across requests
 
-One `Renderer` per process, registered fonts on it, and the same bytes come out of every identical call. In a server that is the difference between a warm glyph cache and rebuilding it per request.
+One `Renderer` per process, registered fonts on it, and the same bytes come out of every identical call: in a server that is the difference between a warm glyph cache and rebuilding it per request.
 
 ```tsx
 import { render } from "takumi-js";
@@ -161,13 +166,8 @@ Key the HTTP cache on the inputs you already have (title, theme, width) rather t
 
 ## Coming from satori or next/og
 
-- `satori()` becomes `render()` for bytes, or `renderSvg()` for vector output.
-- An `ImageResponse` import moves from `next/og` to `takumi-js/response`.
-- A bare `div` is block, so explicit flex styles stay needed, and the rendered output will not match satori pixel for pixel.
-- Puppeteer screenshots lose page scripts, and anything outside the supported CSS matrix; check the [CSS reference](https://takumi.kane.tw/docs/reference) before assuming a property carries over.
-
-[Comparison to Satori](https://takumi.kane.tw/docs/comparison-to-satori) has the full migration table.
+`satori()` becomes `render()` for bytes or `renderSvg()` for vector output, and an `ImageResponse` import moves from `next/og` to `takumi-js/response`. A bare `div` is block, so explicit flex styles stay needed. The renderers differ in layout and font behavior, so compare templates before deploying: [Comparison to Satori](https://takumi.kane.tw/docs/comparison-to-satori).
 
 ## Paged PDF
 
-Invoices and reports are a separate package with its own renderer: `npm i takumi-pdf @takumi-rs/helpers`, then `render(node, { size, margin, header, footer, pages })`. A4 by default, with page numbers, outline, and PDF/A options. Start at [PDF](https://takumi.kane.tw/docs/pdf).
+Invoices and reports are a separate package with its own renderer: `npm i takumi-pdf @takumi-rs/helpers`, then `render(node, { size, margin, header, footer, pages })`, A4 by default, with page numbers, outline, and PDF/A options. Start at [PDF](https://takumi.kane.tw/docs/pdf).

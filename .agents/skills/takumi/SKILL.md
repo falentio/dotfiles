@@ -1,6 +1,6 @@
 ---
 name: takumi
-description: Render images from JSX, HTML, and CSS with Takumi (takumi-js), without a headless browser. Use for OG images, social cards, banners, and favicons; for PNG, JPEG, WebP, ICO, SVG, or animated WebP, GIF, and APNG output on Node, Bun, or an edge runtime; when returning an image from a route with ImageResponse; when porting a satori or next/og template; or when a Takumi render comes out blank, clipped, or missing glyphs.
+description: Render images from JSX, HTML, or a node tree with Takumi (takumi-js). Use for OG images, social cards, banners, favicons, and chart or table PNGs; when returning an image from a route with ImageResponse; when porting a satori or next/og template; or when a Takumi render comes out blank, clipped, or missing glyphs.
 ---
 
 # Takumi
@@ -33,7 +33,7 @@ const png = await render(
 await writeFile("og.png", png);
 ```
 
-**3. Size the canvas.** `width` and `height` are device pixels and are final. Omit both to size the canvas from content. `devicePixelRatio` converts CSS lengths into those device pixels, so at `2` a CSS-pixel value draws twice as large: enlarge the canvas yourself to export at 2x, or content overflows and clips.
+**3. Size the canvas.** `width` and `height` are device pixels and are final; omit both to size the canvas from content. `devicePixelRatio` converts CSS lengths into those device pixels, so at `2` a CSS-pixel value draws twice as large. To export a 1200x630 design at 2x, ask for 2400x1260 and keep the ratio. Skip that and the doubled CSS lengths overflow the canvas and clip.
 
 ```tsx
 await render(card, { width: 2400, height: 1260, devicePixelRatio: 2 });
@@ -61,14 +61,11 @@ Pass `fonts` on every render: registered fonts stay in that process's default fa
 - **Return the image from a route, or run on edge**: [recipes.md](references/recipes.md#serve-from-a-route).
 - **Animation, animated GIF, or keyframes**: [recipes.md](references/recipes.md#animation).
 - **Vector SVG, or layout numbers before you paint**: [recipes.md](references/recipes.md#svg-and-measure).
+- **Tables, charts, or a report card**: [recipes.md](references/recipes.md#tables-and-charts).
 - **Tailwind config, design tokens, or a CSS subset question**: [recipes.md](references/recipes.md#tailwind-and-css) and the [styling reference](https://takumi.kane.tw/docs/styling).
 - **Fonts in depth**: subsetting, variable axes, generic families, per-render chains, and emoji glyphs: [fonts.md](references/fonts.md).
 - **Exact option names, types, and defaults**: [api.md](references/api.md).
 - **Something renders wrong, or an upgrade changed behavior**: [pitfalls.md](references/pitfalls.md), then run the proof script below.
-
-## Docs
-
-Canonical pages, in the order a render needs them: [Introduction](https://takumi.kane.tw/docs/), [Styling](https://takumi.kane.tw/docs/styling), [Typography & Fonts](https://takumi.kane.tw/docs/typography-and-fonts), [Images & Emoji](https://takumi.kane.tw/docs/load-images), [Output Formats](https://takumi.kane.tw/docs/output-formats), [Keyframe Animation](https://takumi.kane.tw/docs/keyframe-animation), [ImageResponse](https://takumi.kane.tw/docs/image-response), [Helpers](https://takumi.kane.tw/docs/helpers), [measure()](https://takumi.kane.tw/docs/measure-api), [CSS reference](https://takumi.kane.tw/docs/reference), [Performance](https://takumi.kane.tw/docs/performance-and-optimization), [Troubleshooting](https://takumi.kane.tw/docs/troubleshooting), [vs Satori](https://takumi.kane.tw/docs/comparison-to-satori), [integration recipes](https://takumi.kane.tw/docs/integration/nextjs).
 
 ## Prove the behavior
 
@@ -76,4 +73,4 @@ Canonical pages, in the order a render needs them: [Introduction](https://takumi
 bun .agents/skills/takumi/scripts/verify-gotchas.tsx --root <project with takumi-js installed>
 ```
 
-Every rule in `pitfalls.md` has a check here, alongside the surface in `api.md`, all measured against the installed version. Run it after an upgrade, and when a render contradicts a rule here. It exits non-zero on the first failed rule and prints the measured value beside each check.
+Each rule in `pitfalls.md` has a check here, except where the rule needs the separate `takumi-pdf` package or a number one render cannot observe; the CSS-subset rule checks `position: sticky` and `prefers-color-scheme` rather than its whole matrix. All measured against the installed version. Run it after an upgrade, and when a render contradicts a rule here. It exits non-zero when any check fails, and prints the measured value beside each check.

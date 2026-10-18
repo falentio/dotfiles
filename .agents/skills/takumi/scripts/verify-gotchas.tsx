@@ -59,8 +59,19 @@ const formats = { png: await render(card, { width: 40, height: 40 }), jpeg: awai
 const raw = await render(card, { width: 40, height: 40, format: "raw" });
 check("png, jpeg, webp, ico, raw all encode", magic(formats.png).png && magic(formats.jpeg).jpeg && magic(formats.webp).webp && formats.ico[2] === 1 && raw.length === 40 * 40 * 4, "raw " + raw.length + "B");
 
+const jpegDefault = await render(card, { width: 240, height: 126, format: "jpeg" });
+const jpeg75 = await render(card, { width: 240, height: 126, format: "jpeg", quality: 75 });
+const jpeg80 = await render(card, { width: 240, height: 126, format: "jpeg", quality: 80 });
+check("jpeg defaults to quality 75", hash(jpegDefault) === hash(jpeg75) && hash(jpeg75) !== hash(jpeg80), "default == 75, != 80");
+
+const webpDefault = await render(card, { width: 240, height: 126, format: "webp" });
+const webpLossless = await render(card, { width: 240, height: 126, format: "webp", lossless: true, quality: 10 });
+check("WebP is lossless by default and lossless ignores quality", hash(webpDefault) === hash(webpLossless), "default == lossless:true, quality:10");
+
 const svg = await renderSvg(card, { width: 200, height: 100 });
 check("renderSvg returns an svg document", svg.startsWith("<svg") && svg.includes("</svg>"), svg.length + " chars");
+const svgRaster = await probe(() => renderSvg(card, { width: 40, height: 40, format: "png" } as never));
+check("renderSvg ignores a raster option at runtime instead of rejecting it", !svgRaster.error && String(svgRaster.value).startsWith("<svg"), svgRaster.error || "svg returned, format dropped");
 
 const animation = await renderAnimation({ width: 60, height: 40, fps: 10, format: "webp", scenes: [{ node: <div tw="w-full h-full bg-red-500" />, durationMs: 200 }] });
 const gif = await renderAnimation({ width: 60, height: 40, fps: 10, format: "gif", scenes: [{ node: <div tw="w-full h-full bg-red-500" />, durationMs: 200 }] });
@@ -152,9 +163,11 @@ check("stylesheet keyframes drive timeMs", hash(await slideFrame(0)) !== hash(aw
 
 const turnSheet = "@keyframes turn { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } .turn { animation: turn 1s linear infinite; }";
 const turnFrame = (timeMs) => render(<div style={white}><div className="turn" style={{ width: 40, height: 40, background: "#000" }} /></div>, { width: 140, height: 60, format: "raw", timeMs, css: [turnSheet] });
-report("stylesheet rotate keyframes render identical frames on takumi-js 2.16.3", hash(await turnFrame(0)) === hash(await turnFrame(125)));
-const twspin = (timeMs) => render(<div tw="w-full h-full bg-white"><div tw="w-10 h-10 bg-black animate-spin" /></div>, { width: 100, height: 100, format: "raw", timeMs });
-report("the built-in animate-spin preset does move", hash(await twspin(0)) !== hash(await twspin(125)));
+check("a 0 to 360 degree rotate keyframe is a zero-degree step", hash(await turnFrame(0)) === hash(await turnFrame(250)), "identical at 0 and 250 ms");
+const quarterSheet = "@keyframes quarter { from { transform: rotate(0deg); } to { transform: rotate(90deg); } } .quarter { animation: quarter 1s linear infinite; }";
+const quarterFrame = (timeMs) => render(<div style={white}><div className="quarter" style={{ width: 40, height: 40, background: "#000" }} /></div>, { width: 140, height: 60, format: "raw", timeMs, css: [quarterSheet] });
+check("a sub-180 degree rotate keyframe animates", hash(await quarterFrame(0)) !== hash(await quarterFrame(125)), "0 vs 125 ms");
+check("the built-in animate-spin preset moves a frame", hash(await spin(0)) !== hash(await spin(125)), "0 vs 125 ms");
 
 const response = new ImageResponse(card, { width: 200, height: 100, headers: { "cache-control": "public, max-age=60" } });
 const served = new Uint8Array(await response.arrayBuffer());
@@ -169,6 +182,13 @@ const unknownProp = await probe(() => render(<div style={{ definitelyNotACssProp
 check("an unknown CSS property name is dropped silently", !unknownProp.error, unknownProp.error || "rendered");
 const badValue = await probe(() => render(<div style={{ display: "not-a-display", width: 40, height: 20 }} />, { width: 40, height: 20 }));
 check("a known CSS property with a bad value throws with its name", Boolean(badValue.error) && badValue.error.includes("display"), badValue.error || "no throw");
+
+const sticky = await probe(() => render(<div style={{ position: "sticky", width: 20, height: 10 }} />, { width: 40, height: 20, format: "raw" }));
+check("position: sticky is rejected by name", Boolean(sticky.error) && sticky.error.includes("invalid value for position"), sticky.error || "no throw");
+const mediaPixel = async (css) => (await render(<div style={white}><div className="m" style={{ width: 40, height: 20 }} /></div>, { width: 40, height: 20, format: "raw", css: [css] })).slice(0, 4).join(",");
+const darkMedia = await mediaPixel("@media (prefers-color-scheme: dark) { .m { background: #000; } }");
+const narrowMedia = await mediaPixel("@media (min-width: 10px) { .m { background: #123456; } }");
+check("prefers-color-scheme never applies while a matching min-width block does", darkMedia === "255,255,255,255" && narrowMedia === "18,52,86,255", darkMedia + " vs " + narrowMedia);
 
 const styled = await render(<div className="prec" tw="w-full h-full bg-blue-500" style={{ background: "#00ff00" }} />, { width: 10, height: 10, format: "raw", css: [".prec { background: #ff0000; }"] });
 check("an inline style beats a tw utility", styled[1] === 255 && styled[0] === 0, "rgba " + styled.slice(0, 4).join(","));
