@@ -13,8 +13,8 @@ Verified against `takumi-js@2.16.3`, `@takumi-rs/core@2.16.3`, `@takumi-rs/helpe
 | `takumi-js` | `render`, `measure`, `renderSvg`, `renderAnimation`, `setGlyphCacheMaxBytes` |
 | `takumi-js/node` | `Renderer`, `setGlyphCacheMaxBytes`; forces the native backend. |
 | `takumi-js/wasm` | `Renderer`, `init`, `initSync`, `setGlyphCacheMaxBytes`, `default`; forces WebAssembly. |
-| `takumi-js/wasm/no-init` | `@takumi-rs/wasm` re-exported, for a runtime that skips `init()`. |
-| `takumi-js/wasm-url` | Default-exports the binary URL for a bundler to resolve. |
+| `takumi-js/wasm/no-init` | The wasm entry without the auto-init import, for a browser or worker bundle. |
+| `takumi-js/wasm-url` | Default-exports the binary URL, for Vite, webpack, or Turbopack to rewrite to its emitted asset. |
 | `takumi-js/response` | `ImageResponse`, also as `default`. |
 | `takumi-js/helpers` | `googleFonts`, `fontFromUrl`, `subsetFonts`, `collectCodepoints`, `prepareImages`, `container`, `text`, `image`, the lazy lengths (`em`, `rem`, `vh`, `vw`, `fr`, `percentage`, `rgba`), and the fetch limits (`defaultMaxFetchBytes`, `fetchOk`, `readBodyLimited`). |
 | `takumi-js/helpers/jsx` | `fromJsx`, `defaultStylePresets`, `Bitmap` |
