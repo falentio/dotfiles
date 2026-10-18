@@ -40,7 +40,7 @@ const renderer = new Renderer();
 const png = await renderer.render(node, { width: 1200, height: 630 });
 ```
 
-The wasm build carries the same built-in face and the same option names, and it renders without `init()` too. WebP on wasm is always lossless and `quality` applies to JPEG only. `takumi-js/wasm/no-init` re-exports `@takumi-rs/wasm` when you would rather skip the wrapper, and `takumi-js/wasm-url` default-exports the binary URL for a bundler that has to resolve it.
+The wasm build carries the same built-in face and the same option names, and it renders without `init()` too. WebP on wasm is always lossless and `quality` applies to JPEG only. For a browser or web worker bundle the pair is `takumi-js/wasm/no-init`, which leaves the auto-init entry out, and `takumi-js/wasm-url`, the binary URL that Vite, webpack, and Turbopack rewrite to the asset they emit.
 
 ## Animation
 
