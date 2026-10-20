@@ -25,6 +25,7 @@ Read each target skill's `SKILL.md` with the read tool.
 - Any code → name the data shape first, then pick its structure per **principle-model-the-domain**.
 - Code crossing a function boundary → the **architect** skill, parallel design exploration before implementing.
 - Parallel fan-out → the **swarm** skill (coverage matrices, races, gauntlets, exploration partitions). Design or code bakeoffs → the **arena** skill.
+- Spawning, resuming, watching, steering, or cancelling another agent in T3 Code, or choosing child task versus top-level thread → the **t3-orchestration** skill.
 - Contested design → the **interrogate** skill before shipping.
 - Nontrivial multi-step → write the throughput checkpoint (Feature step 3).
 - Any prose surface → the **unslop** skill. Authoring agent-facing prose also loads the **writing-great-skills** and **writing-for-agents** skills.
@@ -94,7 +95,7 @@ Scan every entry before implementation. When a trigger matches, read the leaf sk
 
 **Use `role: "implementation"` on `tools.mcp__t3_code__delegate_task` for any subagent you spawn inside a playbook step** (code-writing delegates, ad-hoc helpers), and require each to invoke the `poteto-agent` persona skill before any work. Routed workflow skills (`how`, `why`, `interrogate`, `reflect`, `swarm`) name their own `role` for independent review; respect what the skill prescribes. `tools.mcp__t3_code__delegate_task` is provided by T3; it exists only when pi runs inside a T3 thread. T3's `role` is a one-line framing prefix only, never a persona loader, so a persona travels as a skill the child reads.
 
-**Defaults for every `tools.mcp__t3_code__delegate_task` call.** Run them in parallel by emitting multiple calls in one message, pass file pointers not inlined context, and omit `tools.mcp__t3_code__delegate_task`'s `target` so the subagent inherits the parent chat model. Tier the work by scope and prompt, not by model.
+**Defaults for every `tools.mcp__t3_code__delegate_task` call.** Run them in parallel by emitting multiple calls in one message, pass file pointers not inlined context, and omit `tools.mcp__t3_code__delegate_task`'s `target` so the subagent inherits the parent chat model. Tier the work by scope and prompt, not by model. Field semantics, delivery modes, and the failure codes live in the **t3-orchestration** skill; read it before a call you have not made before, and whenever a delegated task hangs, goes silent, or must be steered.
 
 You own every subagent's work. Review the diff and write your own summary, don't pass through what it said. Fire a fresh subagent with consolidated scope rather than resuming an interrupted one, which silently drops directives. A second opinion is the same prompt in an independent subagent. Agreement is high-signal.
 

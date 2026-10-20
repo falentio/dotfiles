@@ -23,7 +23,7 @@ A: main agent [1]
     └── S crawls the codebase  ← reads what C returned [1a2]
 ```
 
-Spawn the cloner regardless of whether `~/.pi/source` looks populated — the cloner owns that check. One scout per area; record the returned `childThreadId`.
+Spawn the cloner regardless of whether `~/.pi/source` looks populated — the cloner owns that check. One scout per area; record the returned `childThreadId`. Field semantics for the spawn, the fork, and a scout that goes silent: the **t3-orchestration** skill.
 
 ## Reuse the scout
 

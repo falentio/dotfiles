@@ -82,11 +82,11 @@ Our own project's build output is fair game — `dist/` from our library, `.nuxt
 
 A lookup that needs one query runs here. Anything wider — several queries, or sources you must read and reconcile — runs in a `tools.mcp__t3_code__delegate_task` subagent: this context keeps the answer, the child thread keeps the search ceremony.
 
-**Delegating spawns a subagent** — an agent of this thread, scoped to the one task in its prompt. `delegate_task` returns two handles: `taskId` for that run, frozen at its terminal state (read with `task_status`, cancel with `task_cancel`), and `childThreadId` for the child's session, a full T3 thread the thread ops act on (`t3_thread_wait`, `t3_thread_send`, `t3_thread_interrupt`).
+**Delegating spawns a subagent** — an agent of this thread, scoped to the one task in its prompt. Its two handles, the delivery modes, and the result fields live in the **t3-orchestration** skill; read it before a call you have not made before.
 
-**Work leaves this context as a subagent.** `tools.mcp__t3_code__create_threads` and `tools.mcp__t3_code__t3_thread_launch` open ordinary top-level conversations — peers of this chat, and the user's call: open one when the user asks for a separate, new, or top-level thread, and name it in your reply.
+**Work leaves this context as a subagent.** A top-level thread — `create_threads`, `t3_thread_launch` — is a peer of this chat and the user's call: open one when the user asks for a separate, new, or top-level thread, and name it in your reply.
 
-An async child notifies this thread when it reaches a terminal state — steered into an active turn, queued otherwise — so the default is to **end the turn** and let that notification arrive; read the result with `task_status` when you need it mid-turn. Reach for `t3_thread_wait` only when the result is needed before the turn can continue: `childThreadId` plus a `timeoutMs`, re-called while the reply is `timedOut: true`. `timeoutMs` bounds one wait call; it never estimates the child, so a `sleep`, a `task_status` poll loop, and a long timeout picked to outlast a guess stay banned.
+An async child notifies this thread when it finishes, so the default is to **end the turn** and let that notification arrive. Reach for `t3_thread_wait` only when the result is needed before the turn can continue, re-called while the reply is `timedOut: true` — never a `sleep` or a poll loop.
 
 Crawl the codebase through a scout, never in this context:
 
@@ -102,4 +102,4 @@ Ask the scout for findings, not the crawl: the answer, findings anchored to `pat
 
 Reuse a scout's `childThreadId` across the subagents that follow — implementer, researcher, reviewer — so they ask it instead of re-reading. Fork the scout once per receiver with `t3_thread_fork` and hand each its own `targetThreadId`, so every subagent has a dedicated crawler. Arena, swarm, and any fan-out fork N times, one per worker. The `codebase-scout` skill holds the steps and the reply shape.
 
-Read [delegated-subagents.md](docs/delegated-subagents.md) for the call shapes, the status fields, and the gotchas.
+Call shapes, delivery modes, status fields, queue control, and the failure codes: the **t3-orchestration** skill.
