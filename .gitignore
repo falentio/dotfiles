@@ -33,3 +33,6 @@ config/fish/tide-backup/
 .env
 .env.*
 *.pem
+
+# screenshot and run-log proof captured during a session, machine-local
+.audit/*
