@@ -32,7 +32,7 @@ Claude saves an `.html` file. Open it in your browser and press things.
 - `SKILL.md` — the instructions Claude follows
 - `assets/core.js` — the engine: free 3D camera, shapes and shading, ink, see-through and labels, game keypad, the page with its buttons and controls
 - `assets/examples/` — complete figures to learn from (toaster, desk lamp, claw machine)
-- `scripts/build.py` — makes one self-contained file with zoom and the phone layout: `python3 scripts/build.py figure.html OUT.html`
+- `scripts/build.js` — makes one self-contained file with zoom and the phone layout: `node scripts/build.js figure.html OUT.html`
 
 Plain text only. Nothing runs on install; figures run in the browser like any web page, with no outside requests.
 

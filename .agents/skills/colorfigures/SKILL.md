@@ -9,7 +9,7 @@ Hand-inked, flat-coloured isometric objects you can turn round, see inside and p
 page: a small engine (`assets/core.js`) plus your figure script, which models the object in 3D and draws it with the
 engine's shapes. The engine owns the camera (drag to turn, a Turntable and Front view button, arrow keys), the
 shading (three flat tones by the way a face meets the light, which turns with the viewer), the ink and the cast
-shadow. `scripts/build.py` makes the finished page: it inlines the engine and adds zoom, notices, the See-through /
+shadow. `scripts/build.js` makes the finished page: it inlines the engine and adds zoom, notices, the See-through /
 Labels switches and the phone layout.
 
 A figure has three looks, all from the same model:
@@ -32,7 +32,7 @@ A figure has three looks, all from the same model:
 4. **Write `figure.html`** (name it after the object): a doctype/head shell, `<script src="core.js"></script>`, then one
    inline `<script>` that defines the geometry and calls `mountFigure({...})`, then `xrMount(() => ui, () => '')`.
 5. **Look at it from every side** with headless Chrome (*Verify*), fix, repeat (at most 3 rounds).
-6. **Build one file:** `python3 "<skill folder>/scripts/build.py" figure.html OUT.html`. Hand over OUT.html and say
+6. **Build one file:** `node "<skill folder>/scripts/build.js" figure.html OUT.html`. Hand over OUT.html and say
    what the buttons do (the page shows no instructions).
 
 ## Truth first (how the real thing is built)
