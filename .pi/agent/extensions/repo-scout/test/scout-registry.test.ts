@@ -394,6 +394,36 @@ describe("ScoutRegistry", () => {
 		await assert.rejects(running, /evicted while this question ran/);
 	});
 
+	it("stops an open that is waiting for the lock when shutdown starts", async () => {
+		let wait: AbortSignal | undefined;
+		const registry = new ScoutRegistry({
+			acquire: async (_request, signal) => {
+				wait = signal;
+				await new Promise<never>((_, reject) => {
+					signal?.addEventListener("abort", () => reject(new Error("lock wait aborted")), { once: true });
+				});
+				return async () => {};
+			},
+			checkout: async ({ repo: identity }) => ({ dir: "/scratch", display: identity.display }),
+			refresh: async () => {},
+			adapter: {
+				async open() {
+					throw new Error("unreachable");
+				},
+			},
+			sessionFileFor: async () => undefined,
+			newSessionFile: () => "/sessions/x.jsonl",
+			rememberSession: async () => {},
+			timers: { setInterval: () => 1, clearInterval: () => {} },
+		});
+		const running = registry.run(request("q"));
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		const shutdown = registry.shutdown();
+		await assert.rejects(running, /lock wait aborted/);
+		await shutdown;
+		assert.equal(wait?.aborted, true);
+	});
+
 	it("shutdown disposes everything and stops the sweeper", async () => {
 		const { registry, hasSweeper } = build();
 		await registry.run(request("q"));

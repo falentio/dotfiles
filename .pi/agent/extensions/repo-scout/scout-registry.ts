@@ -164,6 +164,8 @@ export class ScoutRegistry {
 	private readonly now: () => number;
 	private readonly timers: NonNullable<ScoutRegistryOptions["timers"]>;
 	private readonly sweep: unknown;
+	/** Aborted on shutdown, so an open waiting on another process's lock does not hold the exit. */
+	private readonly closing = new AbortController();
 	private closed = false;
 
 	private readonly options: ScoutRegistryOptions;
@@ -255,6 +257,7 @@ export class ScoutRegistry {
 		if (this.closed) return;
 		this.closed = true;
 		this.timers.clearInterval(this.sweep);
+		this.closing.abort();
 		await Promise.allSettled([...this.opening.values()]);
 		for (const key of [...this.entries.keys()]) await this.evict(key);
 	}
@@ -279,7 +282,7 @@ export class ScoutRegistry {
 	}
 
 	private async open(key: string, request: ScoutRequest, signal?: AbortSignal): Promise<Entry> {
-		const release = await this.options.acquire({ repo: request.repo, ref: request.ref }, signal);
+		const release = await this.options.acquire({ repo: request.repo, ref: request.ref }, this.untilClose(signal));
 		let handedOver = false;
 		try {
 			const { dir, display, warning } = await this.options.checkout({ repo: request.repo, ref: request.ref });
@@ -332,6 +335,19 @@ export class ScoutRegistry {
 			// Opening failed or the registry closed: hand the tree back to the next process.
 			if (!handedOver) await release();
 		}
+	}
+
+	/** Abort the caller asks for, or this registry closing, whichever comes first. */
+	private untilClose(signal?: AbortSignal): AbortSignal {
+		if (!signal) return this.closing.signal;
+		const controller = new AbortController();
+		const abort = () => controller.abort();
+		if (signal.aborted || this.closing.signal.aborted) controller.abort();
+		else {
+			signal.addEventListener("abort", abort, { once: true });
+			this.closing.signal.addEventListener("abort", abort, { once: true });
+		}
+		return controller.signal;
 	}
 
 	private async remember(key: string, file: string): Promise<void> {

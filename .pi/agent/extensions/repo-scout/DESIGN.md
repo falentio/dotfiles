@@ -208,9 +208,10 @@ dependency for one mutex is not worth the install.
 
 The lock is held from before the checkout opens until the session is evicted or the process exits, not
 per question: the tree and the transcript are the shared things, and both must stay still while another
-process reads them. A second process waits up to `PI_SCOUT_LOCK_MS` and then fails naming the holder.
-Within one process the lock is reentrant, counted per directory, so a second conversation on the same
-tree does not deadlock against itself.
+process reads them. A second process waits up to `PI_SCOUT_LOCK_MS` and then fails naming the holder. Shutdown aborts
+a wait in progress, so closing pi is never stuck behind another process's session. Within one process
+the lock is reentrant, counted per directory, so a second conversation on the same tree does not
+deadlock against itself.
 
 Crash safety is the pid check plus the heartbeat: a killed holder leaves a directory the next waiter
 can prove stale. A pid is only meaningful on the host that wrote it, so a lock from another host is
