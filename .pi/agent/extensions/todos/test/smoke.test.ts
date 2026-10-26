@@ -1,14 +1,11 @@
 /**
  * Smoke test: the extension factory runs against a recording ExtensionAPI
- * stub and registers the tool, flags, and events it should, and the event
- * handlers actually dispatch: session sync, eager prelude injection,
- * reminders, context pruning, and the mid-run nudge.
+ * stub and registers the tool and events it should, and the event handlers
+ * actually dispatch: session sync, eager prelude injection, reminders,
+ * context pruning, and the mid-run nudge.
  */
 
-import { afterEach, describe, expect, it } from "bun:test";
-import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
+import { describe, expect, it } from "bun:test";
 import type {
 	ExtensionAPI,
 	ExtensionContext,
@@ -25,25 +22,7 @@ import {
 } from "./helpers.ts";
 
 describe("todos extension factory", () => {
-	let tempRoot = "";
-	const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
-
-	afterEach(() => {
-		if (tempRoot) fs.rmSync(tempRoot, { recursive: true, force: true });
-		tempRoot = "";
-		if (originalAgentDir === undefined) delete process.env.PI_CODING_AGENT_DIR;
-		else process.env.PI_CODING_AGENT_DIR = originalAgentDir;
-	});
-
-	function sandboxAgentDir(): string {
-		tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "todos-smoke-"));
-		const agent = path.join(tempRoot, "agent");
-		fs.mkdirSync(agent, { recursive: true });
-		process.env.PI_CODING_AGENT_DIR = agent;
-		return agent;
-	}
-
-	it("registers the todo tool, flags, and lifecycle events", () => {
+	it("registers the todo tool and lifecycle events", () => {
 		const { api, handlers, tools, flags } = makeRecordingAPI();
 		todosExtension(api);
 
@@ -60,12 +39,7 @@ describe("todos extension factory", () => {
 			expect(handlers.has(event)).toBe(true);
 		}
 
-		expect(flags.map((flag) => flag.name)).toEqual([
-			"todo-enabled",
-			"todo-reminders",
-			"todo-reminders-max",
-			"todo-eager",
-		]);
+		expect(flags).toEqual([]);
 
 		const tool = tools.find((t) => t.name === "todo");
 		expect(tool).toBeDefined();
@@ -99,7 +73,6 @@ describe("todos extension factory", () => {
 	it("the todo tool executes against branch-synced state", async () => {
 		const { api, handlers, tools } = makeRecordingAPI();
 		todosExtension(api);
-		sandboxAgentDir();
 
 		const phases = [
 			{ name: "Work", tasks: [{ content: "from branch", status: "pending" }] },
@@ -138,15 +111,9 @@ describe("todos extension factory", () => {
 		expect((result.details as { phases: unknown }).phases).toEqual(phases);
 	});
 
-	it("before_agent_start injects the eager prelude when configured", async () => {
+	it("before_agent_start injects the configured eager prelude", async () => {
 		const { api, handlers } = makeRecordingAPI();
 		todosExtension(api);
-		const agent = sandboxAgentDir();
-		fs.writeFileSync(
-			path.join(agent, "todo.json"),
-			JSON.stringify({ eager: "always" }),
-			"utf8",
-		);
 
 		const ctx = makeContext(
 			{ cwd: "/tmp/project" },
@@ -176,35 +143,8 @@ describe("todos extension factory", () => {
 		)?.message;
 		expect(message?.customType).toBe("eager-todo-prelude");
 		expect(message?.display).toBe(false);
-		expect(message?.content).toContain("MUST call `todo` first");
-	});
-
-	it("before_agent_start returns nothing on the default config", async () => {
-		const { api, handlers } = makeRecordingAPI();
-		todosExtension(api);
-		sandboxAgentDir();
-
-		const ctx = makeContext(
-			{ cwd: "/tmp/project" },
-			{
-				getBranch: () => [],
-				getCwd: () => "/tmp/project",
-				getSessionFile: () => "/tmp/project/session.jsonl",
-			},
-		);
-		await dispatch(
-			handlers,
-			"session_start",
-			{ type: "session_start", reason: "startup" },
-			ctx,
-		);
-		const results = await dispatch(
-			handlers,
-			"before_agent_start",
-			{ type: "before_agent_start", prompt: "Build the feature" },
-			ctx,
-		);
-		expect(results[0]).toBeUndefined();
+		expect(message?.content).toContain("Consider calling `todo` first");
+		expect(message?.content).not.toContain("MUST");
 	});
 
 	async function makeEntryCapture(api: ExtensionAPI) {
@@ -260,7 +200,6 @@ describe("todos extension factory", () => {
 	it("does not remind about todos the tool already completed", async () => {
 		const { api, handlers, tools } = makeRecordingAPI();
 		todosExtension(api);
-		sandboxAgentDir();
 		const ctx = makeContext(
 			{ cwd: "/tmp/project" },
 			{
@@ -299,7 +238,6 @@ describe("todos extension factory", () => {
 	it("reminds about live incomplete todos", async () => {
 		const { api, handlers, tools } = makeRecordingAPI();
 		todosExtension(api);
-		sandboxAgentDir();
 		const ctx = makeContext(
 			{ cwd: "/tmp/project" },
 			{
@@ -339,7 +277,6 @@ describe("todos extension factory", () => {
 	it("does not remind after completion", async () => {
 		const { api, handlers, tools } = makeRecordingAPI();
 		todosExtension(api);
-		sandboxAgentDir();
 		const ctx = makeContext(
 			{ cwd: "/tmp/project" },
 			{
@@ -386,7 +323,6 @@ describe("todos extension factory", () => {
 		const { api, handlers, tools } = makeRecordingAPI();
 		const entries = await makeEntryCapture(api);
 		todosExtension(api);
-		sandboxAgentDir();
 		const ctx = makeContext(
 			{ cwd: "/tmp/project" },
 			{
@@ -426,7 +362,6 @@ describe("todos extension factory", () => {
 		const { api, handlers, tools } = makeRecordingAPI();
 		const entries = await makeEntryCapture(api);
 		todosExtension(api);
-		sandboxAgentDir();
 		const ctx = makeContext(
 			{ cwd: "/tmp/project" },
 			{ getBranch: () => [], getCwd: () => "/tmp/project", getSessionFile: () => undefined },
@@ -453,7 +388,6 @@ describe("todos extension factory", () => {
 		const { api, handlers, tools } = makeRecordingAPI();
 		const entries = await makeEntryCapture(api);
 		todosExtension(api);
-		sandboxAgentDir();
 		const ctx = makeContext(
 			{ cwd: "/tmp/project" },
 			{
@@ -495,7 +429,6 @@ describe("todos extension factory", () => {
 	it("prunes superseded tracker messages from outgoing context", async () => {
 		const { api, handlers } = makeRecordingAPI();
 		todosExtension(api);
-		sandboxAgentDir();
 		const ctx = makeContext({ cwd: "/tmp/project" });
 		await dispatch(
 			handlers,
@@ -543,7 +476,6 @@ describe("todos extension factory", () => {
 			expect(options).toEqual({ deliverAs: "steer" });
 		};
 		todosExtension(api);
-		sandboxAgentDir();
 
 		// Seed state via session_start with an existing todo.
 		const ctx = makeContext(

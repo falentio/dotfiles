@@ -7,7 +7,7 @@ import { describe, expect, it } from "bun:test";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { AssistantMessage, TextContent } from "@earendil-works/pi-ai";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
-import { TODO_CONFIG_DEFAULTS, type TodoConfig } from "../config.ts";
+import { TODO_CONFIG, type TodoConfig } from "../config.ts";
 import {
 	EAGER_TODO_PRELUDE_CUSTOM_TYPE,
 	isAwaitingUserAnswer,
@@ -39,7 +39,7 @@ function makeTracker(overrides: {
 	// and the tracker reads/writes it through the host interface.
 	let phases: TodoPhase[] = [];
 	const host = {
-		config: () => ({ ...TODO_CONFIG_DEFAULTS, ...overrides.config }),
+		config: () => ({ ...TODO_CONFIG, ...overrides.config }),
 		getPhases: () => phases,
 		setPhases: (next: TodoPhase[]) => {
 			phases = next;
@@ -71,8 +71,8 @@ function assistantMessage(
 }
 
 describe("createEagerTodoPrelude", () => {
-	it("returns nothing on the default eager mode", () => {
-		const { tracker } = makeTracker({});
+	it("returns nothing when eager is default", () => {
+		const { tracker } = makeTracker({ config: { eager: "default" } });
 		expect(
 			tracker.createEagerTodoPrelude("Do the thing", makeContext()),
 		).toBeUndefined();

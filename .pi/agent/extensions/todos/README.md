@@ -53,18 +53,13 @@ not part of this extension; it is discovered like any other agent skill.
 
 ## Config
 
-Read from `<agent dir>/todo.json`, optionally overridden per trusted project
-at `<cwd>/.pi/todo.json`.
+Settings live in `config.ts` in `TODO_CONFIG`: `enabled` gates the tool and
+every tracker behavior, `reminders` and `remindersMax` control the stop-time
+completion reminder, and `eager` is one of `default` (no prelude), `preferred`
+(a soft reminder), or `always` (a MUST-call reminder). The shipped value is
+`preferred`.
 
-```json
-{ "enabled": true, "reminders": true, "remindersMax": 3, "eager": "default" }
-```
-
-`eager` is `default` (no prelude), `preferred` (a soft reminder), or `always`
-(a MUST-call reminder). CLI flags `--todo-enabled`, `--todo-reminders`,
-`--todo-reminders-max`, and `--todo-eager`, and the matching `PI_TODO_*`
-environment variables, override the JSON. A global `enabled: false` is a floor
-that project config cannot raise.
+No JSON file, environment variable, or CLI flag is read.
 
 ## Develop
 
@@ -89,6 +84,6 @@ under its `node_modules/@types/bun`).
 Then run the checks:
 
 ```sh
-bun test          # 126 tests
+bun test          # 113 tests
 tsc --noEmit
 ```
