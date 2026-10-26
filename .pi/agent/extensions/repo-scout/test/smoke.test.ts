@@ -14,7 +14,8 @@ import { after, describe, it } from "node:test";
 import { fauxAssistantMessage, fauxProvider, fauxText } from "@earendil-works/pi-ai/providers/faux";
 import { ModelRegistry, ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { ScoutRegistry } from "../scout-registry.ts";
-import { buildRegistry, identifyRepo, prepareCheckout, runRepoScout, sessionsDir } from "../tools.ts";
+import { buildRegistry, checkoutFor, identifyRepo, runRepoScout, sessionsDir } from "../tools.ts";
+import { refreshCheckout } from "../checkout.ts";
 import { sessionFileName } from "../repo-id.ts";
 
 const git = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
@@ -81,9 +82,10 @@ describe("repo_scout over a real AgentSession", () => {
 		const built = buildRegistry({ source: () => source, log: { info: () => {}, warn: () => {}, error: () => {} } });
 		// The production checkout path and adapter, with a clock the test owns.
 		const registry = new ScoutRegistry({
-			prepare: prepareCheckout,
+			checkout: checkoutFor,
+			refresh: refreshCheckout,
 			adapter: built.adapter,
-			sessionFileFor: (key) => join(sessionsDir(), `${sessionFileName(key)}.jsonl`),
+			sessionFileFor: (key) => join(sessionsDir(), sessionFileName(key)),
 			idleMs: 600_000,
 			now: () => now,
 			timers: {
@@ -98,17 +100,19 @@ describe("repo_scout over a real AgentSession", () => {
 		});
 
 		const identity = await identifyRepo(repo, repo);
+		const choice = { model: faux.getModel(), modelRegistry };
 		const first = await runRepoScout({
 			params: { repo, question: "what is exported?" },
 			registry,
 			cwd: repo,
+			choice,
 		});
 		assert.match(first, /^answer/m);
 		assert.match(first, /\bsha    [0-9a-f]{7,12}/);
 		assert.match(first, /turn   opened/);
 		assert.equal(registry.size(), 1);
 
-		const second = await runRepoScout({ params: { repo, question: "and again?" }, registry, cwd: repo });
+		const second = await runRepoScout({ params: { repo, question: "and again?" }, registry, cwd: repo, choice });
 		assert.match(second, /turn   continued/);
 		assert.equal(registry.size(), 1);
 
@@ -123,7 +127,7 @@ describe("repo_scout over a real AgentSession", () => {
 		now += 600_001;
 		tick?.();
 		assert.equal(registry.size(), 0);
-		const third = await runRepoScout({ params: { repo, question: "back again?" }, registry, cwd: repo });
+		const third = await runRepoScout({ params: { repo, question: "back again?" }, registry, cwd: repo, choice });
 		assert.match(third, /turn   continued/, "a reopened session continues the same conversation");
 		assert.equal(prompts[2], "back again?", "the replayed conversation is not re-primed");
 		const files = readdirSync(sessionsDir());

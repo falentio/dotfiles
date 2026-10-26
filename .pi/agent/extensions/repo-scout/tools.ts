@@ -2,8 +2,11 @@
  * The two tools, as plain functions.
  *
  * Kept apart from the extension entry so they can be exercised without pi: `runRepoScout` takes an
- * already-built registry, and `runPackageRepo` takes an optional resolver, so tests swap both for
- * fakes without an `ExtensionContext`.
+ * already-built registry and the caller's model choice, and `runPackageRepo` takes an optional
+ * resolver, so tests swap both for fakes without an `ExtensionContext`.
+ *
+ * A repo question carries everything the registry needs to key it: the repo, the ref, the model,
+ * and the thinking level. Nothing is recovered from a side table.
  */
 
 import { existsSync } from 'node:fs';
@@ -16,12 +19,7 @@ import type { ModelRegistry } from '@earendil-works/pi-coding-agent';
 import { createAgentAdapter, type ScoutModelSource } from './agent-session.ts';
 import { ensureCheckout, headSha, originOf, refreshCheckout } from './checkout.ts';
 import { localRepoIdentity, parseRemoteRepo, sessionFileName, type RepoIdentity } from './repo-id.ts';
-import {
-	PACKAGE_SOURCES,
-	resolvePackageRepo,
-	type PackageRepoResult,
-	type PackageSource,
-} from './registry.ts';
+import { PACKAGE_SOURCES, resolvePackageRepo, type PackageRepoResult, type PackageSource } from './registry.ts';
 import { ScoutRegistry, type Logger, type ScoutAdapter, type ScoutResult } from './scout-registry.ts';
 
 /** Root of everything this extension writes. Overridable for tests and for a second mind. */
@@ -39,6 +37,12 @@ export const idleMs = (): number => {
 	return Number.isFinite(raw) && raw > 0 ? raw : 600_000;
 };
 
+/** One turn's ceiling. PI_SCOUT_TURN_MS moves it. */
+export const turnMs = (): number => {
+	const raw = Number(process.env.PI_SCOUT_TURN_MS);
+	return Number.isFinite(raw) && raw > 0 ? raw : 900_000;
+};
+
 /** The report plus its provenance, so the caller sees which tree and commit answered. */
 const withSource = (repo: string, result: ScoutResult, currentSha: string): string =>
 	[
@@ -50,6 +54,7 @@ const withSource = (repo: string, result: ScoutResult, currentSha: string): stri
 		'sha    ' + currentSha,
 		'thread ' + (result.sessionFile ?? '(not persisted)'),
 		'turn   ' + (result.fresh ? 'opened' : 'continued'),
+		...result.warnings.map((warning) => 'warning ' + warning),
 	].join('\n');
 
 /** Resolve whatever the caller passed: an existing checkout, a URL, or owner/name. */
@@ -64,36 +69,15 @@ export const identifyRepo = async (repo: string, cwd: string): Promise<RepoIdent
 	return parseRemoteRepo(trimmed);
 };
 
-/** Rebuild the identity from a registry key; the key is the only handle the registry keeps. */
-export const identityFor = (key: string): RepoIdentity =>
-	key.startsWith('local:') ? localRepoIdentity(key.slice('local:'.length), undefined) : parseRemoteRepo(key);
-
-/**
- * What each key was last asked about. The key alone cannot say where a local checkout lives (it is
- * derived from the origin) or which ref was pinned, and without this a local repo would be cloned
- * from its remote instead of read from the tree the caller is working in.
- */
-type CheckoutRequest = { identity: RepoIdentity; ref?: string };
-const requests = new Map<string, CheckoutRequest>();
-
-/** The registry key for a repo at a ref: two refs are two conversations, not one. */
-export const scoutKey = (identity: RepoIdentity, ref?: string): string =>
-	ref ? identity.key + '@' + ref : identity.key;
-
-export const prepareCheckout = async (key: string): Promise<{ dir: string; display: string }> => {
-	const remembered = requests.get(key);
-	const identity = remembered?.identity ?? identityFor(key);
-	const ref = remembered?.ref;
-	const dir = await ensureCheckout(identity, reposDir(), ref);
-	// A checkout that sat on disk since yesterday should not answer about yesterday's code.
-	await refreshCheckout(dir, ref);
-	return { dir, display: ref ? identity.display + '@' + ref : identity.display };
+/** Clone the tree for a request when it is missing, and verify an existing tree belongs to it. */
+export const checkoutFor = async (request: { repo: RepoIdentity; ref?: string }): Promise<{ dir: string; display: string; warning?: string }> => {
+	const { dir, warning } = await ensureCheckout(request.repo, reposDir(), request.ref);
+	return { dir, display: request.ref ? request.repo.display + '@' + request.ref : request.repo.display, warning };
 };
 
 export type ScoutModelChoice = {
 	model: Model<any>;
 	modelRegistry: Pick<ModelRegistry, 'find'>;
-	thinkingLevel?: ThinkingLevel;
 };
 
 export type RepoScoutInput = {
@@ -104,13 +88,6 @@ export type RepoScoutInput = {
 	/** provider/model; the caller's model when absent. */
 	model?: string;
 	thinkingLevel?: ThinkingLevel;
-};
-
-export type RepoScoutDeps = {
-	cwd: string;
-	/** The calling thread's model choice, read once per conversation. */
-	chooseModel: () => ScoutModelChoice;
-	log?: Logger;
 };
 
 /** provider/model looked up in the caller's registry. */
@@ -124,59 +101,58 @@ const resolveModel = (base: ScoutModelChoice, spec: string): Model<any> => {
 
 export type BuiltRegistry = { registry: ScoutRegistry; adapter: ScoutAdapter };
 
-/** Build the built-in registry: scratch checkouts plus agent sessions on the caller's model. */
+/** Build the one registry: scratch checkouts plus agent sessions on the caller's model. */
 export const buildRegistry = (deps: {
-	/** Read per conversation open, so a thread that switched models is followed. */
+	/** Read per conversation open, for the provider runtime. */
 	source: () => ScoutModelSource;
-	thinkingLevel?: ThinkingLevel;
-	/** provider/model; the source's model when absent. */
-	modelOverride?: string;
 	log?: Logger;
 }): BuiltRegistry => {
-	const adapter = createAgentAdapter({
-		getSource: deps.source,
-		thinkingLevel: deps.thinkingLevel,
-		model: deps.modelOverride ? resolveModel(modelChoice(deps.source()), deps.modelOverride) : undefined,
-		sessionsDir: sessionsDir(),
-	});
+	const adapter = createAgentAdapter({ getSource: deps.source, sessionsDir: sessionsDir() });
 	return {
 		adapter,
 		registry: new ScoutRegistry({
-			prepare: prepareCheckout,
+			checkout: checkoutFor,
+			refresh: refreshCheckout,
 			adapter,
-			sessionFileFor: (key) => join(sessionsDir(), sessionFileName(key) + '.jsonl'),
+			sessionFileFor: (key) => join(sessionsDir(), sessionFileName(key)),
 			idleMs: idleMs(),
+			turnMs: turnMs(),
 			log: deps.log,
 		}),
 	};
 };
 
-/** The model a source currently names, in the shape the resolver wants. */
-const modelChoice = (source: ScoutModelSource): ScoutModelChoice => ({
-	model: source.model as Model<any>,
-	modelRegistry: source.modelRegistry,
-});
-
 /**
  * Ask one question of a repo's scout, optionally at a ref.
  *
  * The repo is identified first, so a typo fails before any network. The question then queues behind
- * any earlier question for the same repo and ref, and the idle clock restarts when it settles.
+ * any earlier question for the same repo, ref, model, and thinking level, and the idle clock
+ * restarts when it settles.
  */
 export async function runRepoScout(input: {
 	params: RepoScoutInput;
 	registry: ScoutRegistry;
 	cwd: string;
+	choice: ScoutModelChoice;
+	signal?: AbortSignal;
 }): Promise<string> {
-	const { params, registry, cwd } = input;
+	const { params, registry, cwd, choice } = input;
 	const question = params.question?.trim();
 	if (!question) throw new Error('question is empty');
 	const identity = await identifyRepo(params.repo, cwd);
 	const ref = params.ref?.trim() || undefined;
-	const key = scoutKey(identity, ref);
-	requests.set(key, { identity, ref });
+	const model = params.model ? resolveModel(choice, params.model) : choice.model;
 	await mkdir(sessionsDir(), { recursive: true });
-	const result = await registry.run(key, question);
+	const result = await registry.run(
+		{
+			repo: identity,
+			ref,
+			model,
+			thinkingLevel: params.thinkingLevel ?? 'medium',
+			question,
+		},
+		input.signal,
+	);
 	return withSource(ref ? identity.display + '@' + ref : identity.display, result, await headSha(result.dir));
 }
 

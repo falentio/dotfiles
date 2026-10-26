@@ -1,12 +1,12 @@
 /**
  * The one place a scout `AgentSession` is created.
  *
- * Everything here is a translation between the registry's small contract (open, ask, file, dispose)
- * and the pi SDK. The interesting choices, all made here rather than by a caller:
+ * Everything here is a translation between the registry's small contract (open, ask, file, abort,
+ * dispose) and the pi SDK. The interesting choices, all made here rather than by a caller:
  *
- *   - **The caller's model and runtime.** `ctx.model` with `ctx.modelRegistry` means a scout
- *     authenticates exactly as the thread that asked, with no second credential path. No
- *     `updateModel`: a model switch drops the cache the whole design exists to keep.
+ *   - **The caller's model and runtime.** The request names its model; the runtime comes from the
+ *     calling thread's context, so a scout authenticates exactly as the thread that asked, with no
+ *     second credential path.
  *   - **Read-only tools.** read, grep, find, ls. No bash (which reaches the network and the host),
  *     no edit or write (a scout answers questions; it does not change the code under study).
  *   - **The scout skills, and nothing else.** A resource loader with extensions and context files
@@ -17,7 +17,6 @@
 import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import type { Model } from "@earendil-works/pi-ai/compat";
 import {
 	type AgentSession,
@@ -28,7 +27,7 @@ import {
 	createAgentSession,
 	getAgentDir,
 } from "@earendil-works/pi-coding-agent";
-import type { ScoutAdapter, ScoutConversation } from "./scout-registry.ts";
+import type { ScoutAdapter, ScoutConversation, ScoutThinking } from "./scout-registry.ts";
 
 /** Read-only by construction: a question is answered by reading. */
 export const SCOUT_TOOLS = ["read", "grep", "find", "ls"] as const;
@@ -65,9 +64,6 @@ export type ScoutModelSource = Pick<ExtensionContext, "model" | "modelRegistry">
 export type AgentAdapterOptions = {
 	/** The calling thread's context, read once per conversation. */
 	getSource: () => ScoutModelSource;
-	thinkingLevel?: ThinkingLevel;
-	/** Overrides the source's model. */
-	model?: Model<any>;
 	/** Where scout session files live. */
 	sessionsDir: string;
 	/** Overridable for tests. */
@@ -117,15 +113,15 @@ export const createAgentAdapter = (options: AgentAdapterOptions): ScoutAdapter =
 	const agentDir = options.agentDir ?? getAgentDir();
 
 	return {
-		async open(repo: string, dir: string, sessionFile: string | undefined): Promise<ScoutConversation> {
+		async open(repo, dir, sessionFile, choice): Promise<ScoutConversation> {
 			if (sessionFile) await mkdir(dirname(sessionFile), { recursive: true });
 			const source = options.getSource();
 			const loader = loaderFor(dir, agentDir);
 			await loader.reload();
 			const { session }: { session: AgentSession } = await create({
 				cwd: dir,
-				model: options.model ?? requireModel(source),
-				thinkingLevel: options.thinkingLevel ?? "medium",
+				model: choice.model ?? requireModel(source),
+				thinkingLevel: choice.thinkingLevel ?? "medium",
 				modelRuntime: runtimeOf(source),
 				sessionManager: sessionManagerFor(dir, sessionFile, options.sessionsDir),
 				resourceLoader: loader,
@@ -137,20 +133,37 @@ export const createAgentAdapter = (options: AgentAdapterOptions): ScoutAdapter =
 			let opening = !replaying;
 			let fresh = !replaying;
 			return {
-				async ask(question: string): Promise<string> {
+				async ask(question: string, signal?: AbortSignal): Promise<string> {
+					if (signal?.aborted) throw new Error("the scout question was aborted before it started");
 					const message = opening ? `${openingMessage(repo, dir)}\n\nQuestion:\n${question}` : question;
 					opening = false;
-					await session.prompt(message);
-					fresh = false;
-					const text = lastText(session);
-					if (!text) throw new Error("the scout returned no text; the turn may have been cut off");
-					return text;
+					const onAbort = () => {
+						void session.abort();
+					};
+					signal?.addEventListener("abort", onAbort, { once: true });
+					try {
+						await session.prompt(message);
+						fresh = false;
+						const text = lastText(session);
+						if (!text) throw new Error("the scout returned no text; the turn may have been cut off");
+						return text;
+					} catch (error) {
+						// The opening turn happened, even if it failed: a retry is a continuation.
+						fresh = false;
+						if (signal?.aborted) throw new Error("the scout question was aborted");
+						throw error;
+					} finally {
+						signal?.removeEventListener("abort", onAbort);
+					}
 				},
 				sessionFile(): string | undefined {
 					return session.sessionFile;
 				},
 				fresh(): boolean {
 					return fresh;
+				},
+				abort(): void {
+					void session.abort();
 				},
 				dispose(): void {
 					session.dispose();

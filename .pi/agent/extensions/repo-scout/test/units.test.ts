@@ -81,10 +81,10 @@ describe("localRepoIdentity", () => {
 });
 
 describe("sessionFileName", () => {
-	it("is a safe filename for every key shape", () => {
-		assert.equal(sessionFileName("github.com/colinhacks/zod"), "github.com_colinhacks_zod");
-		assert.match(sessionFileName("local:/tmp/a b"), /^local-_tmp_a_b$/);
-		assert.match(sessionFileName("github.com/a/b@v1.0.0"), /^[\w.@-]+$/);
+	it("is a safe filename for every key shape, distinct through a digest", () => {
+		assert.match(sessionFileName("github.com/colinhacks/zod"), /^github\.com_colinhacks_zod-[0-9a-f]{10}\.jsonl$/);
+		assert.match(sessionFileName("local:/tmp/a b"), /^local-_tmp_a_b-[0-9a-f]{10}\.jsonl$/);
+		assert.notEqual(sessionFileName("github.com/a/b@release/1.0"), sessionFileName("github.com/a/b@release-1.0"));
 	});
 });
 

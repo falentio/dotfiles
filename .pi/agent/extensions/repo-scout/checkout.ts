@@ -14,11 +14,11 @@
  */
 
 import { execFile } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import type { RepoIdentity } from './repo-id.ts';
+import { shortHash, type RepoIdentity } from './repo-id.ts';
 
 const exec = promisify(execFile);
 
@@ -58,16 +58,9 @@ export const assertSafeRef = (ref: string): string => {
 	return ref;
 };
 
-/** A ref as a directory suffix: one path component, no separators. */
-export const sanitizeRef = (ref: string): string =>
-	ref
-		.replace(/[^\w.-]+/g, '-')
-		.replace(/-+/g, '-')
-		.replace(/^-|-$/g, '')
-
-/** The scratch directory a repo (and ref) lives in. */
+/** The scratch directory a repo (and ref) lives in. The ref is hashed raw, so two refs cannot collide. */
 export const checkoutDir = (identity: RepoIdentity, reposDir: string, ref?: string): string =>
-	join(reposDir, ref ? identity.slug + '@' + sanitizeRef(ref) : identity.slug);
+	join(reposDir, identity.slug + '-' + shortHash(identity.key + (ref ? '@' + ref : '')));
 
 /** The commit a checkout sits at, filling the report's sha. */
 export const headSha = async (dir: string): Promise<string> => {
@@ -78,33 +71,59 @@ export const headSha = async (dir: string): Promise<string> => {
 	}
 };
 
+/** One clone URL, normalized enough to compare an origin with the source that cloned it. */
+const normalizeOrigin = (value: string): string => value.trim().replace(/\.git$/i, '').replace(/\/+$/, '');
+
+const sameSource = (origin: string, source: string): boolean => {
+	if (normalizeOrigin(origin) === normalizeOrigin(source)) return true;
+	try {
+		return realpathSync(origin) === realpathSync(source);
+	} catch {
+		return false;
+	}
+};
+
+export type Checkout = { dir: string; warning?: string };
+
 /**
  * Make sure the checkout for `identity` at `ref` exists, and return its path.
  *
- * Idempotent on purpose: an existing clone is reused, and a directory that is not a repo (a clone
- * killed mid-flight leaves one) is discarded and redone.
+ * Idempotent on purpose: an existing clone is reused when its origin is the source that was asked
+ * for. A directory from another repo, or one with no origin, is discarded and cloned again; a clone
+ * killed mid-flight leaves one too.
  */
 export async function ensureCheckout(
 	identity: RepoIdentity,
 	reposDir: string,
 	ref?: string,
-): Promise<string> {
+): Promise<Checkout> {
 	await mkdir(reposDir, { recursive: true });
 	const pinned = ref ? assertSafeRef(ref) : undefined;
 	const dir = checkoutDir(identity, reposDir, pinned);
 
-	if (existsSync(dir) && existsSync(join(dir, '.git'))) return dir;
+	if (existsSync(dir) && existsSync(join(dir, '.git'))) {
+		const origin = await originOf(dir);
+		if (origin && sameSource(origin, identity.source)) return { dir };
+		await rm(dir, { recursive: true, force: true });
+		await clone(identity, dir, pinned);
+		return {
+			dir,
+			warning: `re-cloned ${dir}: its origin ${origin ?? '(none)'} is not ${identity.source}`,
+		};
+	}
 
-	// A clone that died leaves a directory that is not a repo. Remove and redo.
 	if (existsSync(dir)) await rm(dir, { recursive: true, force: true });
+	await clone(identity, dir, pinned);
+	return { dir };
+}
 
+const clone = async (identity: RepoIdentity, dir: string, pinned: string | undefined): Promise<void> => {
 	const args = ['clone', '--quiet'];
 	args.push(...(identity.kind === 'local' ? ['--shared'] : ['--depth', '1']));
 	if (pinned) args.push('--branch', pinned);
 	args.push(identity.source, dir);
 	await git(args);
-	return dir;
-}
+};
 
 /** Best-effort refresh, so a long-lived scratch clone does not answer about old code. */
 export async function refreshCheckout(dir: string, ref?: string): Promise<void> {

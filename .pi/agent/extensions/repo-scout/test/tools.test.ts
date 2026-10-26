@@ -10,10 +10,10 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
-import { checkoutDir, ensureCheckout, headSha, originOf, refreshCheckout, sanitizeRef } from "../checkout.ts";
+import { checkoutDir, ensureCheckout, headSha, originOf, refreshCheckout } from "../checkout.ts";
 import { localRepoIdentity, parseRemoteRepo } from "../repo-id.ts";
 import type { PackageRepoResult } from "../registry.ts";
-import { identifyRepo, runPackageRepo, scoutKey } from "../tools.ts";
+import { identifyRepo, runPackageRepo } from "../tools.ts";
 
 const git = (cwd: string, ...args: string[]) =>
 	execFileSync("git", args, { cwd, encoding: "utf8", env: { ...process.env, GIT_AUTHOR_DATE: "2020-01-01T00:00:00Z", GIT_COMMITTER_DATE: "2020-01-01T00:00:00Z" } }).trim();
@@ -62,15 +62,6 @@ describe("identifyRepo", () => {
 		assert.equal(identity.key, "github.com/colinhacks/zod");
 		assert.equal(identity.source, root);
 		assert.equal(identity.kind, "local");
-	});
-});
-
-describe("scoutKey", () => {
-	it("gives each ref its own conversation, and the default branch none", () => {
-		const identity = parseRemoteRepo("github.com/o/n");
-		assert.equal(scoutKey(identity), "github.com/o/n");
-		assert.equal(scoutKey(identity, "v4.0.7"), "github.com/o/n@v4.0.7");
-		assert.notEqual(scoutKey(identity, "v4.0.7"), scoutKey(identity, "v4.0.6"));
 	});
 });
 
@@ -183,11 +174,11 @@ describe("ensureCheckout", () => {
 			kind: "local" as const,
 			slug: "local-test",
 		};
-		const dir = await ensureCheckout(identity, scratch);
-		assert.equal(dir, join(scratch, "local-test"));
+		const { dir } = await ensureCheckout(identity, scratch);
+		assert.match(dir, /local-test-[0-9a-f]{10}$/);
 		assert.ok(existsSync(join(dir, "README.md")));
 		assert.match(await headSha(dir), /^[0-9a-f]{7,12}$/);
-		assert.equal(await ensureCheckout(identity, scratch), dir, "second call reuses the clone");
+		assert.equal((await ensureCheckout(identity, scratch)).dir, dir, "second call reuses the clone");
 	});
 
 	it("checks out a pinned ref into its own directory", async () => {
@@ -200,13 +191,13 @@ describe("ensureCheckout", () => {
 		roots.push(scratch);
 		const identity = localRepoIdentity(root, undefined);
 
-		assert.equal(checkoutDir(identity, scratch), join(scratch, identity.slug));
-		const pinned = await ensureCheckout(identity, scratch, "v1.0.0");
-		assert.equal(pinned, join(scratch, identity.slug + "@v1.0.0"));
+		assert.match(checkoutDir(identity, scratch), new RegExp(identity.slug + "-[0-9a-f]{10}$"));
+		const { dir: pinned } = await ensureCheckout(identity, scratch, "v1.0.0");
+		assert.match(pinned, new RegExp(identity.slug + "-[0-9a-f]{10}$"));
 		const readme = execFileSync("cat", [join(pinned, "README.md")], { encoding: "utf8" });
 		assert.equal(readme, "hello\n", "the tagged tree, not the tip");
 
-		const head = await ensureCheckout(identity, scratch);
+		const { dir: head } = await ensureCheckout(identity, scratch);
 		const tip = execFileSync("cat", [join(head, "README.md")], { encoding: "utf8" });
 		assert.equal(tip, "changed after the tag\n");
 		assert.notEqual(pinned, head, "two refs are two trees");
@@ -222,7 +213,7 @@ describe("ensureCheckout", () => {
 		assert.equal(identity.key, "github.com/example/does-not-exist");
 		assert.equal(identity.kind, "local");
 		assert.equal(identity.source, root);
-		const dir = await ensureCheckout(identity, scratch);
+		const { dir } = await ensureCheckout(identity, scratch);
 		assert.ok(existsSync(join(dir, "README.md")));
 	});
 
@@ -233,13 +224,9 @@ describe("ensureCheckout", () => {
 		const identity = localRepoIdentity(root, undefined);
 		const marker = join(scratch, "pwned");
 		const hostile = "--upload-pack=echo pwned > " + marker;
-		// The decoy branch sanitizes to the same directory name, so the second call reuses the tree
-		// and reaches refresh, which is where an unvalidated ref becomes an option.
-		const decoy = sanitizeRef(hostile);
-		git(root, "branch", decoy);
-		const pinned = await ensureCheckout(identity, scratch, decoy);
 		await assert.rejects(ensureCheckout(identity, scratch, hostile), /ref is not a git ref/);
-		await assert.rejects(refreshCheckout(pinned, hostile), /ref is not a git ref/);
+		const { dir } = await ensureCheckout(identity, scratch, "main");
+		await assert.rejects(refreshCheckout(dir, hostile), /ref is not a git ref/);
 		assert.equal(existsSync(marker), false, "git ran the ref as a command");
 	});
 

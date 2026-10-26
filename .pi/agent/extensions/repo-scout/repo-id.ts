@@ -7,6 +7,8 @@
  * session that answers about the wrong code.
  */
 
+import { createHash } from "node:crypto";
+
 /** A resolved repo: the canonical key, plus how to get a checkout of the code. */
 export type RepoIdentity = {
 	/** Canonical identity, e.g. "github.com/owner/name" or "local:/abs/path". */
@@ -52,6 +54,10 @@ export const slugFor = (key: string): string =>
 		.replace(/-+/g, "-")
 		.replace(/^-|-$/g, "")
 		.toLowerCase();
+
+/** A short, stable digest so two keys that sanitize alike still get two paths. */
+export const shortHash = (value: string): string =>
+	createHash("sha256").update(value).digest("hex").slice(0, 10);
 
 const remoteIdentity = (host: string, path: string): RepoIdentity | undefined => {
 	const cleanHost = host.toLowerCase().replace(/^www\./, "");
@@ -145,6 +151,11 @@ export function localRepoIdentity(absPath: string, origin: string | undefined): 
 	return { key, source: absPath, display: absPath, kind: "local", slug: slugFor(key) };
 }
 
-/** A filename-safe cache key for a session file. */
-export const sessionFileName = (key: string): string =>
-	key.replace(/^local:/, "local-").replace(/[^\w.-]+/g, "_") || "repo";
+/**
+ * A filename-safe cache key for a session file: a readable prefix plus a digest of the full key.
+ * Two keys that sanitize to the same readable prefix still get two files.
+ */
+export const sessionFileName = (key: string): string => {
+	const readable = (key.replace(/^local:/, "local-").replace(/[^\w.-]+/g, "_") || "repo").slice(0, 80);
+	return readable + "-" + shortHash(key) + ".jsonl";
+};

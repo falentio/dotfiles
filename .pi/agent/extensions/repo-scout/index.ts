@@ -1,26 +1,21 @@
 /**
  * repo-scout: one tool call replaces spawning and forking a scout subagent.
  *
- * `repo_scout` keeps one `AgentSession` per repo (and per ref): the same conversation, so the
- * provider prompt cache is reused; one question at a time; evicted after ten quiet minutes and
- * reopened from its session file, so the cache survives the eviction. `package_repo` answers the
- * question before it: which git repo serves this package, and at which ref.
+ * `repo_scout` keeps one `AgentSession` per conversation (repo, ref, model, thinking level): the
+ * same conversation, so the provider prompt cache is reused; one question at a time; evicted after
+ * ten quiet minutes and reopened from its session file, so the cache survives the eviction.
+ * `package_repo` answers the question before it: which git repo serves this package, and at which
+ * ref.
  *
- * The rules live in `tools.ts` (both tools, paths), `scout-registry.ts` (queue, idle clock),
- * `repo-id.ts` (identity), `registry.ts` (package provenance and refs) and `checkout.ts` (the
- * scratch tree). This file is the wiring.
+ * The rules live in `tools.ts` (both tools, paths), `scout-registry.ts` (queue, idle clock,
+ * deadline), `repo-id.ts` (identity), `registry.ts` (package provenance and refs) and
+ * `checkout.ts` (the scratch tree). This file is the wiring.
  */
 
 import type { ExtensionAPI, ExtensionToolContext } from '@earendil-works/pi-coding-agent';
 import { Type } from 'typebox';
 import { PACKAGE_SOURCES, type PackageSource } from './registry.ts';
-import {
-	buildRegistry,
-	runPackageRepo,
-	runRepoScout,
-	type BuiltRegistry,
-	type RepoScoutInput,
-} from './tools.ts';
+import { buildRegistry, runPackageRepo, runRepoScout, type BuiltRegistry, type RepoScoutInput } from './tools.ts';
 
 const line = (message: string) => console.error('[repo-scout] ' + message);
 const log = { info: line, warn: line, error: line };
@@ -76,26 +71,16 @@ const text = (value: string) => ({ content: [{ type: "text" as const, text: valu
 
 export default function repoScout(pi: ExtensionAPI) {
 	/**
-	 * One registry per (working directory, model, thinking level). The model is not part of the
-	 * conversation identity by accident: a session is bound to the model it opened with, so asking for
-	 * another model must open another conversation rather than silently re-point the cached one.
+	 * One registry for the extension. The conversation identity carries the model and thinking
+	 * level, so a model switch opens another conversation instead of re-pointing a cached one.
 	 */
-	const registries = new Map<string, BuiltRegistry>();
-	/** The context each registry reads at conversation open, refreshed on every call. */
-	const contexts = new Map<string, ExtensionToolContext>();
+	let current: ExtensionToolContext | undefined;
+	let built: BuiltRegistry | undefined;
 
-	const registryFor = (ctx: ExtensionToolContext, params: RepoScoutParams): BuiltRegistry => {
-		const key = ctx.cwd + "::" + (params.model ?? "") + "::" + (params.thinkingLevel ?? "");
-		contexts.set(key, ctx);
-		const existing = registries.get(key);
-		if (existing) return existing;
-		const built = buildRegistry({
-			source: () => contexts.get(key) ?? ctx,
-			modelOverride: params.model,
-			thinkingLevel: params.thinkingLevel,
-			log,
-		});
-		registries.set(key, built);
+	const registryFor = (ctx: ExtensionToolContext): BuiltRegistry => {
+		current = ctx;
+		if (built) return built;
+		built = buildRegistry({ source: () => current ?? ctx, log });
 		return built;
 	};
 
@@ -103,15 +88,22 @@ export default function repoScout(pi: ExtensionAPI) {
 		name: "repo_scout",
 		label: "Repo scout",
 		description:
-			"Ask a question about a codebase and get a scout report with findings anchored to path:line. Keeps one cached agent session per repo (and per ref): follow-up questions reuse the conversation. Use it instead of spawning a subagent to crawl code. A session is evicted after 10 idle minutes and reopened from disk on the next question.",
+			"Ask a question about a codebase and get a scout report with findings anchored to path:line. Keeps one cached agent session per repo, ref, model, and thinking level: follow-up questions reuse the conversation. Use it instead of spawning a subagent to crawl code. A session is evicted after 10 idle minutes and reopened from disk on the next question.",
 		parameters: repoScoutParameters,
 		exposure: "codemode",
-		// Not idempotent: every call appends a turn to the repo's conversation.
-		annotations: { readOnlyHint: true, openWorldHint: true },
-		async execute(_id: string, params: RepoScoutParams, _signal, _onUpdate, ctx: ExtensionToolContext) {
+		annotations: { readOnlyHint: false, openWorldHint: true },
+		async execute(_id: string, params: RepoScoutParams, signal, _onUpdate, ctx: ExtensionToolContext) {
 			if (!ctx.model) throw new Error("repo_scout needs a current model; select one first");
-			const { registry } = registryFor(ctx, params);
-			return text(await runRepoScout({ params, registry, cwd: ctx.cwd }));
+			const { registry } = registryFor(ctx);
+			return text(
+				await runRepoScout({
+					params,
+					registry,
+					cwd: ctx.cwd,
+					choice: { model: ctx.model, modelRegistry: ctx.modelRegistry },
+					signal,
+				}),
+			);
 		},
 	});
 
@@ -130,8 +122,9 @@ export default function repoScout(pi: ExtensionAPI) {
 	});
 
 	pi.on("session_shutdown", async () => {
-		const pending = [...registries.values()];
-		registries.clear();
-		await Promise.all(pending.map((built) => built.registry.shutdown()));
+		const pending = built;
+		built = undefined;
+		current = undefined;
+		await pending?.registry.shutdown();
 	});
 }
