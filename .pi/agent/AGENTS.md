@@ -96,6 +96,6 @@ A: main agent [1]
     └── answer: findings at path:line, gaps with probes [1a1]
 ```
 
-One session per repo, one question at a time, evicted after ten idle minutes and reopened from disk, so a follow-up reuses the prompt cache instead of re-crawling. A dependency's repo comes from **`package_repo`** (`{ package, source, version }` → a url plus a git-confirmed `ref`); pass both as `repo` and `ref`. Its source is already at `~/.pi/source` when `library-source` ran, and that path can be passed as `repo`. The **codebase-scout** skill holds the report shape and the rules.
+One session per repo, one question at a time, evicted after one idle hour and reopened from disk, so a follow-up reuses the prompt cache instead of re-crawling. A dependency's repo comes from **`package_repo`** (`{ package, source, version }` → a url plus a git-confirmed `ref`); pass both as `repo` and `ref`. Its source is already at `~/.pi/source` when `library-source` ran, and that path can be passed as `repo`. The **codebase-scout** skill holds the report shape and the rules.
 
 Delegation is for work, not for reading: several queries, or sources you must read and reconcile.

@@ -101,7 +101,7 @@ export interface ScoutRegistryOptions {
 	};
 }
 
-const DEFAULT_IDLE_MS = 600_000;
+const DEFAULT_IDLE_MS = 3_600_000;
 const DEFAULT_TURN_MS = 900_000;
 
 type Entry = {
@@ -184,7 +184,8 @@ export class ScoutRegistry {
 			},
 			clearInterval: (handle) => clearInterval(handle as ReturnType<typeof setInterval>),
 		};
-		const sweepMs = options.sweepMs ?? Math.max(1_000, Math.floor(this.idleMs / 3));
+		// An hour window must not mean an hour of slop: sweep at most every five minutes.
+		const sweepMs = options.sweepMs ?? Math.max(1_000, Math.min(300_000, Math.floor(this.idleMs / 3)));
 		this.sweep = this.timers.setInterval(() => this.sweepIdle(), sweepMs);
 	}
 

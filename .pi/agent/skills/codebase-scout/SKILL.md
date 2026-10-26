@@ -40,7 +40,7 @@ Do not spawn a subagent to crawl code. One `repo_scout` call replaces `delegate_
 |---|---|
 | Sessions per repo | one, keyed by canonical identity |
 | Concurrency | one question at a time; later questions queue in order |
-| Idle eviction | 10 minutes after a question settles; the next question reopens the same conversation |
+| Idle eviction | 1 hour after a question settles; the next question reopens the same conversation |
 | `ref` | a tag, branch, or commit; it is part of the session key, so `repo@v1.2.3` is its own conversation |
 | Tools the scout has | `read`, `grep`, `find`, `ls` — read-only, no bash, no edit |
 | Model | the caller's model; `model: "provider/id"` overrides it |

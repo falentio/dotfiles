@@ -97,7 +97,7 @@ describe("repo_scout over a real AgentSession", () => {
 				sessionFileFor: (key) => readSessionIndex(sessionsIndexDir(), key),
 				newSessionFile: (key) => join(sessionsDir(), sessionFileName(key)),
 				rememberSession: (key, file) => writeSessionIndex(sessionsIndexDir(), key, file),
-				idleMs: 600_000,
+				idleMs: 3_600_000,
 				now: () => now,
 				timers: {
 					setInterval: (fn) => {
@@ -136,7 +136,7 @@ describe("repo_scout over a real AgentSession", () => {
 		assert.equal(prompts[1], "and again?");
 
 		// Idle past the window: evicted, then reopened from the same conversation file.
-		now += 600_001;
+		now += 3_600_001;
 		tick?.();
 		assert.equal(registry.size(), 0);
 		const third = await runRepoScout({ params: { repo, question: "back again?" }, registry, cwd: repo, choice });

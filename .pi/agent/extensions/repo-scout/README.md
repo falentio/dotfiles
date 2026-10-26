@@ -50,8 +50,9 @@ with `turn continued` instead of `turn opened`.
   Eviction and shutdown release it.
 - **The caller can cancel.** Aborting the tool call aborts the scout's turn, or stops it waiting for
   the lock.
-- **Ten idle minutes, then evicted.** The clock restarts when a question settles, so a long crawl is
-  never evicted mid-run. Eviction disposes the session.
+- **One idle hour, then evicted.** The clock restarts when a question settles, so a long crawl is
+  never evicted mid-run. The sweep runs at most every five minutes, so an hour means about an hour.
+  Eviction disposes the session.
 - **Eviction does not lose the cache.** The file pi wrote is recorded in `sessions/keys/`, so the
   next question, in this process or another one, reopens that file and continues the same history. A
   new conversation is only started the first time.
@@ -131,7 +132,7 @@ loopback, link-local, or internal name. Set `GITHUB_TOKEN` to raise the search r
 | Variable | Effect |
 |---|---|
 | `PI_SCOUT_HOME` | moves both directories (tests set it) |
-| `PI_SCOUT_IDLE_MS` | idle window, default `600000` |
+| `PI_SCOUT_IDLE_MS` | idle window, default `3600000` |
 | `PI_SCOUT_TURN_MS` | one turn's ceiling, default `900000` |
 | `PI_SCOUT_LOCK_MS` | how long a second process waits for the lock, default `600000` |
 | `GITHUB_TOKEN` / `GH_TOKEN` | authenticated GitHub search in `package_repo` |

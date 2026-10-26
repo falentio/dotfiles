@@ -38,10 +38,10 @@ export const locksDir = (): string => join(stateRoot(), 'locks');
 /** The transcript index, one file per conversation key. */
 export const sessionsIndexDir = (): string => join(sessionsDir(), 'keys');
 
-/** Ten minutes of inactivity, as asked. PI_SCOUT_IDLE_MS moves it. */
+/** One hour of inactivity, as asked. PI_SCOUT_IDLE_MS moves it. */
 export const idleMs = (): number => {
 	const raw = Number(process.env.PI_SCOUT_IDLE_MS);
-	return Number.isFinite(raw) && raw > 0 ? raw : 600_000;
+	return Number.isFinite(raw) && raw > 0 ? raw : 3_600_000;
 };
 
 /** One turn's ceiling. PI_SCOUT_TURN_MS moves it. */

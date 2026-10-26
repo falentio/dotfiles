@@ -67,11 +67,11 @@ Two things end a turn other than an answer:
 Eviction settles the running waiter and rejects the queued ones. The idle sweep never evicts a busy
 entry, so in practice that happens on shutdown or an explicit evict.
 
-### 4. 10 minutes of inactivity, measured from the end of a run
+### 4. One hour of inactivity, measured from the end of a run
 
 `lastUsedAt` is set when a question settles (not when it starts, so a long crawl is not evicted
-mid-run). A sweeper ticks every `idleMs / 3` and evicts sessions idle past `idleMs` (default 600_000,
-env `PI_SCOUT_IDLE_MS`). Eviction disposes the session and drops the entry.
+mid-run). A sweeper ticks every `min(idleMs / 3, 5 minutes)` and evicts sessions idle past `idleMs`
+(default 3_600_000, env `PI_SCOUT_IDLE_MS`). Eviction disposes the session and drops the entry.
 
 Prompt cache survives eviction because the conversation is **persisted**: the session manager writes
 into `~/.pi/scout/sessions/` (a directory of its own, so pi's session listing stays clean). On the next

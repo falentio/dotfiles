@@ -3,8 +3,8 @@
  *
  * `repo_scout` keeps one `AgentSession` per repo and ref, whatever model asks: one conversation per
  * repo at one version, so the provider prompt cache is reused and two callers read the same crawl.
- * One question at a time, one cross-process lock per repo and ref, evicted after ten quiet minutes
- * and reopened from its session file, so the cache survives the eviction. A different model rebinds
+ * One question at a time, one cross-process lock per repo and ref, evicted after one quiet hour and
+ * reopened from its session file, so the cache survives the eviction. A different model rebinds
  * the same transcript instead of starting a second one. `package_repo` answers the question before
  * it: which git repo serves this package, and at which ref.
  *
@@ -89,7 +89,7 @@ export default function repoScout(pi: ExtensionAPI) {
 		name: "repo_scout",
 		label: "Repo scout",
 		description:
-			"Ask a question about a codebase and get a scout report with findings anchored to path:line. Keeps one cached agent session per repo and ref: follow-up questions reuse the conversation, and a different model continues the same one. Only one process reads a repo at a ref at a time; a second waits for the lock. Use it instead of spawning a subagent to crawl code. A session is evicted after 10 idle minutes and reopened from disk on the next question.",
+			"Ask a question about a codebase and get a scout report with findings anchored to path:line. Keeps one cached agent session per repo and ref: follow-up questions reuse the conversation, and a different model continues the same one. Only one process reads a repo at a ref at a time; a second waits for the lock. Use it instead of spawning a subagent to crawl code. A session is evicted after one idle hour and reopened from disk on the next question.",
 		parameters: repoScoutParameters,
 		exposure: "codemode",
 		annotations: { readOnlyHint: false, openWorldHint: true },
