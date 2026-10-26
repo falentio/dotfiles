@@ -87,6 +87,34 @@ const SITE_ROUTES = new Set(['issues', 'pulls', 'releases', 'wiki', 'actions', '
 const asString = (value: unknown): string | undefined =>
 	typeof value === 'string' && value.trim() ? value.trim() : undefined;
 
+const VERSION = /^[0-9A-Za-z][0-9A-Za-z.+-]*$/;
+
+/** A published version is one URL path segment: anything else never reaches a registry. */
+const versionOf = (value: string | undefined): string | undefined => {
+	if (!value) return undefined;
+	if (!VERSION.test(value) || value.includes('..') || value.endsWith('.')) {
+		throw new Error('version is not a published version: ' + JSON.stringify(value));
+	}
+	return value;
+};
+
+/** npm names are URL paths: the scope's @ stays, the slash is %2F. */
+const npmPath = (name: string): string => {
+	const encoded = name.replace(/^@/, '').split('/').map(encodeURIComponent).join('%2F');
+	return name.startsWith('@') ? '@' + encoded : encoded;
+};
+
+const warnMissingVersion = (
+	source: PackageSource,
+	version: string | undefined,
+	known: string[],
+	warnings: string[],
+): void => {
+	if (version && known.length > 0 && !known.includes(version)) {
+		warnings.push('no ' + source + ' release ' + version + '; the fields may describe another release');
+	}
+};
+
 const asRecord = (value: unknown): Record<string, unknown> | undefined =>
 	value && typeof value === 'object' ? (value as Record<string, unknown>) : undefined;
 
@@ -380,8 +408,9 @@ export function parseNpm(packument: unknown, version?: string): { version: strin
 	const resolved = version ?? npmVersion(packument) ?? null;
 	const manifest = npmManifest(packument, version);
 	if (!manifest) throw new Error('npm manifest was not an object');
-	if (version && npmVersion(packument) && !asRecord(asRecord(packument)?.versions)?.[version]) {
-		warnings.push('npm has no version ' + version + '; the fields may describe another release');
+	const known = Object.keys(asRecord(asRecord(packument)?.versions) ?? {});
+	if (version && known.length > 0 && !known.includes(version)) {
+		warnings.push('no npm release ' + version + '; the fields may describe another release');
 	}
 	const stated = reposFromManifest(manifest);
 	if (stated.length) return { version: resolved, repos: stated, warnings };
@@ -433,7 +462,7 @@ const discover = async (
 
 	switch (input.source) {
 		case 'npm': {
-			const packument = await deps.fetchJson('https://registry.npmjs.org/' + name.replace('/', '%2F'));
+			const packument = await deps.fetchJson('https://registry.npmjs.org/' + npmPath(name));
 			return parseNpm(packument, input.version);
 		}
 
@@ -444,11 +473,12 @@ const discover = async (
 			const meta = await deps.fetchJson('https://jsr.io/' + path + '/meta.json');
 			const { latest, versions } = parseJsrMeta(meta);
 			const version = pickVersion(input.version, latest, versions);
+			warnMissingVersion('jsr', input.version, versions, warnings);
 			if (!version) throw new Error('jsr reported no versions for ' + name);
 			let repos: RepoRef[] = [];
 			let deno: unknown;
 			try {
-				deno = JSON.parse(await deps.fetchText('https://jsr.io/' + path + '/' + version + '/deno.json'));
+				deno = JSON.parse(await deps.fetchText('https://jsr.io/' + path + '/' + encodeURIComponent(version) + '/deno.json'));
 				repos = reposFromJsrDenoJson(deno);
 			} catch (error) {
 				warnings.push('could not read the jsr deno.json: ' + (error instanceof Error ? error.message : String(error)));
@@ -463,10 +493,14 @@ const discover = async (
 		}
 
 		case 'crate': {
-			const crate = asRecord(await deps.fetchJson('https://crates.io/api/v1/crates/' + name));
+			const crate = asRecord(await deps.fetchJson('https://crates.io/api/v1/crates/' + encodeURIComponent(name)));
 			const info = asRecord(crate?.crate);
 			if (!info) throw new Error('crates.io returned no crate for ' + name);
 			const version = pickVersion(input.version, asString(info.max_version) ?? null, []);
+			const known = Array.isArray(crate?.versions)
+				? crate.versions.map((entry) => asString(asRecord(entry)?.num)).filter((entry): entry is string => Boolean(entry))
+				: [];
+			warnMissingVersion('crate', input.version, known, warnings);
 			let repos = reposFromManifest({ repository: info.repository, homepage: info.homepage });
 			if (!repos.length) {
 				warnings.push('crates.io names no repository');
@@ -476,10 +510,11 @@ const discover = async (
 		}
 
 		case 'pypi': {
-			const project = asRecord(await deps.fetchJson('https://pypi.org/pypi/' + name + '/json'));
+			const project = asRecord(await deps.fetchJson('https://pypi.org/pypi/' + encodeURIComponent(name) + '/json'));
 			const info = asRecord(project?.info);
 			if (!info) throw new Error('PyPI returned no info for ' + name);
 			const version = pickVersion(input.version, asString(info.version) ?? null, []);
+			warnMissingVersion('pypi', input.version, Object.keys(asRecord(project?.releases) ?? {}), warnings);
 			let repos = reposFromPypi(info);
 			if (!repos.length) {
 				warnings.push('PyPI project_urls name no repository');
@@ -543,12 +578,13 @@ export async function resolvePackageRepo(
 ): Promise<PackageRepoResult> {
 	const name = input.package.trim();
 	if (!name) throw new Error('package is empty');
+	const version = versionOf(input.version);
 	const source = input.source ?? 'npm';
 	if (!PACKAGE_SOURCES.includes(source)) {
 		throw new Error('unknown source: ' + String(source) + '. Supported: ' + PACKAGE_SOURCES.join(', ') + '.');
 	}
 
-	const discovered = await discover({ package: name, source, version: input.version }, deps);
+	const discovered = await discover({ package: name, source, version }, deps);
 	const warnings = [...discovered.warnings];
 	const candidates = refCandidates(source, name, discovered.version);
 	const repos = await withRefs(discovered.repos, candidates, deps, warnings);

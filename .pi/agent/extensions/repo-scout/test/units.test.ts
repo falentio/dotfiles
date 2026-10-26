@@ -214,7 +214,7 @@ describe("npm", () => {
 	it("warns about a version the registry does not have", () => {
 		const parsed = parseNpm(packument, "9.9.9");
 		assert.equal(parsed.version, "9.9.9");
-		assert.match(parsed.warnings[0] ?? "", /no version 9\.9\.9/);
+		assert.match(parsed.warnings[0] ?? "", /no npm release 9\.9\.9/);
 	});
 
 	it("falls back to the tarball, marked as not browsable", () => {

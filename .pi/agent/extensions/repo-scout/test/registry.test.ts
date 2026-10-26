@@ -29,6 +29,7 @@ const CRATE = {
 
 const PYPI = {
 	info: { version: "2.34.2", project_urls: { Source: "https://github.com/psf/requests" } },
+	releases: { "2.34.2": {}, "2.34.1": {} },
 };
 
 const JSR_META = { latest: "1.1.6", versions: { "1.1.6": {}, "0.1.0": {} } };
@@ -210,6 +211,45 @@ describe("resolvePackageRepo", () => {
 		assert.deepEqual(result.repos, []);
 		assert.deepEqual(listed, [], "git never contacts a private host");
 		assert.match(result.warnings.join("\n"), /ignored http:\/\/169\.254\.169\.254\/latest\/meta-data: not a cloneable https git host/);
+	});
+
+	it("pypi: warns about a version the registry does not have", async () => {
+		const { impl } = deps({
+			json: { "https://pypi.org/pypi/requests/json": PYPI },
+			refs: { "https://github.com/psf/requests": { tags: ["v99.99.99"], branches: [] } },
+		});
+		const result = await resolvePackageRepo({ package: "requests", source: "pypi", version: "99.99.99" }, impl);
+		assert.equal(result.version, "99.99.99");
+		assert.match(result.warnings.join("\n"), /no pypi release 99\.99\.99/);
+	});
+
+	it("rejects a version that is not one path segment, before any fetch", async () => {
+		let fetched = 0;
+		const impl: RegistryDeps = {
+			async fetchJson() {
+				fetched += 1;
+				throw new Error("fetched");
+			},
+			async fetchText() {
+				fetched += 1;
+				return "";
+			},
+			async lsRemote() {
+				fetched += 1;
+				return { tags: [], branches: [] };
+			},
+		};
+		await assert.rejects(
+			resolvePackageRepo({ package: "@std/path", source: "jsr", version: "x/../../../@std/fs/1.1.6" }, impl),
+			/version is not a published version/,
+		);
+		assert.equal(fetched, 0);
+	});
+
+	it("encodes a scoped npm name as one path segment", async () => {
+		const { impl, requested } = deps({ json: { "https://registry.npmjs.org/@scope%2Fname": NPM_PACKUMENT } });
+		await resolvePackageRepo({ package: "@scope/name" }, impl);
+		assert.equal(requested[0], "https://registry.npmjs.org/@scope%2Fname");
 	});
 
 	it("dockerhub: warns when the version tag does not exist", async () => {
