@@ -91,15 +91,16 @@ export type BuiltRegistry = { registry: ScoutRegistry; adapter: ScoutAdapter };
 
 /** Build the built-in registry: scratch checkouts plus agent sessions on the caller's model. */
 export const buildRegistry = (deps: {
-	source: ScoutModelSource;
+	/** Read per conversation open, so a thread that switched models is followed. */
+	source: () => ScoutModelSource;
 	thinkingLevel?: ThinkingLevel;
 	/** `provider/model`; the source's model when absent. */
 	modelOverride?: string;
 	log?: Logger;
 }): BuiltRegistry => {
-	const model = deps.modelOverride ? resolveModel(deps.source, deps.modelOverride) : undefined;
+	const model = deps.modelOverride ? resolveModel(deps.source(), deps.modelOverride) : undefined;
 	const adapter = createAgentAdapter({
-		source: deps.source,
+		getSource: deps.source,
 		thinkingLevel: deps.thinkingLevel,
 		model,
 		sessionsDir: sessionsDir(),

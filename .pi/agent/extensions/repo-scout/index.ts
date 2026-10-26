@@ -21,11 +21,8 @@ import {
 	type RepoScoutInput,
 } from "./tools.ts";
 
-const log = {
-	info: (message: string) => console.error(`[repo-scout] ${message}`),
-	warn: (message: string) => console.error(`[repo-scout] ${message}`),
-	error: (message: string) => console.error(`[repo-scout] ${message}`),
-};
+const line = (message: string) => console.error(`[repo-scout] ${message}`);
+const log = { info: line, warn: line, error: line };
 
 const repoScoutParameters = Type.Object({
 	repo: Type.String({
@@ -65,17 +62,21 @@ const text = (value: string) => ({ content: [{ type: "text" as const, text: valu
 
 export default function repoScout(pi: ExtensionAPI) {
 	/**
-	 * One registry per calling context, keyed by working directory. The context is read on every
-	 * conversation open, so a thread that switched models is followed without stale state.
+	 * One registry per (working directory, model, thinking level). The model is not part of the
+	 * conversation's identity by accident: a session is bound to the model it opened with, so asking
+	 * for another model must open another conversation rather than silently re-point the cached one.
 	 */
 	const registries = new Map<string, BuiltRegistry>();
+	/** The context each registry reads at conversation open, refreshed on every call. */
+	const contexts = new Map<string, ExtensionToolContext>();
 
 	const registryFor = (ctx: ExtensionToolContext, params: RepoScoutParams): BuiltRegistry => {
 		const key = `${ctx.cwd}::${params.model ?? ""}::${params.thinkingLevel ?? ""}`;
+		contexts.set(key, ctx);
 		const existing = registries.get(key);
 		if (existing) return existing;
 		const built = buildRegistry({
-			source: ctx,
+			source: () => contexts.get(key) ?? ctx,
 			modelOverride: params.model,
 			thinkingLevel: params.thinkingLevel,
 			log,
@@ -91,7 +92,8 @@ export default function repoScout(pi: ExtensionAPI) {
 			"Ask a question about a codebase and get a scout report with findings anchored to path:line. Keeps one cached agent session per repo: follow-up questions on the same repo reuse the conversation. Use it instead of spawning a subagent to crawl code. The session is evicted after 10 idle minutes and reopened from disk on the next question.",
 		parameters: repoScoutParameters,
 		exposure: "codemode",
-		annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+		// Not idempotent: every call appends a turn to the repo's conversation.
+		annotations: { readOnlyHint: true, openWorldHint: true },
 		async execute(_id: string, params: RepoScoutParams, _signal, _onUpdate, ctx: ExtensionToolContext) {
 			if (!ctx.model) throw new Error("repo_scout needs a current model; select one first");
 			const { registry } = registryFor(ctx, params);

@@ -77,7 +77,7 @@ describe("repo_scout over a real AgentSession", () => {
 		roots.push(scratch);
 		let now = 0;
 		let tick: (() => void) | undefined;
-		const built = buildRegistry({ source, log: { info: () => {}, warn: () => {}, error: () => {} } });
+		const built = buildRegistry({ source: () => source, log: { info: () => {}, warn: () => {}, error: () => {} } });
 		// Same registry, but a scratch dir and clock the test owns.
 		const registry = new ScoutRegistry({
 			prepare: async (key) => ({ dir: await ensureCheckout(identityFor(key), scratch), display: key }),

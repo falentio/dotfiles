@@ -63,8 +63,8 @@ export const openingMessage = (repo: string, dir: string): string =>
 export type ScoutModelSource = Pick<ExtensionContext, "model" | "modelRegistry">;
 
 export type AgentAdapterOptions = {
-	/** The calling thread's context; its model is read once per conversation. */
-	source: ScoutModelSource;
+	/** The calling thread's context, read once per conversation. */
+	getSource: () => ScoutModelSource;
 	thinkingLevel?: ThinkingLevel;
 	/** Overrides the source's model. */
 	model?: Model<any>;
@@ -119,13 +119,14 @@ export const createAgentAdapter = (options: AgentAdapterOptions): ScoutAdapter =
 	return {
 		async open(repo: string, dir: string, sessionFile: string | undefined): Promise<ScoutConversation> {
 			if (sessionFile) await mkdir(dirname(sessionFile), { recursive: true });
+			const source = options.getSource();
 			const loader = loaderFor(dir, agentDir);
 			await loader.reload();
 			const { session }: { session: AgentSession } = await create({
 				cwd: dir,
-				model: options.model ?? requireModel(options.source),
+				model: options.model ?? requireModel(source),
 				thinkingLevel: options.thinkingLevel ?? "medium",
-				modelRuntime: runtimeOf(options.source),
+				modelRuntime: runtimeOf(source),
 				sessionManager: sessionManagerFor(dir, sessionFile, options.sessionsDir),
 				resourceLoader: loader,
 				tools: [...SCOUT_TOOLS],

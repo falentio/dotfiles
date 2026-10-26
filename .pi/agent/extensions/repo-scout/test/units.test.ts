@@ -17,7 +17,6 @@ import {
 	reposFromManifest,
 	tarballFromNpmManifest,
 } from "../registry.ts";
-import { ScoutRegistry, type ScoutConversation } from "../scout-registry.ts";
 
 /** Every spelling of one repo, in the shapes callers actually pass. */
 describe("parseRemoteRepo", () => {
