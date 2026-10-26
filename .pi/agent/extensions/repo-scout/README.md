@@ -142,7 +142,7 @@ loopback, link-local, or internal name. Set `GITHUB_TOKEN` to raise the search r
 
 ```sh
 cd ~/.pi/agent/extensions/repo-scout
-npm test          # 102 tests: parsers, registry queue/identity/abort, checkouts, and a full pipeline run
+npm test          # 101 tests: parsers, registry queue/identity/abort, checkouts, and a full pipeline run
 npm run typecheck
 ```
 
