@@ -13,10 +13,12 @@ import { join } from "node:path";
 import { after, describe, it } from "node:test";
 import { fauxAssistantMessage, fauxProvider, fauxText } from "@earendil-works/pi-ai/providers/faux";
 import { ModelRegistry, ModelRuntime } from "@earendil-works/pi-coding-agent";
-import { ScoutRegistry } from "../scout-registry.ts";
-import { buildRegistry, checkoutFor, identifyRepo, runRepoScout, sessionsDir } from "../tools.ts";
+import { conversationKey, ScoutRegistry } from "../scout-registry.ts";
+import { buildRegistry, checkoutFor, identifyRepo, locksDir, runRepoScout, sessionsDir, sessionsIndexDir } from "../tools.ts";
 import { refreshCheckout } from "../checkout.ts";
 import { sessionFileName } from "../repo-id.ts";
+import { acquireLock } from "../state-lock.ts";
+import { digestKey, readSessionIndex, writeSessionIndex } from "../session-index.ts";
 
 const git = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
 
@@ -55,7 +57,7 @@ const fakeProvider = () => {
 		prompts.push(text);
 		return fauxAssistantMessage([fauxText(`answer\nseen: ${text.slice(0, 60)}`)]);
 	};
-	faux.setResponses([respond, respond, respond]);
+	faux.setResponses([respond, respond, respond, respond]);
 	return { faux, prompts };
 };
 
@@ -80,24 +82,34 @@ describe("repo_scout over a real AgentSession", () => {
 		let now = 0;
 		let tick: (() => void) | undefined;
 		const built = buildRegistry({ source: () => source, log: { info: () => {}, warn: () => {}, error: () => {} } });
-		// The production checkout path and adapter, with a clock the test owns.
-		const registry = new ScoutRegistry({
-			checkout: checkoutFor,
-			refresh: refreshCheckout,
-			adapter: built.adapter,
-			sessionFileFor: (key) => join(sessionsDir(), sessionFileName(key)),
-			idleMs: 600_000,
-			now: () => now,
-			timers: {
-				setInterval: (fn) => {
-					tick = fn;
-					return 1;
+		// The production checkout, lock, index, and adapter, with a clock the test owns.
+		const registryFor = () =>
+			new ScoutRegistry({
+				acquire: (request) =>
+					acquireLock({
+						dir: join(locksDir(), digestKey(conversationKey(request)) + ".lock"),
+						label: "smoke",
+						waitMs: 5_000,
+					}),
+				checkout: checkoutFor,
+				refresh: refreshCheckout,
+				adapter: built.adapter,
+				sessionFileFor: (key) => readSessionIndex(sessionsIndexDir(), key),
+				newSessionFile: (key) => join(sessionsDir(), sessionFileName(key)),
+				rememberSession: (key, file) => writeSessionIndex(sessionsIndexDir(), key, file),
+				idleMs: 600_000,
+				now: () => now,
+				timers: {
+					setInterval: (fn) => {
+						tick = fn;
+						return 1;
+					},
+					clearInterval: () => {
+						tick = undefined;
+					},
 				},
-				clearInterval: () => {
-					tick = undefined;
-				},
-			},
-		});
+			});
+		const registry = registryFor();
 
 		const identity = await identifyRepo(repo, repo);
 		const choice = { model: faux.getModel(), modelRegistry };
@@ -130,10 +142,20 @@ describe("repo_scout over a real AgentSession", () => {
 		const third = await runRepoScout({ params: { repo, question: "back again?" }, registry, cwd: repo, choice });
 		assert.match(third, /turn   continued/, "a reopened session continues the same conversation");
 		assert.equal(prompts[2], "back again?", "the replayed conversation is not re-primed");
-		const files = readdirSync(sessionsDir());
-		assert.equal(files.length, 1, "both conversations recorded to one session file");
+		const transcripts = readdirSync(sessionsDir()).filter((name) => name.endsWith(".jsonl"));
+		assert.equal(transcripts.length, 1, "every turn recorded to one session file");
 		assert.equal(identity.key, "github.com/example/local-smoke");
+		const indexed = await readSessionIndex(sessionsIndexDir(), identity.key);
+		assert.equal(indexed, join(sessionsDir(), transcripts[0]!), "the index names the file pi wrote");
 
 		await registry.shutdown();
+		assert.deepEqual(readdirSync(locksDir()), [], "shutdown releases the repo lock");
+
+		// A fresh registry is what another pi process starts with: same state root, same index.
+		const other = registryFor();
+		const fourth = await runRepoScout({ params: { repo, question: "one more?" }, registry: other, cwd: repo, choice });
+		assert.match(fourth, /turn   continued/, "the new registry continues the recorded transcript");
+		assert.equal(prompts[3], "one more?", "and does not re-prime it");
+		await other.shutdown();
 	});
 });

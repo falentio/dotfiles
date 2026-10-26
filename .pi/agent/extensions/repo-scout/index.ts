@@ -1,11 +1,12 @@
 /**
  * repo-scout: one tool call replaces spawning and forking a scout subagent.
  *
- * `repo_scout` keeps one `AgentSession` per conversation (repo, ref, model, thinking level): the
- * same conversation, so the provider prompt cache is reused; one question at a time; evicted after
- * ten quiet minutes and reopened from its session file, so the cache survives the eviction.
- * `package_repo` answers the question before it: which git repo serves this package, and at which
- * ref.
+ * `repo_scout` keeps one `AgentSession` per repo and ref, whatever model asks: one conversation per
+ * repo at one version, so the provider prompt cache is reused and two callers read the same crawl.
+ * One question at a time, one cross-process lock per repo and ref, evicted after ten quiet minutes
+ * and reopened from its session file, so the cache survives the eviction. A different model rebinds
+ * the same transcript instead of starting a second one. `package_repo` answers the question before
+ * it: which git repo serves this package, and at which ref.
  *
  * The rules live in `tools.ts` (both tools, paths), `scout-registry.ts` (queue, idle clock,
  * deadline), `repo-id.ts` (identity), `registry.ts` (package provenance and refs) and
@@ -71,8 +72,8 @@ const text = (value: string) => ({ content: [{ type: "text" as const, text: valu
 
 export default function repoScout(pi: ExtensionAPI) {
 	/**
-	 * One registry for the extension. The conversation identity carries the model and thinking
-	 * level, so a model switch opens another conversation instead of re-pointing a cached one.
+	 * One registry for the extension. Identity is the repo and the ref; the model rebinds the same
+	 * transcript, and the repo lock keeps other pi processes from opening a second session on it.
 	 */
 	let current: ExtensionToolContext | undefined;
 	let built: BuiltRegistry | undefined;
@@ -88,7 +89,7 @@ export default function repoScout(pi: ExtensionAPI) {
 		name: "repo_scout",
 		label: "Repo scout",
 		description:
-			"Ask a question about a codebase and get a scout report with findings anchored to path:line. Keeps one cached agent session per repo, ref, model, and thinking level: follow-up questions reuse the conversation. Use it instead of spawning a subagent to crawl code. A session is evicted after 10 idle minutes and reopened from disk on the next question.",
+			"Ask a question about a codebase and get a scout report with findings anchored to path:line. Keeps one cached agent session per repo and ref: follow-up questions reuse the conversation, and a different model continues the same one. Only one process reads a repo at a ref at a time; a second waits for the lock. Use it instead of spawning a subagent to crawl code. A session is evicted after 10 idle minutes and reopened from disk on the next question.",
 		parameters: repoScoutParameters,
 		exposure: "codemode",
 		annotations: { readOnlyHint: false, openWorldHint: true },

@@ -5,8 +5,9 @@
  * already-built registry and the caller's model choice, and `runPackageRepo` takes an optional
  * resolver, so tests swap both for fakes without an `ExtensionContext`.
  *
- * A repo question carries everything the registry needs to key it: the repo, the ref, the model,
- * and the thinking level. Nothing is recovered from a side table.
+ * A repo question carries everything the registry needs to key it: the repo and the ref. The model
+ * and thinking level travel with the question too, because the conversation is rebound to them; they
+ * do not split one repo's transcript into several.
  */
 
 import { existsSync } from 'node:fs';
@@ -20,7 +21,9 @@ import { createAgentAdapter, type ScoutModelSource } from './agent-session.ts';
 import { ensureCheckout, headSha, originOf, refreshCheckout } from './checkout.ts';
 import { localRepoIdentity, parseRemoteRepo, sessionFileName, type RepoIdentity } from './repo-id.ts';
 import { PACKAGE_SOURCES, cloneTarget, resolvePackageRepo, type PackageRepoResult, type PackageSource } from './registry.ts';
-import { ScoutRegistry, type Logger, type ScoutAdapter, type ScoutResult } from './scout-registry.ts';
+import { conversationKey, ScoutRegistry, type Logger, type ScoutAdapter, type ScoutResult } from './scout-registry.ts';
+import { digestKey, readSessionIndex, writeSessionIndex } from './session-index.ts';
+import { acquireLock } from './state-lock.ts';
 
 /** Root of everything this extension writes. Overridable for tests and for a second mind. */
 export const stateRoot = (): string => {
@@ -30,6 +33,10 @@ export const stateRoot = (): string => {
 
 export const reposDir = (): string => join(stateRoot(), 'repos');
 export const sessionsDir = (): string => join(stateRoot(), 'sessions');
+/** One lock per repo and ref, so two pi processes queue instead of opening two sessions. */
+export const locksDir = (): string => join(stateRoot(), 'locks');
+/** The transcript index, one file per conversation key. */
+export const sessionsIndexDir = (): string => join(sessionsDir(), 'keys');
 
 /** Ten minutes of inactivity, as asked. PI_SCOUT_IDLE_MS moves it. */
 export const idleMs = (): number => {
@@ -41,6 +48,12 @@ export const idleMs = (): number => {
 export const turnMs = (): number => {
 	const raw = Number(process.env.PI_SCOUT_TURN_MS);
 	return Number.isFinite(raw) && raw > 0 ? raw : 900_000;
+};
+
+/** How long a second process waits for the lock. PI_SCOUT_LOCK_MS moves it. */
+export const lockWaitMs = (): number => {
+	const raw = Number(process.env.PI_SCOUT_LOCK_MS);
+	return Number.isFinite(raw) && raw > 0 ? raw : 600_000;
 };
 
 /** The report plus its provenance, so the caller sees which tree and commit answered. */
@@ -108,13 +121,27 @@ export const buildRegistry = (deps: {
 	log?: Logger;
 }): BuiltRegistry => {
 	const adapter = createAgentAdapter({ getSource: deps.source, sessionsDir: sessionsDir() });
+	// The lock is keyed exactly like the conversation, so a ref gets its own lock and its own tree.
+	const lockDirFor = (request: { repo: RepoIdentity; ref?: string }): string =>
+		join(locksDir(), digestKey(conversationKey(request)) + '.lock');
 	return {
 		adapter,
 		registry: new ScoutRegistry({
+			acquire: (request, signal) =>
+				acquireLock(
+					{
+						dir: lockDirFor(request),
+						label: 'the scout for ' + (request.ref ? request.repo.display + '@' + request.ref : request.repo.display),
+						waitMs: lockWaitMs(),
+					},
+					signal,
+				),
 			checkout: checkoutFor,
 			refresh: refreshCheckout,
 			adapter,
-			sessionFileFor: (key) => join(sessionsDir(), sessionFileName(key)),
+			sessionFileFor: (key) => readSessionIndex(sessionsIndexDir(), key),
+			newSessionFile: (key) => join(sessionsDir(), sessionFileName(key)),
+			rememberSession: (key, file) => writeSessionIndex(sessionsIndexDir(), key, file),
 			idleMs: idleMs(),
 			turnMs: turnMs(),
 			log: deps.log,
@@ -126,7 +153,7 @@ export const buildRegistry = (deps: {
  * Ask one question of a repo's scout, optionally at a ref.
  *
  * The repo is identified first, so a typo fails before any network. The question then queues behind
- * any earlier question for the same repo, ref, model, and thinking level, and the idle clock
+ * any earlier question for the same repo and ref, in this process or another, and the idle clock
  * restarts when it settles.
  */
 export async function runRepoScout(input: {

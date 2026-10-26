@@ -1,7 +1,7 @@
 /**
- * The registry's contract: one conversation per repo, ref, model, and thinking level, one question
- * at a time, evicted when idle, reopened from the session file after an eviction. Every test drives
- * a fake clock, so none wait.
+ * The registry's contract: one conversation per repo and ref however many models ask, one question
+ * at a time, one cross-process lock per conversation, evicted when idle, reopened from the session
+ * file after an eviction. Every test drives a fake clock, so none wait.
  */
 
 import assert from "node:assert/strict";
@@ -120,6 +120,9 @@ const build = (
 	const conversations = new Map<string, FakeConversation>();
 	const opened: Array<{ repo: string; dir: string; file: string | undefined; model: string }> = [];
 	const refreshed: string[] = [];
+	const index = new Map<string, string>();
+	let locked = 0;
+	let released = 0;
 	const { clock, advance, hasSweeper } = fakeClock();
 	const adapter: ScoutAdapter = {
 		async open(openedRepo, openedDir, sessionFile, choice) {
@@ -135,6 +138,12 @@ const build = (
 		},
 	};
 	const registry = new ScoutRegistry({
+		acquire: async () => {
+			locked += 1;
+			return async () => {
+				released += 1;
+			};
+		},
 		checkout: async ({ repo: identity, ref }) => ({
 			dir: "/scratch/" + identity.key + (ref ? "@" + ref : ""),
 			display: identity.display,
@@ -144,18 +153,22 @@ const build = (
 			if (options.refreshFails) throw new Error("fetch refused");
 		},
 		adapter,
-		sessionFileFor: (key) => `/sessions/${key}.jsonl`,
+		sessionFileFor: async (key) => index.get(key),
+		newSessionFile: (key) => `/sessions/${key}.jsonl`,
+		rememberSession: async (key, file) => {
+			index.set(key, file);
+		},
 		idleMs: 600_000,
 		sweepMs: 200_000,
 		turnMs: options.turnMs,
 		now: clock.now,
 		timers: clock.timers,
 	});
-	return { registry, conversations, opened, refreshed, advance, hasSweeper };
+	return { registry, conversations, opened, refreshed, index, advance, hasSweeper, locked: () => locked, released: () => released };
 };
 
 describe("ScoutRegistry", () => {
-	it("opens one conversation per request identity and reuses it", async () => {
+	it("opens one conversation per repo and reuses it", async () => {
 		const { registry, opened } = build();
 		await registry.run(request("first"));
 		await registry.run(request("second"));
@@ -168,18 +181,63 @@ describe("ScoutRegistry", () => {
 		await registry.run(request("q1"));
 		await registry.run(request("q2", { repo: repo("github.com/c/d") }));
 		assert.equal(opened.length, 2);
-		assert.deepEqual(registry.keys(), ["github.com/a/b||p/m|medium", "github.com/c/d||p/m|medium"]);
+		assert.deepEqual(registry.keys(), ["github.com/a/b", "github.com/c/d"]);
 	});
 
-	it("gives each model its own conversation on one repo", async () => {
+	it("rebinds the one conversation when the model changes", async () => {
 		const { registry, opened, conversations, refreshed } = build();
 		await registry.run(request("a1", { model: model("a") }));
 		await registry.run(request("b1", { model: model("b") }));
-		assert.equal(opened.length, 2, "a model switch opens another conversation");
+		assert.equal(registry.size(), 1, "a model switch does not add a conversation");
+		assert.equal(opened.length, 2, "the change reopens the session on the new model");
+		assert.equal(opened[1]?.file, "/sessions/github.com/a/b.jsonl", "the same transcript");
+		assert.equal(conversations.get("github.com/a/b|a")?.disposed, true, "the old binding is disposed");
 		await registry.run(request("b2", { model: model("b") }));
-		assert.equal(opened.length, 2, "the second model keeps its own conversation");
+		assert.equal(opened.length, 2, "the same model stays bound");
 		assert.deepEqual(conversations.get("github.com/a/b|b")?.questions, ["b1", "b2"]);
-		assert.equal(refreshed.length, 1, "the shared tree is refreshed once, not under the live session");
+		assert.equal(refreshed.length, 1, "the shared tree is refreshed once, not on a rebind");
+	});
+
+	it("rebinds when the thinking level changes", async () => {
+		const { registry, opened } = build();
+		await registry.run(request("a1"));
+		await registry.run(request("a2", { thinkingLevel: "high" }));
+		assert.equal(opened.length, 2);
+		assert.equal(registry.size(), 1);
+	});
+
+	it("holds the repo lock for the session and releases it on eviction", async () => {
+		const { registry, advance, locked, released } = build();
+		await registry.run(request("q"));
+		assert.equal(locked(), 1);
+		assert.equal(released(), 0);
+		advance(600_001);
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		assert.equal(released(), 1);
+	});
+
+	it("releases the lock when opening fails", async () => {
+		let released = 0;
+		const registry = new ScoutRegistry({
+			acquire: async () => async () => {
+				released += 1;
+			},
+			checkout: async () => {
+				throw new Error("no clone");
+			},
+			refresh: async () => {},
+			adapter: {
+				async open() {
+					throw new Error("unreachable");
+				},
+			},
+			sessionFileFor: async () => undefined,
+			newSessionFile: () => "/sessions/x.jsonl",
+			rememberSession: async () => {},
+			timers: { setInterval: () => 1, clearInterval: () => {} },
+		});
+		await assert.rejects(registry.run(request("q")), /no clone/);
+		assert.equal(released, 1);
 	});
 
 	it("gives each ref its own conversation", async () => {
@@ -224,10 +282,13 @@ describe("ScoutRegistry", () => {
 			},
 		};
 		const registry = new ScoutRegistry({
+			acquire: async () => async () => {},
 			checkout: async ({ repo: identity }) => ({ dir: "/scratch", display: identity.display }),
 			refresh: async () => {},
 			adapter,
-			sessionFileFor: () => "/sessions/x.jsonl",
+			sessionFileFor: async () => undefined,
+			newSessionFile: () => "/sessions/x.jsonl",
+			rememberSession: async () => {},
 			idleMs: 600_000,
 			timers: { setInterval: () => 1, clearInterval: () => {} },
 		});
@@ -290,12 +351,18 @@ describe("ScoutRegistry", () => {
 				};
 			},
 		};
+		const index = new Map<string, string>();
 		const { clock, advance } = fakeClock();
 		const registry = new ScoutRegistry({
+			acquire: async () => async () => {},
 			checkout: async ({ repo: identity }) => ({ dir: "/scratch", display: identity.display }),
 			refresh: async () => {},
 			adapter,
-			sessionFileFor: () => "/sessions/guessed.jsonl",
+			sessionFileFor: async (key) => index.get(key),
+			newSessionFile: () => "/sessions/guessed.jsonl",
+			rememberSession: async (key, file) => {
+				index.set(key, file);
+			},
 			idleMs: 600_000,
 			now: clock.now,
 			timers: clock.timers,
@@ -304,6 +371,7 @@ describe("ScoutRegistry", () => {
 		advance(600_001);
 		await registry.run(request("q2"));
 		assert.deepEqual(opened, ["/sessions/guessed.jsonl", "/sessions/generated-by-pi.jsonl"]);
+		assert.equal(index.get("github.com/a/b"), "/sessions/generated-by-pi.jsonl", "the written path is what survives");
 	});
 
 	it("does not evict while a question is in flight", async () => {
@@ -322,7 +390,7 @@ describe("ScoutRegistry", () => {
 		const { registry } = build({ manual: true });
 		const running = registry.run(request("slow"));
 		await new Promise((resolve) => setTimeout(resolve, 0));
-		assert.equal(await registry.evict("github.com/a/b||p/m|medium"), true);
+		assert.equal(await registry.evict("github.com/a/b"), true);
 		await assert.rejects(running, /evicted while this question ran/);
 	});
 
@@ -343,7 +411,15 @@ describe("ScoutRegistry", () => {
 			release = resolve;
 		});
 		let disposed = false;
+		let releaseLock: (() => void) | undefined;
+		const lockGate = new Promise<void>((resolve) => {
+			releaseLock = resolve;
+		});
 		const registry = new ScoutRegistry({
+			acquire: async () => {
+				await lockGate;
+				return async () => {};
+			},
 			checkout: async ({ repo: identity }) => {
 				await gate;
 				return { dir: "/scratch", display: identity.display };
@@ -361,13 +437,16 @@ describe("ScoutRegistry", () => {
 					};
 				},
 			},
-			sessionFileFor: () => "/sessions/x.jsonl",
+			sessionFileFor: async () => undefined,
+			newSessionFile: () => "/sessions/x.jsonl",
+			rememberSession: async () => {},
 			timers: { setInterval: () => 1, clearInterval: () => {} },
 		});
 		const running = registry.run(request("q"));
 		await new Promise((resolve) => setTimeout(resolve, 0));
 		const shutdown = registry.shutdown();
 		release?.();
+		releaseLock?.();
 		await assert.rejects(running, /closed/);
 		await shutdown;
 		assert.equal(registry.size(), 0);
