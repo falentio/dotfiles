@@ -1,4 +1,5 @@
 import { isAbsolute, resolve } from "node:path";
+import { ORCH_DISPLAY_LIMIT, ORCH_FORCE_LOCK_STEAL } from "../config.ts";
 import type { SessionDir } from "./session-dir.ts";
 import {
   NotFoundError,
@@ -13,8 +14,6 @@ import {
   type Unit,
   type Verdict,
 } from "./orch-store.ts";
-
-const DISPLAY_LIMIT = 4;
 
 function countLine(value: Counts): string {
   const entries = Object.entries(value);
@@ -58,7 +57,7 @@ function compactRows<T>(
   rows: readonly T[],
   format: (row: T) => string,
   empty: string,
-  limit: number | null = DISPLAY_LIMIT,
+  limit: number | null = ORCH_DISPLAY_LIMIT,
 ): string {
   if (rows.length === 0) {
     return empty;
@@ -85,10 +84,10 @@ function frontierLine(value: Frontier): string {
 }
 
 function statusLines(report: StatusReport): string {
-  const visible = report.summary.openGateIds.slice(0, DISPLAY_LIMIT);
+  const visible = report.summary.openGateIds.slice(0, ORCH_DISPLAY_LIMIT);
   const more =
-    report.summary.openGateIds.length > DISPLAY_LIMIT
-      ? `,+${report.summary.openGateIds.length - DISPLAY_LIMIT} more`
+    report.summary.openGateIds.length > ORCH_DISPLAY_LIMIT
+      ? `,+${report.summary.openGateIds.length - ORCH_DISPLAY_LIMIT} more`
       : "";
   return [
     `counts: units=${report.units.length}; states=${countLine(report.summary.unitStates)}; ledger=${countLine(report.summary.ledgerVerdicts)}`,
@@ -111,7 +110,7 @@ async function withStore<T>(
 ): Promise<string> {
   const notices: string[] = [];
   const store = openStore(resolveStore(storePath, directory), {
-    force: process.env["POTETO_ORCH_FORCE"] === "1",
+    force: ORCH_FORCE_LOCK_STEAL,
     onLockStolen: (holder) => void notices.push(`notice: stealing store lock held by pid ${holder}`),
     onStaleLock: (holder) => void notices.push(`notice: replacing stale store lock (pid ${holder} is dead)`),
   });
@@ -249,7 +248,7 @@ export function buildOrchUnitListTool(deps: { sessionDir: SessionDir }) {
           directory,
           input.store,
           (store) => store.units.list({ state: input.state, track: input.track }),
-          (rows) => compactRows(rows, unitLine, "(no units)", input.limit ?? DISPLAY_LIMIT),
+          (rows) => compactRows(rows, unitLine, "(no units)", input.limit ?? ORCH_DISPLAY_LIMIT),
         ),
       };
     },

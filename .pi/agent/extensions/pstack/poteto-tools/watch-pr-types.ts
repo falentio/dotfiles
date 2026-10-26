@@ -1,3 +1,5 @@
+import { CODE_REVIEW_GATE_NAME } from "../config.ts";
+
 declare const prNumberBrand: unique symbol;
 export type PrNumber = number & { readonly [prNumberBrand]: "PrNumber" };
 export type NonEmpty<T> = readonly [T, ...T[]];
@@ -82,7 +84,7 @@ export type Check =
   | (CheckDetails & { readonly kind: "pending" })
   | (CheckDetails & {
       readonly kind: "code-review-gate";
-      readonly name: "Code Review Gate";
+      readonly name: typeof CODE_REVIEW_GATE_NAME;
     });
 export type FailedCheck = Extract<Check, { readonly kind: "failed" }>;
 export type PendingCheck = Extract<Check, { readonly kind: "pending" }>;

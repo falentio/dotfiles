@@ -1,8 +1,8 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { COMPACTION_SCAN_LIMIT } from "./config.ts";
 
 type Evidence = { kind: "slash-command" | "skill-read" | "delegate"; detail: string };
 
-const MAX_ENTRIES = 300;
 const SLASH_PATTERN = /(^|\s)\/skill:poteto-mode(?![\w-])/;
 const OPT_OUT_PATTERN = /\b(opt\s*-?\s*out|disable|turn\s+off|quit)\b/i;
 const SKILL_MARKER = "# Poteto mode";
@@ -17,7 +17,7 @@ function textOf(entry: unknown): string {
 }
 
 export function findEvidence(entries: readonly unknown[]): Evidence | null {
-  const limit = Math.min(entries.length, MAX_ENTRIES);
+  const limit = Math.min(entries.length, COMPACTION_SCAN_LIMIT);
   for (let i = 0; i < limit; i++) {
     const text = textOf(entries[i]);
     if (!text) continue;
