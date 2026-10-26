@@ -66,7 +66,6 @@ describe("repo_scout over a real AgentSession", () => {
 		const repo = await makeRepo();
 		const state = await mkdtemp(join(tmpdir(), "repo-scout-state-"));
 		roots.push(state);
-		process.env.PI_SCOUT_HOME = state;
 
 		const { faux, prompts } = fakeProvider();
 		// The caller's registry, with the fake provider standing in for a real one.
@@ -76,27 +75,24 @@ describe("repo_scout over a real AgentSession", () => {
 		const modelRegistry = new ModelRegistry(runtime);
 		const source = { model: faux.getModel(), modelRegistry };
 
-		const scratch = await mkdtemp(join(tmpdir(), "repo-scout-scratch-"));
-		process.env.PI_SCOUT_SCRATCH = scratch;
-		roots.push(scratch);
 		let now = 0;
 		let tick: (() => void) | undefined;
-		const built = buildRegistry({ source: () => source, log: { info: () => {}, warn: () => {}, error: () => {} } });
+		const built = buildRegistry({ source: () => source, log: { info: () => {}, warn: () => {}, error: () => {} }, stateRoot: state });
 		// The production checkout, lock, index, and adapter, with a clock the test owns.
 		const registryFor = () =>
 			new ScoutRegistry({
 				acquire: (request) =>
 					acquireLock({
-						dir: join(locksDir(), digestKey(conversationKey(request)) + ".lock"),
+						dir: join(locksDir(state), digestKey(conversationKey(request)) + ".lock"),
 						label: "smoke",
 						waitMs: 5_000,
 					}),
-				checkout: checkoutFor,
+				checkout: (request) => checkoutFor(request, state),
 				refresh: refreshCheckout,
 				adapter: built.adapter,
-				sessionFileFor: (key) => readSessionIndex(sessionsIndexDir(), key),
-				newSessionFile: (key) => join(sessionsDir(), sessionFileName(key)),
-				rememberSession: (key, file) => writeSessionIndex(sessionsIndexDir(), key, file),
+				sessionFileFor: (key) => readSessionIndex(sessionsIndexDir(state), key),
+				newSessionFile: (key) => join(sessionsDir(state), sessionFileName(key)),
+				rememberSession: (key, file) => writeSessionIndex(sessionsIndexDir(state), key, file),
 				idleMs: 3_600_000,
 				now: () => now,
 				timers: {
@@ -142,14 +138,14 @@ describe("repo_scout over a real AgentSession", () => {
 		const third = await runRepoScout({ params: { repo, question: "back again?" }, registry, cwd: repo, choice });
 		assert.match(third, /turn   continued/, "a reopened session continues the same conversation");
 		assert.equal(prompts[2], "back again?", "the replayed conversation is not re-primed");
-		const transcripts = readdirSync(sessionsDir()).filter((name) => name.endsWith(".jsonl"));
+		const transcripts = readdirSync(sessionsDir(state)).filter((name) => name.endsWith(".jsonl"));
 		assert.equal(transcripts.length, 1, "every turn recorded to one session file");
 		assert.equal(identity.key, "github.com/example/local-smoke");
-		const indexed = await readSessionIndex(sessionsIndexDir(), identity.key);
-		assert.equal(indexed, join(sessionsDir(), transcripts[0]!), "the index names the file pi wrote");
+		const indexed = await readSessionIndex(sessionsIndexDir(state), identity.key);
+		assert.equal(indexed, join(sessionsDir(state), transcripts[0]!), "the index names the file pi wrote");
 
 		await registry.shutdown();
-		assert.deepEqual(readdirSync(locksDir()), [], "shutdown releases the repo lock");
+		assert.deepEqual(readdirSync(locksDir(state)), [], "shutdown releases the repo lock");
 
 		// A fresh registry is what another pi process starts with: same state root, same index.
 		const other = registryFor();

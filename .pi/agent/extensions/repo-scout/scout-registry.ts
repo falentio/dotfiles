@@ -14,6 +14,7 @@
  */
 
 import type { Model } from "@earendil-works/pi-ai/compat";
+import { SCOUT_CONFIG } from "./config.ts";
 import type { RepoIdentity } from "./repo-id.ts";
 import type { ReleaseLock } from "./state-lock.ts";
 
@@ -86,11 +87,11 @@ export interface ScoutRegistryOptions {
 	newSessionFile: (key: string) => string;
 	/** Persist the file pi actually wrote, so the next process reopens it. */
 	rememberSession: (key: string, file: string) => Promise<void>;
-	/** Idle window in ms. A session quiet for this long is evicted. */
+	/** Idle window in ms. Defaults to `SCOUT_CONFIG.idleMs`. */
 	idleMs?: number;
 	/** Idle sweep interval in ms. Defaults to a third of `idleMs`, at least 1s. */
 	sweepMs?: number;
-	/** One turn's ceiling in ms. Defaults to fifteen minutes. */
+	/** One turn's ceiling in ms. Defaults to `SCOUT_CONFIG.turnMs`. */
 	turnMs?: number;
 	log?: Logger;
 	now?: () => number;
@@ -100,9 +101,6 @@ export interface ScoutRegistryOptions {
 		clearInterval(handle: unknown): void;
 	};
 }
-
-const DEFAULT_IDLE_MS = 3_600_000;
-const DEFAULT_TURN_MS = 900_000;
 
 type Entry = {
 	key: string;
@@ -172,8 +170,8 @@ export class ScoutRegistry {
 
 	constructor(options: ScoutRegistryOptions) {
 		this.options = options;
-		this.idleMs = options.idleMs ?? DEFAULT_IDLE_MS;
-		this.turnMs = options.turnMs ?? DEFAULT_TURN_MS;
+		this.idleMs = options.idleMs ?? SCOUT_CONFIG.idleMs;
+		this.turnMs = options.turnMs ?? SCOUT_CONFIG.turnMs;
 		this.now = options.now ?? Date.now;
 		this.log = options.log ?? { info: () => {}, warn: () => {}, error: () => {} };
 		this.timers = options.timers ?? {
