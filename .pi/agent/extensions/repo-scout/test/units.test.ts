@@ -5,6 +5,9 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { mkdirSync, mkdtempSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { localRepoIdentity, parseRemoteRepo, sessionFileName } from "../repo-id.ts";
 import {
 	isRepoRootUrl,
@@ -27,6 +30,19 @@ import {
 
 /** Every spelling of one repo, in the shapes callers actually pass. */
 describe("parseRemoteRepo", () => {
+	it("keeps a GitLab subgroup and drops the /-/ route", () => {
+		assert.equal(parseRemoteRepo("https://gitlab.com/g/sub/proj").key, "gitlab.com/g/sub/proj");
+		assert.equal(parseRemoteRepo("https://gitlab.com/g/sub/other").key, "gitlab.com/g/sub/other");
+		assert.equal(parseRemoteRepo("https://gitlab.com/g/sub/proj/-/tree/main/src").key, "gitlab.com/g/sub/proj");
+	});
+
+	it("reads a repo named like a forge route", () => {
+		assert.equal(parseRemoteRepo("https://github.com/o/src").key, "github.com/o/src");
+		assert.equal(parseRemoteRepo("https://github.com/o/tree").key, "github.com/o/tree");
+		assert.equal(parseRemoteRepo("https://github.com/o/actions").key, "github.com/o/actions");
+		assert.equal(parseRemoteRepo("https://github.com/o/n/tree/main/x").key, "github.com/o/n");
+	});
+
 	const cases: Array<[string, string]> = [
 		["https://github.com/colinhacks/zod", "github.com/colinhacks/zod"],
 		["https://github.com/colinhacks/zod.git", "github.com/colinhacks/zod"],
@@ -67,6 +83,15 @@ describe("parseRemoteRepo", () => {
 });
 
 describe("localRepoIdentity", () => {
+	it("keys a symlink by its target", () => {
+		const root = mkdtempSync(join(tmpdir(), "repo-id-link-"));
+		const target = join(root, "target");
+		const link = join(root, "link");
+		mkdirSync(target);
+		symlinkSync(target, link);
+		assert.equal(localRepoIdentity(link, undefined).key, localRepoIdentity(target, undefined).key);
+	});
+
 	it("keys a local checkout by its origin, so a worktree shares the remote session", () => {
 		const identity = localRepoIdentity("/work/zod-feature", "git@github.com:colinhacks/zod.git");
 		assert.equal(identity.key, "github.com/colinhacks/zod");

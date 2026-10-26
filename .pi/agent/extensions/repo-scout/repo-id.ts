@@ -8,6 +8,7 @@
  */
 
 import { createHash } from "node:crypto";
+import { realpathSync } from "node:fs";
 
 /** A resolved repo: the canonical key, plus how to get a checkout of the code. */
 export type RepoIdentity = {
@@ -72,11 +73,26 @@ const remoteIdentity = (host: string, path: string): RepoIdentity | undefined =>
 	};
 };
 
-/** The repo path out of a URL path: two segments, stopping at a forge route. */
-const repoPathOf = (pathname: string): string => {
+const isGitLab = (host: string): boolean => host === "gitlab.com" || host.includes("gitlab.");
+
+/**
+ * The repo path out of a URL path.
+ *
+ * GitLab nests projects under subgroups and marks a route with `/-`, so every segment before that
+ * marker belongs to the project. Elsewhere the first two segments are owner and name, and a route
+ * word only counts when a path follows it: `github.com/o/tree` is a repo named tree, while
+ * `github.com/o/n/tree/main` is a file inside `o/n`.
+ */
+const repoPathOf = (host: string, pathname: string): string => {
 	const segments = pathname.split("/").filter(Boolean);
-	const routeAt = segments.findIndex((segment) => ROUTE_WORDS.has(segment));
-	return stripGitSuffix((routeAt > 0 ? segments.slice(0, routeAt) : segments).slice(0, 2).join("/"));
+	if (isGitLab(host)) {
+		const dashAt = segments.indexOf("-");
+		const project = dashAt >= 0 ? segments.slice(0, dashAt) : segments;
+		return stripGitSuffix(project.join("/"));
+	}
+	const routeAt = segments.findIndex((segment, index) => index >= 2 && ROUTE_WORDS.has(segment));
+	const project = routeAt > 0 ? segments.slice(0, routeAt) : segments;
+	return stripGitSuffix(project.slice(0, 2).join("/"));
 };
 
 /**
@@ -129,7 +145,7 @@ export function parseRemoteRepo(input: string): RepoIdentity {
 		);
 	}
 
-	const identity = remoteIdentity(host, repoPathOf(pathname));
+	const identity = remoteIdentity(host, repoPathOf(host.toLowerCase().replace(/^www\./, ""), pathname));
 	if (!identity) {
 		throw new Error(`repo reference does not name both an owner and a repo: ${trimmed}`);
 	}
@@ -137,18 +153,28 @@ export function parseRemoteRepo(input: string): RepoIdentity {
 }
 
 /** A local checkout is identified by its origin when it has one, so a worktree matches its remote. */
+const realPath = (path: string): string => {
+	try {
+		return realpathSync(path);
+	} catch {
+		return path;
+	}
+};
+
 export function localRepoIdentity(absPath: string, origin: string | undefined): RepoIdentity {
+	// One directory, however the caller spelled its path: a symlink and its target are one repo.
+	const source = realPath(absPath);
 	if (origin) {
 		try {
 			// The key comes from the origin so a worktree shares its remote's session, but the code
 			// read is the local path: that is the tree the caller is asking about.
-			return { ...parseRemoteRepo(origin), source: absPath, kind: "local" };
+			return { ...parseRemoteRepo(origin), source, kind: "local" };
 		} catch {
 			// An origin we cannot parse (a bare local path, a bare repo) is not an identity.
 		}
 	}
-	const key = `local:${absPath}`;
-	return { key, source: absPath, display: absPath, kind: "local", slug: slugFor(key) };
+	const key = `local:${source}`;
+	return { key, source, display: source, kind: "local", slug: slugFor(key) };
 }
 
 /**
