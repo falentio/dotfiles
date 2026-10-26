@@ -28,7 +28,7 @@ the main clone, and the https URL all share one session).
 
 A **`ref`** is part of that key: `github.com/o/n@v4.0.7` is a different conversation from
 `github.com/o/n`. Two refs are two trees, so they never share a checkout, a conversation, or a report.
-The ref is cloned with `--branch`, so the scout reads exactly that tag, branch, or commit.
+The ref is cloned with `--branch`, so the scout reads exactly that tag, branch, or commit. It is validated as a plain git ref name first: `git fetch` reads a leading `-` as an option, and `--upload-pack=<cmd>` would run a command on this host.
 
 That session is the point. Every later question about the same repo appends to the same conversation,
 so the provider's prompt cache is reused instead of re-crawling from zero, and the report comes back

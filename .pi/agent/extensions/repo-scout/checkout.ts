@@ -40,6 +40,24 @@ const git = async (args: string[], cwd?: string): Promise<string> => {
 	}
 };
 
+/**
+ * A ref as one safe git argument.
+ *
+ * `git fetch origin <ref>` parses a leading `-` as an option, not a refspec, and
+ * `--upload-pack=<cmd>` makes git run <cmd> on this host. So the ref has to be a plain git ref
+ * name before it reaches an argv: no leading dash, no whitespace, no `..`, no `@{}`.
+ */
+export const assertSafeRef = (ref: string): string => {
+	const parts = ref.split('/');
+	const safe =
+		/^[A-Za-z0-9._][A-Za-z0-9._/-]*$/.test(ref) &&
+		!ref.includes('..') &&
+		!/[./]$/.test(ref) &&
+		!parts.some((part) => part === '' || part.endsWith('.lock'));
+	if (!safe) throw new Error('ref is not a git ref: ' + JSON.stringify(ref));
+	return ref;
+};
+
 /** A ref as a directory suffix: one path component, no separators. */
 export const sanitizeRef = (ref: string): string =>
 	ref
@@ -72,7 +90,8 @@ export async function ensureCheckout(
 	ref?: string,
 ): Promise<string> {
 	await mkdir(reposDir, { recursive: true });
-	const dir = checkoutDir(identity, reposDir, ref);
+	const pinned = ref ? assertSafeRef(ref) : undefined;
+	const dir = checkoutDir(identity, reposDir, pinned);
 
 	if (existsSync(dir) && existsSync(join(dir, '.git'))) return dir;
 
@@ -81,7 +100,7 @@ export async function ensureCheckout(
 
 	const args = ['clone', '--quiet'];
 	args.push(...(identity.kind === 'local' ? ['--shared'] : ['--depth', '1']));
-	if (ref) args.push('--branch', ref);
+	if (pinned) args.push('--branch', pinned);
 	args.push(identity.source, dir);
 	await git(args);
 	return dir;
@@ -90,7 +109,7 @@ export async function ensureCheckout(
 /** Best-effort refresh, so a long-lived scratch clone does not answer about old code. */
 export async function refreshCheckout(dir: string, ref?: string): Promise<void> {
 	if (ref) {
-		await git(['fetch', '--depth', '1', '--quiet', 'origin', ref], dir).catch(() => undefined);
+		await git(['fetch', '--depth', '1', '--quiet', 'origin', assertSafeRef(ref)], dir).catch(() => undefined);
 		await git(['reset', '--hard', '--quiet', 'FETCH_HEAD'], dir).catch(() => undefined);
 		return;
 	}

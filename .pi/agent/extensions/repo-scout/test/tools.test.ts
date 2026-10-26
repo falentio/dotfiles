@@ -10,7 +10,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
-import { checkoutDir, ensureCheckout, headSha, originOf } from "../checkout.ts";
+import { checkoutDir, ensureCheckout, headSha, originOf, refreshCheckout, sanitizeRef } from "../checkout.ts";
 import { localRepoIdentity, parseRemoteRepo } from "../repo-id.ts";
 import type { PackageRepoResult } from "../registry.ts";
 import { identifyRepo, runPackageRepo, scoutKey } from "../tools.ts";
@@ -224,6 +224,23 @@ describe("ensureCheckout", () => {
 		assert.equal(identity.source, root);
 		const dir = await ensureCheckout(identity, scratch);
 		assert.ok(existsSync(join(dir, "README.md")));
+	});
+
+	it("refuses a ref git would read as an option", async () => {
+		const root = await makeRepo();
+		const scratch = await mkdtemp(join(tmpdir(), "repo-scout-scratch-"));
+		roots.push(root, scratch);
+		const identity = localRepoIdentity(root, undefined);
+		const marker = join(scratch, "pwned");
+		const hostile = "--upload-pack=echo pwned > " + marker;
+		// The decoy branch sanitizes to the same directory name, so the second call reuses the tree
+		// and reaches refresh, which is where an unvalidated ref becomes an option.
+		const decoy = sanitizeRef(hostile);
+		git(root, "branch", decoy);
+		const pinned = await ensureCheckout(identity, scratch, decoy);
+		await assert.rejects(ensureCheckout(identity, scratch, hostile), /ref is not a git ref/);
+		await assert.rejects(refreshCheckout(pinned, hostile), /ref is not a git ref/);
+		assert.equal(existsSync(marker), false, "git ran the ref as a command");
 	});
 
 	it("reads the origin of a checkout", async () => {
