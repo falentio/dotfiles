@@ -5,7 +5,7 @@ Two tools that replace the scout-subagent dance with one call.
 | Tool | Takes | Returns |
 |---|---|---|
 | `repo_scout` | a repo (URL, `host/owner/name`, `owner/name`, or a local path), a question, and optionally a `ref` | the scout report: `answer`, findings anchored to `path:line`, gaps, blockers, and the checkout/commit that answered |
-| `package_repo` | a package name, a `source` (`npm`, `jsr`, `crate`, `pypi`, `dockerhub`), and optionally a `version` | the git repo URLs that serve it, each with provenance, a confirmed git `ref`, and the exact clone target |
+| `package_repo` | a package name, a `source` (`npm`, `jsr`, `crate`, `pypi`, `dockerhub`, `go`, `hex`, `maven`, `nuget`, `zig`), and optionally a `version` | the git repo URLs that serve it, each with provenance, a confirmed git `ref`, and the exact clone target |
 
 Both are `codemode` tools, so they are reached from codemode scripts:
 
@@ -92,8 +92,9 @@ repos
 clone    https://github.com/colinhacks/zod ref=v3.22.4
 ```
 
-**Sources.** `npm`, `jsr`, `crate` (crates.io), `pypi`, `dockerhub`. Each reads the field that registry
-actually publishes:
+**Sources.** `npm`, `jsr`, `crate` (crates.io), `pypi`, `dockerhub`, `go` (the module proxy),
+`hex` (Hex.pm), `maven` (Maven Central), `nuget` (NuGet), `zig` (the zpm index). Each reads the field
+that registry actually publishes:
 
 | Source | Endpoint | Repo comes from |
 |---|---|---|
@@ -102,9 +103,16 @@ actually publishes:
 | `crate` | `crates.io/api/v1/crates/<name>` | `crate.repository`, then `homepage` |
 | `pypi` | `pypi.org/pypi/<name>/json` | `project_urls` Source/Code/Repository, then `home_page` |
 | `dockerhub` | `hub.docker.com/v2/repositories/<owner>/<name>/` | a repo link in the description (Docker Hub has no repo field) |
+| `go` | `proxy.golang.org/<module>/@latest` or `/@v/<version>.info` | the proxy's `Origin.URL`; a vanity path without one serves `go-import` meta |
+| `hex` | `hex.pm/api/packages/<name>` | `meta.links` (GitHub, GitLab, Source, Repository), plus the release list |
+| `maven` | `repo1.maven.org/.../maven-metadata.xml`, then the POM | `<scm>` developerConnection, connection, or url; its `<tag>` is tried first |
+| `nuget` | `api.nuget.org/v3-flatcontainer/<id>/index.json`, then the `.nuspec` | `<repository url>` in the nuspec |
+| `zig` | `zig.pm/api/packages` | the `git` field, else a `links` URL (zpm has no releases) |
 
 **Version.** `version` picks the manifest to read and names the version in the result. When it is
 absent the registry's latest is used; a version the registry does not have comes back as a warning.
+Go versions keep their `v` (they are module versions), and Maven coordinates are `group:artifact`.
+zpm lists git repos, not releases: a Zig version is only checked against git tags, and says so.
 
 **Ref.** Registries publish versions, not git tags, so a tag is a candidate (`v4.0.7`, `4.0.7`,
 `zod@4.0.7`, `serde-v1.0.229`, …) that is only reported after `git ls-remote` confirms it. No match
@@ -156,7 +164,7 @@ loopback, link-local, or internal name. Set `GITHUB_TOKEN` to raise the search r
 
 ```sh
 cd ~/.pi/agent/extensions/repo-scout
-npm test          # 112 tests: parsers, registry queue/lock/abort, checkouts, a two-process race, and a full pipeline run
+npm test          # 126 tests: parsers and every source, registry queue/lock/abort, checkouts, a two-process race, and a full pipeline run
 npm run typecheck
 ```
 

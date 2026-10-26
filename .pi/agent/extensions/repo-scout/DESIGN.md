@@ -138,6 +138,11 @@ back to a GitHub name search:
 | `crate` | `crates.io/api/v1/crates/<name>` | `crate.repository`, then `homepage` |
 | `pypi` | `pypi.org/pypi/<name>/json` | `project_urls` Source/Code/Repository, then `home_page` |
 | `dockerhub` | `hub.docker.com/v2/repositories/<owner>/<name>/` | a repo link in the description |
+| `go` | `proxy.golang.org/<module>/@latest`, `/@v/<version>.info` | `Origin.URL`, which the proxy derives from the module's VCS; else a `go-import` meta tag |
+| `hex` | `hex.pm/api/packages/<name>` | `meta.links` |
+| `maven` | `repo1.maven.org/.../maven-metadata.xml`, then the POM | `<scm>`, and its `<tag>` when present |
+| `nuget` | `api.nuget.org/v3-flatcontainer/<id>/index.json`, then the `.nuspec` | `<repository url>` |
+| `zig` | `zig.pm/api/packages` | the `git` field or a `links` URL |
 
 `source` defaults to `npm`; an unknown one is an error naming the supported ones.
 
@@ -190,7 +195,14 @@ bug trackers in `repository` often enough that trusting the field hands a caller
 The URL must be https on a public host: an IP literal, `localhost`, `*.local`, and `*.internal` are
 refused, because `git ls-remote` would otherwise become egress chosen by third-party metadata. Only
 then does the forge test run: two segments on `github.com` is a repo, two segments on `hub.docker.com`
-is a page. A `.git` suffix proves a git URL without bypassing either check.
+is a page. A path ending in `.git` proves a git URL without bypassing either check; a query string
+that happens to end in `.git` (a gitweb page) does not.
+
+The Go proxy is the one exception to the forge-shape test: `Origin.URL` is built from the module's
+VCS, so a repo on `go.googlesource.com` is trusted after the public-host check. A vanity path with no
+origin (`gopkg.in/yaml.v3`) serves a `go-import` meta tag, and the git URL comes from there. Maven
+coordinates must be `group:artifact`; both halves are validated before a URL is built. NuGet ids are
+case-insensitive and lowercased for the flat-container path, while the nuspec keeps the repo's case.
 
 ### 11. One live session per repo and ref, across processes
 

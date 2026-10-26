@@ -9,6 +9,7 @@ import {
 	type RegistryDeps,
 	type RemoteRefs,
 	cloneTarget,
+	isRepoRootUrl,
 	resolvePackageRepo,
 } from "../registry.ts";
 
@@ -39,6 +40,57 @@ const DOCKERHUB = {
 	description: "The image",
 	full_description: "Source: https://github.com/docker-library/postgres.",
 };
+
+
+const GO_INFO = {
+	Version: "v1.10.0",
+	Origin: { VCS: "git", URL: "https://github.com/gin-gonic/gin", Ref: "refs/tags/v1.10.0" },
+};
+
+const GO_VANITY_META =
+	'<meta name="go-import" content="gopkg.in/yaml.v3 git https://github.com/go-yaml/yaml">';
+
+const HEX_PACKAGE = {
+	name: "phoenix",
+	meta: {
+		links: {
+			Changelog: "https://hexdocs.pm/phoenix/changelog.html",
+			GitHub: "https://github.com/phoenixframework/phoenix",
+		},
+	},
+	releases: [{ version: "1.8.16" }, { version: "1.7.14" }],
+};
+
+const MAVEN_METADATA = `<?xml version="1.0" encoding="UTF-8"?>
+<metadata><groupId>com.example</groupId><artifactId>guava</artifactId>
+<versioning><latest>3.17.0</latest><release>3.17.0</release>
+<versions><version>3.16.0</version><version>3.17.0</version></versions></versioning></metadata>`;
+
+const MAVEN_POM = `<project>
+  <url>https://example.github.io/guava/</url>
+  <scm><developerConnection>scm:git:https://github.com/google/guava.git</developerConnection>
+  <url>https://github.com/google/guava</url></scm>
+</project>`;
+
+const NUGET_INDEX = { versions: ["12.0.3", "13.0.3"] };
+
+const NUGET_NUSPEC =
+	'<package><id>Newtonsoft.Json</id><repository type="git" url="https://github.com/JamesNK/Newtonsoft.Json" /></package>';
+
+const ZPM = [
+	{
+		author: "BanchouBoo",
+		name: "accord",
+		git: "https://github.com/BanchouBoo/accord.git",
+		links: { github: "https://github.com/BanchouBoo/accord" },
+	},
+	{
+		author: "someone",
+		name: "accord",
+		git: "https://github.com/someone/accord.git",
+		links: {},
+	},
+];
 
 type Fixtures = {
 	json?: Record<string, unknown>;
@@ -198,6 +250,24 @@ describe("resolvePackageRepo", () => {
 		assert.match(result.warnings.join("\n"), /a Docker tag names an image, not a git revision/);
 	});
 
+	it("refuses a gitweb page whose query merely ends in .git", () => {
+		assert.equal(
+			isRepoRootUrl(
+				"https://gitbox.apache.org/repos/asf?p=commons-lang",
+				"https://gitbox.apache.org/repos/asf?p=commons-lang.git",
+			),
+			false,
+		);
+		assert.equal(
+			isRepoRootUrl(
+				"https://gitbox.apache.org/repos/asf/commons-lang",
+				"https://gitbox.apache.org/repos/asf/commons-lang.git",
+			),
+			true,
+			"a clone path that ends in .git is still a repo",
+		);
+	});
+
 	it("drops a manifest URL that points at a private host, and names it", async () => {
 		const { impl, listed } = deps({
 			json: {
@@ -264,9 +334,172 @@ describe("resolvePackageRepo", () => {
 		assert.match(result.warnings.join("\n"), /no tag 99/);
 	});
 
+
+	it("go: reads the origin repo and version from the proxy, then the v tag", async () => {
+		const { impl, requested, listed } = deps({
+			json: { "https://proxy.golang.org/github.com/gin-gonic/gin/@latest": GO_INFO },
+			refs: { "https://github.com/gin-gonic/gin": { tags: ["v1.10.0"], branches: [] } },
+		});
+		const result = await resolvePackageRepo({ package: "github.com/gin-gonic/gin", source: "go" }, impl);
+		assert.equal(result.version, "v1.10.0");
+		assert.equal(result.repos[0]?.url, "https://github.com/gin-gonic/gin");
+		assert.equal(result.repos[0]?.via, "go-proxy-origin");
+		assert.equal(result.repos[0]?.ref, "v1.10.0");
+		assert.deepEqual(requested, ["https://proxy.golang.org/github.com/gin-gonic/gin/@latest"]);
+		assert.deepEqual(listed, ["https://github.com/gin-gonic/gin"]);
+	});
+
+	it("go: escapes an uppercase module path and reads the requested version", async () => {
+		const info = { Version: "v1.9.5", Origin: { URL: "https://github.com/BurntSushi/toml" } };
+		const { impl, requested } = deps({
+			json: { "https://proxy.golang.org/github.com/!burnt!sushi/toml/@v/v1.9.5.info": info },
+			refs: { "https://github.com/BurntSushi/toml": { tags: ["v1.9.5"], branches: [] } },
+		});
+		const result = await resolvePackageRepo(
+			{ package: "github.com/BurntSushi/toml", source: "go", version: "v1.9.5" },
+			impl,
+		);
+		assert.equal(requested[0], "https://proxy.golang.org/github.com/!burnt!sushi/toml/@v/v1.9.5.info");
+		assert.equal(result.repos[0]?.ref, "v1.9.5");
+	});
+
+	it("go: trusts a proxy origin on a host that is not a known forge", async () => {
+		const { impl } = deps({
+			json: {
+				"https://proxy.golang.org/golang.org/x/text/@latest": {
+					Version: "v0.43.0",
+					Origin: { VCS: "git", URL: "https://go.googlesource.com/text" },
+				},
+			},
+			refs: { "https://go.googlesource.com/text": { tags: ["v0.43.0"], branches: [] } },
+		});
+		const result = await resolvePackageRepo({ package: "golang.org/x/text", source: "go" }, impl);
+		assert.equal(result.repos[0]?.url, "https://go.googlesource.com/text");
+		assert.equal(result.repos[0]?.ref, "v0.43.0");
+	});
+
+	it("go: without an origin, a vanity path reads the go-import meta tag", async () => {
+		const { impl } = deps({
+			json: { "https://proxy.golang.org/gopkg.in/yaml.v3/@latest": { Version: "v3.0.1" } },
+			text: { "https://gopkg.in/yaml.v3?go-get=1": GO_VANITY_META },
+			refs: { "https://github.com/go-yaml/yaml": { tags: ["v3.0.1"], branches: [] } },
+		});
+		const result = await resolvePackageRepo({ package: "gopkg.in/yaml.v3", source: "go" }, impl);
+		assert.equal(result.repos[0]?.url, "https://github.com/go-yaml/yaml");
+		assert.equal(result.repos[0]?.via, "go-import-meta");
+		assert.equal(result.repos[0]?.ref, "v3.0.1");
+	});
+
+	it("hex: reads meta.links and the release list", async () => {
+		const { impl } = deps({
+			json: { "https://hex.pm/api/packages/phoenix": HEX_PACKAGE },
+			refs: { "https://github.com/phoenixframework/phoenix": { tags: ["v1.7.14"], branches: [] } },
+		});
+		const result = await resolvePackageRepo({ package: "phoenix", source: "hex", version: "1.7.14" }, impl);
+		assert.equal(result.version, "1.7.14");
+		assert.equal(result.repos[0]?.url, "https://github.com/phoenixframework/phoenix");
+		assert.equal(result.repos[0]?.via, "hex-links");
+		assert.equal(result.repos[0]?.ref, "v1.7.14");
+	});
+
+	it("maven: metadata picks the release, the pom names the scm repo", async () => {
+		const { impl, requested } = deps({
+			text: {
+				"https://repo1.maven.org/maven2/com/google/guava/guava/maven-metadata.xml": MAVEN_METADATA,
+				"https://repo1.maven.org/maven2/com/google/guava/guava/3.17.0/guava-3.17.0.pom": MAVEN_POM,
+			},
+			refs: { "https://github.com/google/guava": { tags: ["v3.17.0"], branches: [] } },
+		});
+		const result = await resolvePackageRepo({ package: "com.google.guava:guava", source: "maven" }, impl);
+		assert.equal(result.version, "3.17.0");
+		assert.equal(result.repos[0]?.url, "https://github.com/google/guava");
+		assert.equal(result.repos[0]?.via, "maven-pom");
+		assert.equal(result.repos[0]?.ref, "v3.17.0");
+		assert.ok(requested.includes("https://repo1.maven.org/maven2/com/google/guava/guava/3.17.0/guava-3.17.0.pom"));
+	});
+
+	it("maven: a pom's scm tag is tried before the guessed candidates", async () => {
+		const metadata = `<metadata><versioning><release>3.17.0</release>
+			<versions><version>3.17.0</version></versions></versioning></metadata>`;
+		const pom = `<project><scm>
+			<developerConnection>scm:git:https://gitbox.apache.org/repos/asf/commons-lang.git</developerConnection>
+			<tag>rel/commons-lang-3.17.0</tag>
+		</scm></project>`;
+		const { impl } = deps({
+			text: {
+				"https://repo1.maven.org/maven2/org/apache/commons/commons-lang3/maven-metadata.xml": metadata,
+				"https://repo1.maven.org/maven2/org/apache/commons/commons-lang3/3.17.0/commons-lang3-3.17.0.pom": pom,
+			},
+			refs: {
+				"https://gitbox.apache.org/repos/asf/commons-lang": {
+					tags: ["rel/commons-lang-3.17.0"],
+					branches: [],
+				},
+			},
+		});
+		const result = await resolvePackageRepo(
+			{ package: "org.apache.commons:commons-lang3", source: "maven", version: "3.17.0" },
+			impl,
+		);
+		assert.equal(result.repos[0]?.ref, "rel/commons-lang-3.17.0");
+		assert.equal(result.repos[0]?.refCandidates[0], "rel/commons-lang-3.17.0");
+	});
+
+	it("maven: a -jre classifier falls back to the base version's tag", async () => {
+		const metadata = `<metadata><versioning><release>3.17.0-jre</release>
+			<versions><version>3.16.0</version><version>3.17.0-jre</version></versions></versioning></metadata>`;
+		const { impl } = deps({
+			text: {
+				"https://repo1.maven.org/maven2/com/google/guava/guava/maven-metadata.xml": metadata,
+				"https://repo1.maven.org/maven2/com/google/guava/guava/3.17.0-jre/guava-3.17.0-jre.pom": MAVEN_POM,
+			},
+			refs: { "https://github.com/google/guava": { tags: ["v3.17.0"], branches: [] } },
+		});
+		const result = await resolvePackageRepo(
+			{ package: "com.google.guava:guava", source: "maven", version: "3.17.0-jre" },
+			impl,
+		);
+		assert.equal(result.repos[0]?.ref, "v3.17.0");
+	});
+
+	it("nuget: lowercases the id, reads the nuspec repository, and the plain tag", async () => {
+		const { impl, requested } = deps({
+			json: { "https://api.nuget.org/v3-flatcontainer/newtonsoft.json/index.json": NUGET_INDEX },
+			text: {
+				"https://api.nuget.org/v3-flatcontainer/newtonsoft.json/13.0.3/newtonsoft.json.nuspec": NUGET_NUSPEC,
+			},
+			refs: { "https://github.com/JamesNK/Newtonsoft.Json": { tags: ["13.0.3"], branches: [] } },
+		});
+		const result = await resolvePackageRepo(
+			{ package: "Newtonsoft.Json", source: "nuget", version: "13.0.3" },
+			impl,
+		);
+		assert.equal(result.version, "13.0.3");
+		assert.equal(result.repos[0]?.url, "https://github.com/JamesNK/Newtonsoft.Json");
+		assert.equal(result.repos[0]?.via, "nuget-nuspec");
+		assert.equal(result.repos[0]?.ref, "13.0.3");
+		assert.ok(requested[0]?.includes("/newtonsoft.json/index.json"));
+	});
+
+	it("zig: reads the zpm git repo, and says the index has no releases", async () => {
+		const { impl } = deps({
+			json: { "https://zig.pm/api/packages": ZPM },
+			refs: {
+				"https://github.com/BanchouBoo/accord": { tags: [], branches: [] },
+				"https://github.com/someone/accord": { tags: [], branches: [] },
+			},
+		});
+		const result = await resolvePackageRepo({ package: "BanchouBoo/accord", source: "zig", version: "0.1.0" }, impl);
+		assert.equal(result.repos[0]?.url, "https://github.com/BanchouBoo/accord");
+		assert.equal(result.repos[0]?.via, "zpm-index");
+		assert.deepEqual(result.repos[0]?.refCandidates, ["v0.1.0", "0.1.0"]);
+		assert.match(result.warnings.join("\n"), /zpm lists git repos, not releases/);
+		assert.equal(cloneTarget(result)?.url, "https://github.com/BanchouBoo/accord");
+	});
+
 	it("rejects an unknown source before any request", async () => {
 		const { impl, requested } = deps({});
-		await assert.rejects(resolvePackageRepo({ package: "x", source: "maven" as never }, impl), /unknown source: maven/);
+		await assert.rejects(resolvePackageRepo({ package: "x", source: "conda" as never }, impl), /unknown source: conda/);
 		assert.deepEqual(requested, []);
 	});
 

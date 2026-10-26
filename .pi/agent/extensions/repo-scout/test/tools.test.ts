@@ -155,8 +155,8 @@ describe("runPackageRepo", () => {
 
 	it("rejects a source it cannot read, naming the ones it can", async () => {
 		await assert.rejects(
-			runPackageRepo({ package: "x", source: "maven" as never }),
-			/unknown source: maven\. Supported: npm, jsr, crate, pypi, dockerhub\./,
+			runPackageRepo({ package: "x", source: "conda" as never }),
+			/unknown source: conda\. Supported: npm, jsr, crate, pypi, dockerhub, go, hex, maven, nuget, zig\./,
 		);
 		await assert.rejects(runPackageRepo({ package: "  " }), /package is empty/);
 	});

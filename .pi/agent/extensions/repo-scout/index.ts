@@ -51,7 +51,10 @@ const repoScoutParameters = Type.Object({
 });
 
 const packageRepoParameters = Type.Object({
-	package: Type.String({ description: "Package name: zod, @scope/name, serde, requests, or owner/image for Docker Hub." }),
+	package: Type.String({
+		description:
+			"Package name: zod, @scope/name, serde, requests, owner/image (Docker Hub), a Go module path (github.com/o/n), a Hex name (phoenix), group:artifact (Maven), a NuGet id (Newtonsoft.Json), or a zpm name (accord or author/name).",
+	}),
 	source: Type.Optional(
 		Type.Union(
 			PACKAGE_SOURCES.map((source) => Type.Literal(source)),

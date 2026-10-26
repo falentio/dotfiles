@@ -13,7 +13,18 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
-export const PACKAGE_SOURCES = ['npm', 'jsr', 'crate', 'pypi', 'dockerhub'] as const;
+export const PACKAGE_SOURCES = [
+	'npm',
+	'jsr',
+	'crate',
+	'pypi',
+	'dockerhub',
+	'go',
+	'hex',
+	'maven',
+	'nuget',
+	'zig',
+] as const;
 
 /** A package registry this tool can read. */
 export type PackageSource = (typeof PACKAGE_SOURCES)[number];
@@ -25,7 +36,19 @@ export type RepoKind = 'repository' | 'tarball';
 export type Confidence = 'stated' | 'guess';
 
 /** Which field the URL came out of, so a reader can judge it. */
-export type RepoVia = 'manifest' | 'npm-tarball' | 'jsr-deno-json' | 'pypi-project-urls' | 'dockerhub-description' | 'github-search';
+export type RepoVia =
+	| 'manifest'
+	| 'npm-tarball'
+	| 'jsr-deno-json'
+	| 'pypi-project-urls'
+	| 'dockerhub-description'
+	| 'github-search'
+	| 'go-proxy-origin'
+	| 'go-import-meta'
+	| 'hex-links'
+	| 'maven-pom'
+	| 'nuget-nuspec'
+	| 'zpm-index';
 
 export type RefKind = 'tag' | 'branch';
 
@@ -115,6 +138,8 @@ const warnMissingVersion = (
 	}
 };
 
+const messageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+
 const asRecord = (value: unknown): Record<string, unknown> | undefined =>
 	value && typeof value === 'object' ? (value as Record<string, unknown>) : undefined;
 
@@ -180,8 +205,10 @@ export function isRepoRootUrl(url: string, raw?: unknown): boolean {
 	}
 	if (parsed.protocol !== 'https:' || !isPublicGitHost(parsed.hostname)) return false;
 	// A URL the publisher wrote with a .git suffix is a git URL by construction, whatever the host.
+	// Test the path, not the query: gitbox.apache.org/repos/asf?p=x.git is a gitweb page.
 	const original = asString(raw);
-	if (original && /\.git([#?].*)?$/i.test(original)) return true;
+	const beforeQuery = original?.split(/[?#]/)[0];
+	if (beforeQuery && /\.git\/?$/i.test(beforeQuery)) return true;
 	if (!isForgeHost(parsed.hostname)) return false;
 	const parts = parsed.pathname.split('/').filter(Boolean);
 	return parts.length === 2 && !SITE_ROUTES.has((parts[1] ?? '').toLowerCase());
@@ -295,6 +322,166 @@ export function reposFromGithubSearch(payload: unknown): RepoRef[] {
 	return refs;
 }
 
+
+/**
+ * Go modules are fetched through proxy.golang.org, which reports the origin repo of a version in
+ * `Origin.URL`. That field is why a Go answer does not need a name search: the proxy already knows
+ * which git repo served the module. Uppercase letters in a module path are escaped as `!lower`.
+ */
+export const escapeGoModule = (module: string): string => module.replace(/[A-Z]/g, (char) => '!' + char.toLowerCase());
+
+/** A module path names a host with a dot, then a path: github.com/o/n, gopkg.in/yaml.v3. */
+export const isGoModulePath = (name: string): boolean =>
+	/^[A-Za-z0-9.-]+\.[A-Za-z]{2,}\/[A-Za-z0-9._~/-]+$/.test(name) && !name.includes('..') && !name.startsWith('/') && !name.endsWith('/');
+
+/**
+ * The version, origin repo, and VCS from a proxy `.info` or `@latest` response.
+ *
+ * The proxy builds Origin from the module's VCS, so its URL is a git origin by construction even
+ * when the host is not a known forge (go.googlesource.com/text). The caller still checks the host is
+ * public before git contacts it.
+ */
+export function parseGoVersionInfo(document: unknown): { version: string | null; repo: string | null; vcs: string | null } {
+	const record = asRecord(document);
+	const origin = asRecord(record?.Origin);
+	return {
+		version: asString(record?.Version) ?? null,
+		repo: normalizeRepoUrl(asString(origin?.URL)) ?? null,
+		vcs: asString(origin?.VCS) ?? null,
+	};
+}
+
+/** The go-import meta tag a vanity module path serves: "prefix git url". */
+export function goImportRepo(html: string): string | undefined {
+	for (const tag of html.match(/<meta\b[^>]*>/gi) ?? []) {
+		if (!/\bname=["']go-import["']/i.test(tag)) continue;
+		const content = /\bcontent=["']([^"']+)["']/i.exec(tag)?.[1];
+		const [prefix, vcs, url] = content?.trim().split(/\s+/) ?? [];
+		if (!prefix || vcs !== 'git' || !url) continue;
+		const normalized = normalizeRepoUrl(url);
+		if (normalized) return normalized;
+	}
+	return undefined;
+}
+
+/** Hex publishes a package's links and every release; the GitHub link is the usual repo field. */
+export function parseHexPackage(document: unknown): { latest: string | null; versions: string[]; repos: RepoRef[] } {
+	const record = asRecord(document);
+	const releases = Array.isArray(record?.releases) ? record.releases : [];
+	const versions = releases
+		.map((entry) => asString(asRecord(entry)?.version))
+		.filter((entry): entry is string => Boolean(entry));
+	const links = asRecord(asRecord(record?.meta)?.links);
+	const order = ['github', 'gitlab', 'source', 'source code', 'repository', 'code'];
+	const entries = (links ? Object.entries(links) : []).sort(([a], [b]) => {
+		const rank = (key: string) => {
+			const at = order.indexOf(key.toLowerCase());
+			return at < 0 ? order.length : at;
+		};
+		return rank(a) - rank(b);
+	});
+	const refs: RepoRef[] = [];
+	for (const [, value] of entries) {
+		const url = normalizeRepoUrl(value);
+		if (!url || !isRepoRootUrl(url, value)) continue;
+		if (refs.some((existing) => existing.url === url)) continue;
+		refs.push(makeRef(url, 'hex-links'));
+	}
+	return { latest: versions[0] ?? null, versions, repos: refs };
+}
+
+/** The tag a POM's <scm> block names, when the publisher wrote one. */
+export function pomTag(xml: string): string | undefined {
+	const scm = /<scm>([\s\S]*?)<\/scm>/i.exec(xml)?.[1];
+	const tag = scm ? /<tag>\s*([^<\s]+)\s*<\/tag>/i.exec(scm)?.[1] : undefined;
+	return tag && !tag.startsWith('-') ? tag : undefined;
+}
+
+/** maven-metadata.xml: the release, the latest, and every version in the directory. */
+export function parseMavenMetadata(xml: string): { release: string | null; latest: string | null; versions: string[] } {
+	const versions = [...xml.matchAll(/<version>\s*([^<\s]+)\s*<\/version>/g)].map((match) => match[1] as string);
+	return {
+		release: /<release>\s*([^<\s]+)\s*<\/release>/.exec(xml)?.[1] ?? null,
+		latest: /<latest>\s*([^<\s]+)\s*<\/latest>/.exec(xml)?.[1] ?? null,
+		versions,
+	};
+}
+
+const scmRepo = (value: string): string | undefined => {
+	const cleaned = value.trim().replace(/^scm:git:/i, '').replace(/^scm:/i, '');
+	const url = normalizeRepoUrl(cleaned);
+	return url && isRepoRootUrl(url, cleaned) ? url : undefined;
+};
+
+/**
+ * A POM names its source in `<scm>`. developerConnection is the clone URL, connection is often the
+ * read-only clone, and `<url>` is sometimes a browsable page; try them in that order, then the
+ * project url, and let the repo-root test drop a project site.
+ */
+export function reposFromPom(xml: string): RepoRef[] {
+	const scm = /<scm>([\s\S]*?)<\/scm>/i.exec(xml)?.[1];
+	const refs: RepoRef[] = [];
+	const push = (raw: string | undefined) => {
+		if (!raw) return;
+		const url = scmRepo(raw);
+		if (!url || refs.some((existing) => existing.url === url)) return;
+		refs.push(makeRef(url, 'maven-pom'));
+	};
+	if (scm) {
+		push(/<developerConnection>\s*([^<]+?)\s*<\/developerConnection>/i.exec(scm)?.[1]);
+		push(/<connection>\s*([^<]+?)\s*<\/connection>/i.exec(scm)?.[1]);
+		push(/<url>\s*([^<]+?)\s*<\/url>/i.exec(scm)?.[1]);
+	}
+	push(/<url>\s*([^<]+?)\s*<\/url>/i.exec(xml)?.[1]);
+	return refs;
+}
+
+/** The version list from the NuGet flat-container index. */
+export function parseNugetVersions(document: unknown): string[] {
+	const versions = asRecord(document)?.versions;
+	return Array.isArray(versions) ? versions.map(asString).filter((entry): entry is string => Boolean(entry)) : [];
+}
+
+/** A .nuspec names its source in `<repository url>`; modern packages publish it. */
+export function reposFromNuspec(xml: string): RepoRef[] {
+	const raw = /<repository\b[^>]*\burl=["']([^"']+)["']/i.exec(xml)?.[1];
+	const url = normalizeRepoUrl(raw);
+	if (!url || !isRepoRootUrl(url, raw)) return [];
+	return [makeRef(url, 'nuget-nuspec')];
+}
+
+/**
+ * zpm is the community Zig package index. It lists git repos, not releases, so a version only
+ * reaches the ref stage: tag candidates are verified against git like every other source.
+ */
+export type ZigMatch = { author: string; name: string; repos: RepoRef[] };
+
+export function zigMatches(payload: unknown, name: string): ZigMatch[] {
+	if (!Array.isArray(payload)) return [];
+	const wanted = name.trim().toLowerCase();
+	const slash = wanted.indexOf('/');
+	const wantedAuthor = slash > 0 ? wanted.slice(0, slash) : undefined;
+	const wantedName = slash > 0 ? wanted.slice(slash + 1) : wanted;
+	const matches: ZigMatch[] = [];
+	for (const item of payload) {
+		const record = asRecord(item);
+		const author = asString(record?.author) ?? '';
+		const packageName = asString(record?.name) ?? '';
+		if (!packageName || packageName.toLowerCase() !== wantedName) continue;
+		if (wantedAuthor && author.toLowerCase() !== wantedAuthor) continue;
+		const links = asRecord(record?.links);
+		const refs: RepoRef[] = [];
+		for (const value of [record?.git, links?.github, links?.gitlab]) {
+			const url = normalizeRepoUrl(value);
+			if (!url || !isRepoRootUrl(url, value)) continue;
+			if (refs.some((existing) => existing.url === url)) continue;
+			refs.push(makeRef(url, 'zpm-index'));
+		}
+		matches.push({ author, name: packageName, repos: refs });
+	}
+	return matches;
+}
+
 /**
  * Tag names worth trying for a published version, most likely first. Registries do not publish
  * git tags, so these are guesses that git then confirms or rejects.
@@ -326,6 +513,42 @@ export function refCandidates(source: PackageSource, name: string, version: stri
 			push('v' + version);
 			push(version);
 			push(name + '-' + version);
+			break;
+		case 'go':
+			push('v' + version);
+			push(version);
+			break;
+		case 'hex':
+			push('v' + version);
+			push(version);
+			push(name + '-v' + version);
+			break;
+		case 'maven': {
+			const artifact = name.split(':')[1] ?? name;
+			push('v' + version);
+			push(version);
+			push(artifact + '-v' + version);
+			push(artifact + '-' + version);
+			push('rel/' + artifact + '-' + version);
+			// A classifier (guava's -jre, -android) is not part of the tag: v33.3.1 serves both.
+			const base = version.replace(/-(?:jre|android)$/i, '');
+			if (base !== version) {
+				push('v' + base);
+				push(base);
+				push(artifact + '-v' + base);
+				push(artifact + '-' + base);
+				push('rel/' + artifact + '-' + base);
+			}
+			break;
+		}
+		case 'nuget':
+			push('v' + version);
+			push(version);
+			push(name + '-v' + version);
+			break;
+		case 'zig':
+			push('v' + version);
+			push(version);
 			break;
 		case 'dockerhub':
 			// A Docker tag names an image, not a git revision: there is nothing to clone at.
@@ -444,7 +667,7 @@ const githubSearch = async (name: string, deps: RegistryDeps, warnings: string[]
 const discover = async (
 	input: { package: string; source: PackageSource; version?: string },
 	deps: RegistryDeps,
-): Promise<{ version: string | null; repos: RepoRef[]; warnings: string[] }> => {
+): Promise<{ version: string | null; repos: RepoRef[]; warnings: string[]; refHints?: string[] }> => {
 	const name = input.package.trim();
 	const warnings: string[] = [];
 
@@ -511,6 +734,171 @@ const discover = async (
 			return { version, repos, warnings };
 		}
 
+		case 'go': {
+			if (!isGoModulePath(name)) {
+				throw new Error('go package must be a module path: github.com/owner/name or gopkg.in/name.vN');
+			}
+			const modulePath = escapeGoModule(name);
+			const base = 'https://proxy.golang.org/' + modulePath;
+			let info: unknown;
+			if (input.version) {
+				try {
+					info = await deps.fetchJson(base + '/@v/' + encodeURIComponent(input.version) + '.info');
+				} catch {
+					warnings.push('no go release ' + input.version + '; the fields may describe another release');
+					info = await deps.fetchJson(base + '/@latest');
+				}
+			} else {
+				info = await deps.fetchJson(base + '/@latest');
+			}
+			const parsed = parseGoVersionInfo(info);
+			const version = input.version ?? parsed.version;
+			const proxyOrigin =
+				parsed.repo && (!parsed.vcs || parsed.vcs === 'git') && isPublicGitHost(new URL(parsed.repo).hostname)
+					? parsed.repo
+					: undefined;
+			let repoUrl = proxyOrigin;
+			const ignored = parsed.repo && !repoUrl ? parsed.repo : undefined;
+			if (ignored) warnings.push('ignored ' + ignored + ': not a cloneable https git host');
+			if (!repoUrl && isRepoRootUrl('https://' + name)) repoUrl = 'https://' + name;
+			let via: RepoVia = 'go-proxy-origin';
+			if (!repoUrl) {
+				// A vanity path (golang.org/x/text, gopkg.in/...) serves its repo in a go-import meta tag.
+				try {
+					const fromMeta = goImportRepo(await deps.fetchText('https://' + name + '?go-get=1'));
+					if (fromMeta && isRepoRootUrl(fromMeta)) {
+						repoUrl = fromMeta;
+						via = 'go-import-meta';
+					}
+				} catch (error) {
+					warnings.push('could not resolve the go-import meta tag: ' + messageOf(error));
+				}
+			}
+			let repos = repoUrl ? [makeRef(repoUrl, via)] : [];
+			if (!repos.length) {
+				warnings.push('the go proxy named no source repository');
+				repos = await githubSearch(name.split('/').pop() ?? name, deps, warnings);
+			}
+			return { version, repos, warnings };
+		}
+
+		case 'hex': {
+			if (!/^[a-z0-9_]+$/i.test(name)) throw new Error('hex package must be a name like phoenix or ecto_sql');
+			const payload = await deps.fetchJson('https://hex.pm/api/packages/' + encodeURIComponent(name));
+			const parsed = parseHexPackage(payload);
+			const version = pickVersion(input.version, parsed.latest, parsed.versions);
+			warnMissingVersion('hex', input.version, parsed.versions, warnings);
+			let repos = parsed.repos;
+			if (!repos.length) {
+				warnings.push('the hex package links no repository');
+				repos = await githubSearch(name, deps, warnings);
+			}
+			return { version, repos, warnings };
+		}
+
+		case 'maven': {
+			const coordinates = name.split(':');
+			if (coordinates.length !== 2 || !coordinates.every((part) => /^[A-Za-z0-9_.-]+$/.test(part))) {
+				throw new Error('maven package must be group:artifact, e.g. com.google.guava:guava: ' + name);
+			}
+			const [group, artifact] = coordinates as [string, string];
+			const base =
+				'https://repo1.maven.org/maven2/' +
+				group.split('.').map(encodeURIComponent).join('/') +
+				'/' +
+				encodeURIComponent(artifact);
+			const metadata = parseMavenMetadata(await deps.fetchText(base + '/maven-metadata.xml'));
+			const version = pickVersion(
+				input.version,
+				metadata.release ?? metadata.latest ?? metadata.versions.at(-1) ?? null,
+				metadata.versions,
+			);
+			warnMissingVersion('maven', input.version, metadata.versions, warnings);
+			// A requested version that the directory does not list falls back to the release's POM.
+			const pomVersion = version && metadata.versions.includes(version) ? version : (metadata.release ?? version);
+			let repos: RepoRef[] = [];
+			let refHints: string[] = [];
+			if (pomVersion) {
+				try {
+					const pom = await deps.fetchText(
+						base + '/' + encodeURIComponent(pomVersion) + '/' + encodeURIComponent(artifact + '-' + pomVersion) + '.pom',
+					);
+					repos = reposFromPom(pom);
+					const tag = pomTag(pom);
+					if (tag) refHints = [tag];
+					if (!repos.length) {
+						const raw = /<url>\s*([^<]+?)\s*<\/url>/i.exec(pom)?.[1];
+						const url = raw ? normalizeRepoUrl(raw) : undefined;
+						if (url && !isRepoRootUrl(url, raw)) {
+							warnings.push('ignored ' + url + ': not a cloneable https git host');
+						}
+						warnings.push('the pom names no repository');
+					}
+				} catch (error) {
+					warnings.push('could not read the pom: ' + messageOf(error));
+				}
+			}
+			if (!repos.length) repos = await githubSearch(artifact, deps, warnings);
+			return { version, repos, warnings, refHints };
+		}
+
+		case 'nuget': {
+			if (!/^[A-Za-z0-9_.-]+$/.test(name)) throw new Error('nuget package must be an id like Newtonsoft.Json');
+			const id = name.toLowerCase();
+			const base = 'https://api.nuget.org/v3-flatcontainer/' + encodeURIComponent(id);
+			const versions = parseNugetVersions(await deps.fetchJson(base + '/index.json'));
+			const version = pickVersion(input.version, versions.at(-1) ?? null, versions);
+			warnMissingVersion('nuget', input.version, versions, warnings);
+			const nuspecVersion = version && versions.includes(version) ? version : versions.at(-1);
+			let repos: RepoRef[] = [];
+			if (nuspecVersion) {
+				try {
+					const nuspec = await deps.fetchText(
+						base + '/' + encodeURIComponent(nuspecVersion) + '/' + encodeURIComponent(id) + '.nuspec',
+					);
+					repos = reposFromNuspec(nuspec);
+					if (!repos.length) {
+						const raw = /<repository\b[^>]*\burl=["']([^"']+)["']/i.exec(nuspec)?.[1];
+						const url = raw ? normalizeRepoUrl(raw) : undefined;
+						if (url && !isRepoRootUrl(url, raw)) {
+							warnings.push('ignored ' + url + ': not a cloneable https git host');
+						}
+						warnings.push('the nuspec names no repository');
+					}
+				} catch (error) {
+					warnings.push('could not read the nuspec: ' + messageOf(error));
+				}
+			}
+			if (!repos.length) repos = await githubSearch(name, deps, warnings);
+			return { version, repos, warnings };
+		}
+
+		case 'zig': {
+			if (!/^[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)?$/.test(name)) {
+				throw new Error('zig package must be name or author/name, e.g. accord or BanchouBoo/accord');
+			}
+			const zpm = await deps.fetchJson('https://zig.pm/api/packages');
+			const matches = zigMatches(zpm, name);
+			if (matches.length > 1) {
+				warnings.push('zpm lists ' + matches.length + ' packages named ' + name + '; pass author/name to choose one');
+			}
+			if (input.version) {
+				warnings.push(
+					'zpm lists git repos, not releases: ' + input.version + ' is checked against git tags only',
+				);
+			}
+			const repos = matches.flatMap((match) => match.repos);
+			const unique = repos.filter((repo, index) => repos.findIndex((other) => other.url === repo.url) === index);
+			if (!unique.length) {
+				warnings.push('zpm lists no package named ' + name);
+			}
+			return {
+				version: input.version ?? null,
+				repos: unique.length ? unique : await githubSearch(name.split('/').pop() ?? name, deps, warnings),
+				warnings,
+			};
+		}
+
 		case 'dockerhub': {
 			if (!/^[\w.-]+\/[\w.-]+$/.test(name)) throw new Error('dockerhub image must be owner/name: ' + name);
 			const image = await deps.fetchJson('https://hub.docker.com/v2/repositories/' + name + '/');
@@ -574,7 +962,8 @@ export async function resolvePackageRepo(
 
 	const discovered = await discover({ package: name, source, version }, deps);
 	const warnings = [...discovered.warnings];
-	const candidates = refCandidates(source, name, discovered.version);
+	// A ref the metadata declared (a POM's scm tag) is tried before guessed tag names.
+	const candidates = [...new Set([...(discovered.refHints ?? []), ...refCandidates(source, name, discovered.version)])];
 	const repos = await withRefs(discovered.repos, candidates, deps, warnings);
 	if (repos.length > 0 && !repos.some((repo) => repo.kind === 'repository' && repo.confidence === 'stated')) {
 		warnings.push('no stated repository: every URL here is a name-search guess, so verify it before reading');
