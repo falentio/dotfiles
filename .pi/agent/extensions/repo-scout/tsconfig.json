@@ -1,0 +1,43 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "forceConsistentCasingInFileNames": true,
+    "esModuleInterop": true,
+    "baseUrl": ".",
+    "paths": {
+      "@earendil-works/pi-coding-agent": [
+        "/home/kevin/.vite-plus/packages/@earendil-works/pi-coding-agent/58f82a7b-190b-4214-bb77-229a4ceca622/lib/node_modules/@earendil-works/pi-coding-agent/dist/index.d.ts"
+      ],
+      "@earendil-works/pi-agent-core": [
+        "/home/kevin/.vite-plus/packages/@earendil-works/pi-coding-agent/58f82a7b-190b-4214-bb77-229a4ceca622/lib/node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-agent-core/dist/index.d.ts"
+      ],
+      "@earendil-works/pi-ai/compat": [
+        "/home/kevin/.vite-plus/packages/@earendil-works/pi-coding-agent/58f82a7b-190b-4214-bb77-229a4ceca622/lib/node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/compat.d.ts"
+      ],
+      "typebox": [
+        "/home/kevin/.vite-plus/packages/@earendil-works/pi-coding-agent/58f82a7b-190b-4214-bb77-229a4ceca622/lib/node_modules/@earendil-works/pi-coding-agent/node_modules/typebox/build/index.d.mts"
+      ],
+      "@earendil-works/pi-ai/providers/faux": [
+        "/home/kevin/.vite-plus/packages/@earendil-works/pi-coding-agent/58f82a7b-190b-4214-bb77-229a4ceca622/lib/node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/providers/faux.d.ts"
+      ]
+    },
+    "types": []
+  },
+  "include": [
+    "**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

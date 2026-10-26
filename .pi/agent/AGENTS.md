@@ -88,18 +88,14 @@ A lookup that needs one query runs here. Anything wider — several queries, or 
 
 An async child notifies this thread when it finishes, so the default is to **end the turn** and let that notification arrive. Reach for `t3_thread_wait` only when the result is needed before the turn can continue, re-called while the reply is `timedOut: true` — never a `sleep` or a poll loop.
 
-Crawl the codebase through a scout, never in this context:
+Crawl a codebase with **`repo_scout`**, never in this context:
 
 ```text
 A: main agent [1]
-└── spawn S: scout  ← delegate_task; A never crawls; S must use codebase-scout skills [1a]
-    ├── S spawns C: cloner  ← "use the library-source skill, do npm zod@4.0.7" [1a1]
-    │   └── C: check ~/.pi/source → clone if absent → return path, repo, ref, sha [1a1a]
-    └── S crawls  ← reads what C returned [1a2]
+└── repo_scout(repo, question)  ← one cached session per repo [1a]
+    └── answer: findings at path:line, gaps with probes [1a1]
 ```
 
-Ask the scout for findings, not the crawl: the answer, findings anchored to `path:line` with a status, gaps with a probe, and the cloner's source when fetched. No file dumps, no narration.
+One session per repo, one question at a time, evicted after ten idle minutes and reopened from disk, so a follow-up reuses the prompt cache instead of re-crawling. A dependency's repo comes from **`package_repo`** (`{ package, registry }`); its source is already at `~/.pi/source` when `library-source` ran, and that path can be passed as `repo`. The **codebase-scout** skill holds the report shape and the rules.
 
-Reuse a scout's `childThreadId` across the subagents that follow — implementer, researcher, reviewer — so they ask it instead of re-reading. Fork the scout once per receiver with `t3_thread_fork` and hand each its own `targetThreadId`, so every subagent has a dedicated crawler. Arena, swarm, and any fan-out fork N times, one per worker. The `codebase-scout` skill holds the steps and the reply shape.
-
-Call shapes, delivery modes, status fields, queue control, and the failure codes: the **t3-orchestration** skill.
+Delegation is for work, not for reading: several queries, or sources you must read and reconcile.

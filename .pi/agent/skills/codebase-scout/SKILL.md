@@ -1,121 +1,107 @@
 ---
 name: codebase-scout
-description: "Read and search a codebase through a delegated scout thread, not in the main context. Use when you need to understand code, grep across many files, or answer where things live, and when several subagents need the same codebase knowledge."
+description: "Read and search a codebase through a cached scout session, not in the main context. Use when you need to understand code, grep across many files, or answer where things live, and when several questions hit the same repo."
 ---
 
 # Codebase scout
 
-Never crawl the codebase in the main context. A crawl is file reads and grep output; it crowds the window and buries the answer. Send a **scout** — a delegated thread that reads the codebase and reports — and reuse it.
+Never crawl the codebase in the main context. A crawl is file reads and grep output; it crowds the window and buries the answer. Ask a **scout** and reuse it.
 
-Read the right surface. A dependency's code comes from the clone C placed at `~/.pi/source`, never from `node_modules`, `target`, `vendor`, or the cargo registry — those are transformed, deduped, or minified. Our own project's build output is fair game: `dist/`, `.nuxt/`, `.next/`, `.output/` are our code, and generated types or bundles are sometimes the only place a fact is observable.
+Read the right surface. A dependency's code comes from the clone the `library-source` skill places at `~/.pi/source`, never from `node_modules`, `target`, `vendor`, or the cargo registry — those are transformed, deduped, or minified. Our own project's build output is fair game: `dist/`, `.nuxt/`, `.next/`, `.output/` are our code, and generated types or bundles are sometimes the only place a fact is observable.
 
-## The flow
+## One call, one session
 
-```text
-A: main agent [1]
-└── spawn S: scout  ← delegate_task; A never crawls [1a]
-    ├── S spawns C: cloner  ← first move when source is needed [1a1]
-    │   └── C checks out source  ← "use the library-source skill, do npm zod@v4.0.7" [1a1a]
-    │       ├── path in ~/.pi/source? [1a1a1]
-    │       │   ├── yes: reuse [1a1a1a]
-    │       │   └── no: clone shallow [1a1a1b]
-    │       └── return path, repo, ref, sha [1a1a2]
-    └── S crawls the codebase  ← reads what C returned [1a2]
-```
-
-Spawn the cloner regardless of whether `~/.pi/source` looks populated — the cloner owns that check. One scout per area; record the returned `childThreadId`. Field semantics for the spawn, the fork, and a scout that goes silent: the **t3-orchestration** skill.
-
-## Reuse the scout
-
-A scout that has read the codebase knows more than a fresh subagent. Hand its id to the subagents that follow, each in its own fork:
-
-```text
-S: scout thread [1]
-└── per receiver R  ← implementer, researcher, reviewer, worker [1a]
-    ├── fork S → F  ← t3_thread_fork, sourcePoint latest_stable [1a1]
-    ├── hand F.targetThreadId to R [1a2]
-    └── R asks F  ← t3_thread_send; F keeps S's knowledge [1a3]
-```
+`repo_scout` is the scout. It keeps one agent session per repo and answers by reading a checkout of it, so a follow-up question continues the same conversation and reuses the prompt cache instead of re-crawling.
 
 ```js
-const fork = JSON.parse(await tools.mcp__t3_code__t3_thread_fork({
-  threadId: scoutThreadId,
-  sourcePoint: { type: "latest_stable" },
-  title: "scout for implementer",
-}));
-// hand fork.targetThreadId to the consumer
+const report = await tools.repo_scout({
+  repo: "https://github.com/colinhacks/zod",
+  question: "How does it validate a date-time string, and where?",
+});
+
+// Follow-up: same repo, same session, no re-crawl.
+const again = await tools.repo_scout({ repo: "github.com/colinhacks/zod", question: "Which error does it throw?" });
 ```
 
-A fork inherits everything the scout learned and is independent: a receiver's follow-ups land in its own copy, and the scout's thread stays clean. Fork one per receiver — two consumers on one id queue into one timeline and see each other's turns.
+`repo` takes a git URL, `host/owner/name`, `owner/name`, or a local path. Every spelling of one repo lands on one session: a worktree, the main clone, and the https URL share it when the checkout has an `origin`.
 
-## Fan-out
+Do not spawn a subagent to crawl code. One `repo_scout` call replaces `delegate_task` plus `t3_thread_fork`, keeps the crawl out of this context, and comes back in the report shape below.
+
+## Which repo
+
+- **A dependency** — get its repo from the package: `await tools.package_repo({ package: "zod", registry: "npm" })`, then pass a returned `url` to `repo_scout`. `confidence: stated` is the package's own manifest; `guess` is a name search and needs checking before you trust a finding.
+- **A dependency whose source must sit at `~/.pi/source`** — run `library-source` first, then pass that path as `repo`. A local path is given a thin `--shared` clone, so it is read as it stands without edits shifting under the scout.
+- **This project** — pass the repo root or the git URL. The scout reads a scratch checkout, never the branch you are editing.
+
+## The session
+
+| Behaviour | Value |
+|---|---|
+| Sessions per repo | one, keyed by canonical identity |
+| Concurrency | one question at a time; later questions queue in order |
+| Idle eviction | 10 minutes after a question settles; the next question reopens the same conversation |
+| Tools the scout has | `read`, `grep`, `find`, `ls` — read-only, no bash, no edit |
+| Model | the caller's model; `model: "provider/id"` overrides it |
+
+The reply ends with `repo`, `path`, `sha`, `thread` (the session file), and `turn`. `turn opened` means the first question of a new conversation; `turn continued` means the cache was reused.
+
+Ask two repos as two calls. Ask one repo twice as two calls with the same `repo` — they run in order and stay in one conversation.
+
+## What the scout returns
+
+**A report, not a crawl.** Every line spends the budget the call exists to save.
 
 ```text
-arena/swarm: N workers [1]
-└── fork S per worker → F1..FN  ← one dedicated crawler each [1a]
-    └── worker i asks Fi  ← no two share a timeline [1a1]
-```
-
-## What S returns
-
-**Report only. Name the answer, findings with `path:line` anchors, gaps with probes, and blockers.** S's reply is A's whole view of the codebase: A forked S to keep the crawl out of its window, so every line S returns spends the budget the fork was meant to save.
-
-```text
-S reply [1]
-├── answer  ← direct, no preamble [1a]
-├── findings [1b]  ← ≤ 30, one claim each
-│   ├── id  ← F<n>, addressable so A can cite it [1b1]
-│   ├── claim  ← one falsifiable assertion [1b2]
-│   ├── anchor  ← `path:line` or `path:symbol` [1b3]
-│   └── status  ← VERIFIED | INFERRED | STALE | UNVERIFIED [1b4]
-├── gaps [1c]  ← ≤ 10, what S could not settle
-│   ├── what  ← the claim left open [1c1]
-│   ├── why  ← absent, unreadable, ambiguous, out of scope [1c2]
-│   └── probe  ← the check that would settle it [1c3]
-├── blockers  ← ≤ 6, and who resolves each [1d]
-└── source  ← when C placed one: the absolute path it sits at, repo, ref, sha [1e]
+answer      ← direct, no preamble, one or two sentences
+findings    ← ≤ 30, each: id, one falsifiable claim, path:line, status
+gaps        ← ≤ 10: what stayed open, why, and the probe that would settle it
+blockers    ← ≤ 5, each with who resolves it
+source      ← the checkout, commit, and session file that answered
 ```
 
 | Field | Holds | Must not hold |
 |---|---|---|
-| answer | the finding, direct | narration, restated task |
-| claim | one assertion | multiple claims, hedging |
-| anchor | `path:line` | file contents, grep output, directory listings, diffs |
-| status | one tag | prose justification |
+| answer | the finding | narration, restated task |
+| claim | one assertion | several claims, hedging |
+| anchor | `path:line` | file contents, grep output, listings, diffs |
+| status | `VERIFIED` \| `INFERRED` \| `STALE` \| `UNVERIFIED` | prose justification |
 | gaps | missing item + probe | silence, invented claims |
-| source | the placement path C returned, plus repo/ref/sha | file contents, the clone log |
 
-**Hard limits.** ≤ 800 words, ≤ 120 lines. Pointers only — no file contents, grep output, directory listings, diffs, or command transcripts. A pointer may quote one line, and only when that line is the finding.
+**Hard limits.** ≤ 800 words, ≤ 120 lines. Pointers only. A pointer may quote one line, and only when that line is the finding.
 
-**Missing or unverifiable.** A claim with no anchor is `UNVERIFIED`; with no probe it is a gap, not a finding. Evidence older than the file's last change is `STALE`. A finding S could not produce goes under gaps — never omitted, never invented. Empty gaps means the crawl was complete: write `none`, do not drop the heading.
+A claim with no anchor is `UNVERIFIED`; a claim with no probe is a gap, not a finding. A finding the scout could not produce goes under gaps — never omitted, never invented. Empty gaps or blockers says `none`; it does not drop the heading.
 
-## Example reply
+Run the probe a gap names yourself, in this context, or give it to the next call as the question.
 
-A scout asked *how zod 4.0.7 validates a date-time string, and where that source sits*. Its reply — illustration only, not a template to fill:
+## Example
 
 ```text
 answer
-zod 4.0.7 validates a date-time string in the v4 core: the ISO date-time schema builds a regex and the string format check runs it. The dependency source is checked out at the path under source.
+zod validates a date-time string by building a format schema around a compiled ISO regex.
 
 findings
-F1  _isoDateTime() builds the schema with format "datetime".         packages/zod/src/v4/core/api.ts:454        VERIFIED
-F2  datetime() compiles the regex the format check runs.            packages/zod/src/v4/core/regexes.ts:104    VERIFIED
-F3  Parsing dispatches to the v4 core, not the legacy v3 path.      packages/zod/src/index.ts:1                INFERRED
-F4  A def-level pattern overrides the compiled datetime regex.      packages/zod/src/v4/core/schemas.ts:620    STALE
+F1  _isoDateTime() builds the schema with format "datetime".   packages/zod/src/v4/core/api.ts:454   VERIFIED
+F2  datetime() compiles the regex the check runs.              packages/zod/src/v4/core/regexes.ts:104 VERIFIED
+F3  Parsing dispatches to the v4 core, not legacy v3.          packages/zod/src/index.ts:1            INFERRED
 
 gaps
-what   whether an invalid date-time throws or returns a result object
-why    the error path lives outside the crawled area
+what   whether an invalid value throws or returns a result object
+why    the error path sits outside the crawled area
 probe  grep -rn 'ZodError' packages/zod/src/v4/core/errors.ts
 
 blockers
 none
 
 source
-path  /home/kevin/.pi/source/github.com-colinhacks-zod@v4.0.7
-repo  https://github.com/colinhacks/zod
-ref   v4.0.7
-sha   34b400a5422bc30b48395cdd44007ff4e811fb71
+repo   github.com/colinhacks/zod
+path   ~/.pi/scout/repos/github.com-colinhacks-zod
+sha    34b400a5422b
+thread ~/.pi/scout/sessions/...jsonl
+turn   opened
 ```
 
-Note the shape. `answer` answers in two sentences with no preamble. Every finding is one claim with a `path:line` anchor and a status (`VERIFIED`, `INFERRED`, `STALE`). The one thing the crawl could not settle sits under `gaps` with a probe A can run. `blockers` says `none`. `source` gives the placement path the cloner returned — where the source sits on disk — so A or a later receiver reads it without re-cloning, and the dependency findings anchor against it. No file contents, no grep output, no narration.
+Note the shape. `answer` answers in one sentence. Findings carry `path:line` and a status. The one open question sits under `gaps` with a probe. `blockers` says `none`. `source` names the checkout, commit, and session, so a later call or a reviewer reads the same code without re-cloning.
+
+## The session file
+
+The report's `thread` is the conversation, on disk. That is where a crawl lives: it is how you audit what the scout saw, and how a resumed `repo_scout` continues instead of rereading. Do not hand-edit it.

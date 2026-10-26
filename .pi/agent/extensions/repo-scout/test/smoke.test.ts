@@ -1,0 +1,134 @@
+/**
+ * The whole pipeline over a real `AgentSession` on a fake provider: the first question opens a
+ * session in a scratch clone, the second continues it, and an evicted session is reopened from its
+ * file. No credentials and no network beyond a local git repo.
+ */
+
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { readdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { after, describe, it } from "node:test";
+import { fauxAssistantMessage, fauxProvider, fauxText } from "@earendil-works/pi-ai/providers/faux";
+import { ModelRegistry, ModelRuntime } from "@earendil-works/pi-coding-agent";
+import { ScoutRegistry } from "../scout-registry.ts";
+import { ensureCheckout } from "../checkout.ts";
+import { buildRegistry, identifyRepo, identityFor, runRepoScout, sessionsDir } from "../tools.ts";
+import { sessionFileName } from "../repo-id.ts";
+
+const git = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
+
+const roots: string[] = [];
+after(async () => {
+	for (const root of roots) await rm(root, { recursive: true, force: true });
+});
+
+const makeRepo = async (): Promise<string> => {
+	const root = await mkdtemp(join(tmpdir(), "repo-scout-smoke-"));
+	roots.push(root);
+	git(root, "init", "--quiet", "--initial-branch", "main");
+	git(root, "config", "user.email", "test@example.com");
+	git(root, "config", "user.name", "Test");
+	await writeFile(join(root, "index.ts"), "export const answer = 42;\n");
+	git(root, "add", ".");
+	git(root, "commit", "--quiet", "-m", "first");
+	return root;
+};
+
+/** A provider that answers with a fixed report and records every prompt it was sent. */
+const fakeProvider = () => {
+	const prompts: string[] = [];
+	const faux = fauxProvider({ models: [{ id: "scout-fake", name: "Fake scout" }] });
+	// One scripted response per model call to come: open, continue, reopen.
+	const respond = (context: { messages: Array<{ content: unknown }> }) => {
+		const last = context.messages[context.messages.length - 1];
+		const text =
+			typeof last?.content === "string"
+				? last.content
+				: Array.isArray(last?.content)
+					? last.content.map((part) => (part && typeof part === "object" && "text" in part ? String(part.text) : "")).join("")
+					: "";
+		prompts.push(text);
+		return fauxAssistantMessage([fauxText(`answer\nseen: ${text.slice(0, 60)}`)]);
+	};
+	faux.setResponses([respond, respond, respond]);
+	return { faux, prompts };
+};
+
+describe("repo_scout over a real AgentSession", () => {
+	it("opens once, continues the conversation, and reopens it after eviction", async () => {
+		const repo = await makeRepo();
+		const state = await mkdtemp(join(tmpdir(), "repo-scout-state-"));
+		roots.push(state);
+		process.env.PI_SCOUT_HOME = state;
+
+		const { faux, prompts } = fakeProvider();
+		// The caller's registry, with the fake provider standing in for a real one.
+		const runtime = await ModelRuntime.create({ modelsPath: null, allowModelNetwork: false });
+		runtime.registerNativeProvider(faux.provider);
+		// The facade the extension gets, backed by the fake runtime.
+		const modelRegistry = new ModelRegistry(runtime);
+		const source = { model: faux.getModel(), modelRegistry };
+
+		const scratch = await mkdtemp(join(tmpdir(), "repo-scout-scratch-"));
+		process.env.PI_SCOUT_SCRATCH = scratch;
+		roots.push(scratch);
+		let now = 0;
+		let tick: (() => void) | undefined;
+		const built = buildRegistry({ source, log: { info: () => {}, warn: () => {}, error: () => {} } });
+		// Same registry, but a scratch dir and clock the test owns.
+		const registry = new ScoutRegistry({
+			prepare: async (key) => ({ dir: await ensureCheckout(identityFor(key), scratch), display: key }),
+			adapter: built.adapter,
+			sessionFileFor: (key) => join(sessionsDir(), `${sessionFileName(key)}.jsonl`),
+			idleMs: 600_000,
+			now: () => now,
+			timers: {
+				setInterval: (fn) => {
+					tick = fn;
+					return 1;
+				},
+				clearInterval: () => {
+					tick = undefined;
+				},
+			},
+		});
+
+		const identity = await identifyRepo(repo, repo);
+		const first = await runRepoScout({
+			params: { repo, question: "what is exported?" },
+			registry,
+			cwd: repo,
+		});
+		assert.match(first, /^answer/m);
+		assert.match(first, /\bsha    [0-9a-f]{7,12}/);
+		assert.match(first, /turn   opened/);
+		assert.equal(registry.size(), 1);
+
+		const second = await runRepoScout({ params: { repo, question: "and again?" }, registry, cwd: repo });
+		assert.match(second, /turn   continued/);
+		assert.equal(registry.size(), 1);
+
+		// The scout saw the opening message first, then the bare follow-up.
+		assert.equal(prompts.length, 2);
+		assert.match(prompts[0] ?? "", /^Repository: /);
+		assert.match(prompts[0] ?? "", /Checkout: /);
+		assert.match(prompts[0] ?? "", /what is exported\?$/);
+		assert.equal(prompts[1], "and again?");
+
+		// Idle past the window: evicted, then reopened from the same conversation file.
+		now += 600_001;
+		tick?.();
+		assert.equal(registry.size(), 0);
+		const third = await runRepoScout({ params: { repo, question: "back again?" }, registry, cwd: repo });
+		assert.match(third, /turn   continued/, "a reopened session continues the same conversation");
+		assert.equal(prompts[2], "back again?", "the replayed conversation is not re-primed");
+		const files = readdirSync(sessionsDir());
+		assert.equal(files.length, 1, "both conversations recorded to one session file");
+		assert.equal(identity.key.startsWith("local:"), true);
+
+		await registry.shutdown();
+	});
+});
