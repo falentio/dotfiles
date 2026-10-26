@@ -197,6 +197,21 @@ describe("resolvePackageRepo", () => {
 		assert.match(result.warnings.join("\n"), /a Docker tag names an image, not a git revision/);
 	});
 
+	it("drops a manifest URL that points at a private host, and names it", async () => {
+		const { impl, listed } = deps({
+			json: {
+				"https://registry.npmjs.org/x": {
+					"dist-tags": { latest: "1.0.0" },
+					versions: { "1.0.0": { repository: "http://169.254.169.254/latest/meta-data.git" } },
+				},
+			},
+		});
+		const result = await resolvePackageRepo({ package: "x" }, impl);
+		assert.deepEqual(result.repos, []);
+		assert.deepEqual(listed, [], "git never contacts a private host");
+		assert.match(result.warnings.join("\n"), /ignored http:\/\/169\.254\.169\.254\/latest\/meta-data: not a cloneable https git host/);
+	});
+
 	it("dockerhub: warns when the version tag does not exist", async () => {
 		const { impl } = deps({
 			json: { "https://hub.docker.com/v2/repositories/library/postgres/": DOCKERHUB },

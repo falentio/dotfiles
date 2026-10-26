@@ -122,25 +122,48 @@ export function normalizeRepoUrl(value: unknown): string | undefined {
 	return url;
 }
 
+const IP_LITERAL = /^\d{1,3}(?:\.\d{1,3}){3}$/;
+
+/**
+ * A host a package manifest may point git at. Metadata is third-party input, so an IP literal, a
+ * loopback name, or a private suffix is refused: `git ls-remote` would otherwise become egress to
+ * whatever a package author wrote down, metadata endpoints included.
+ */
+export const isPublicGitHost = (hostname: string): boolean => {
+	const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
+	if (!host) return false;
+	if (host === 'localhost' || host.endsWith('.local') || host.endsWith('.internal')) return false;
+	return !IP_LITERAL.test(host) && !host.includes(':');
+};
+
 /**
  * Is this URL a repo root rather than a page inside one, or beside it? A homepage (zod.dev) or a
  * bugs page (github.com/o/n/issues) is provenance but cannot be cloned.
+ *
+ * The https and public-host checks come first, so the `.git` suffix proves a git URL without
+ * bypassing them.
  */
 export function isRepoRootUrl(url: string, raw?: unknown): boolean {
-	// A URL the publisher wrote with a .git suffix is a git URL by construction, whatever the host.
-	const original = asString(raw);
-	if (original && /\.git([#?].*)?$/i.test(original)) return true;
-
 	let parsed: URL;
 	try {
 		parsed = new URL(url);
 	} catch {
 		return false;
 	}
+	if (parsed.protocol !== 'https:' || !isPublicGitHost(parsed.hostname)) return false;
+	// A URL the publisher wrote with a .git suffix is a git URL by construction, whatever the host.
+	const original = asString(raw);
+	if (original && /\.git([#?].*)?$/i.test(original)) return true;
 	if (!isForgeHost(parsed.hostname)) return false;
 	const parts = parsed.pathname.split('/').filter(Boolean);
 	return parts.length === 2 && !SITE_ROUTES.has((parts[1] ?? '').toLowerCase());
 }
+
+/** A manifest URL that cannot be cloned, so the drop can be named instead of silent. */
+const ignoredRepository = (value: unknown): string | undefined => {
+	const url = normalizeRepoUrl(value);
+	return url && !isRepoRootUrl(url, value) ? url : undefined;
+};
 
 const makeRef = (url: string, via: RepoVia, kind: RepoKind = 'repository'): RepoRef => ({
 	url,
@@ -318,7 +341,7 @@ const fetchWithTimeout = async (url: string, headers: Record<string, string>, ac
 
 const gitLsRemote = async (url: string): Promise<RemoteRefs> => {
 	const { stdout } = await promisify(execFile)('git', ['ls-remote', '--tags', '--heads', url], {
-		timeout: 60_000,
+		timeout: 20_000,
 		maxBuffer: 16 * 1024 * 1024,
 		env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
 	});
@@ -362,6 +385,8 @@ export function parseNpm(packument: unknown, version?: string): { version: strin
 	}
 	const stated = reposFromManifest(manifest);
 	if (stated.length) return { version: resolved, repos: stated, warnings };
+	const ignored = ignoredRepository(manifest.repository) ?? ignoredRepository(manifest.homepage);
+	if (ignored) warnings.push('ignored ' + ignored + ': not a cloneable https git host');
 	const tarball = tarballFromNpmManifest(manifest);
 	if (tarball) {
 		warnings.push('npm manifest names no repository; only the tarball is known');
@@ -421,12 +446,15 @@ const discover = async (
 			const version = pickVersion(input.version, latest, versions);
 			if (!version) throw new Error('jsr reported no versions for ' + name);
 			let repos: RepoRef[] = [];
+			let deno: unknown;
 			try {
-				const denoJson = await deps.fetchText('https://jsr.io/' + path + '/' + version + '/deno.json');
-				repos = reposFromJsrDenoJson(JSON.parse(denoJson));
+				deno = JSON.parse(await deps.fetchText('https://jsr.io/' + path + '/' + version + '/deno.json'));
+				repos = reposFromJsrDenoJson(deno);
 			} catch (error) {
 				warnings.push('could not read the jsr deno.json: ' + (error instanceof Error ? error.message : String(error)));
 			}
+			const ignored = ignoredRepository(asRecord(deno)?.repository);
+			if (ignored) warnings.push('ignored ' + ignored + ': not a cloneable https git host');
 			if (!repos.length) {
 				warnings.push('jsr deno.json names no githubRepository');
 				repos = await githubSearch(name, deps, warnings);
@@ -483,23 +511,23 @@ const discover = async (
 };
 
 const withRefs = async (repos: RepoRef[], candidates: string[], deps: RegistryDeps, warnings: string[]): Promise<RepoRef[]> => {
-	const out: RepoRef[] = [];
-	for (const repo of repos) {
-		if (repo.kind !== 'repository' || candidates.length === 0) {
-			out.push({ ...repo, refCandidates: candidates });
-			continue;
-		}
-		try {
-			const remotes = await deps.lsRemote(repo.url);
-			const match = matchRef(candidates, remotes);
-			if (!match) warnings.push('no tag matched on ' + repo.url + '; tried ' + candidates.join(', '));
-			out.push({ ...repo, ref: match?.ref ?? null, refKind: match?.refKind ?? null, refCandidates: candidates });
-		} catch (error) {
-			warnings.push('could not list refs on ' + repo.url + ': ' + (error instanceof Error ? error.message : String(error)));
-			out.push({ ...repo, refCandidates: candidates });
-		}
-	}
-	return out;
+	const results = await Promise.all(
+		repos.map(async (repo) => {
+			const notes: string[] = [];
+			if (repo.kind !== 'repository' || candidates.length === 0) return { repo: { ...repo, refCandidates: candidates }, notes };
+			try {
+				const remotes = await deps.lsRemote(repo.url);
+				const match = matchRef(candidates, remotes);
+				if (!match) notes.push('no tag matched on ' + repo.url + '; tried ' + candidates.join(', '));
+				return { repo: { ...repo, ref: match?.ref ?? null, refKind: match?.refKind ?? null, refCandidates: candidates }, notes };
+			} catch (error) {
+				notes.push('could not list refs on ' + repo.url + ': ' + (error instanceof Error ? error.message : String(error)));
+				return { repo: { ...repo, refCandidates: candidates }, notes };
+			}
+		}),
+	);
+	for (const result of results) warnings.push(...result.notes);
+	return results.map((result) => result.repo);
 };
 
 /**

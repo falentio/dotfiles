@@ -111,6 +111,15 @@ describe("normalizeRepoUrl", () => {
 });
 
 describe("isRepoRootUrl", () => {
+	it("refuses a private or non-https host, even with a .git suffix", () => {
+		assert.equal(isRepoRootUrl("http://169.254.169.254/latest/meta-data", "http://169.254.169.254/latest/meta-data.git"), false);
+		assert.equal(isRepoRootUrl("https://10.0.0.1/o/n", "https://10.0.0.1/o/n.git"), false);
+		assert.equal(isRepoRootUrl("https://localhost/o/n", "https://localhost/o/n.git"), false);
+		assert.equal(isRepoRootUrl("https://git.internal/o/n", "https://git.internal/o/n.git"), false);
+		assert.equal(isRepoRootUrl("https://example.com/o/n", "https://example.com/o/n.git"), true);
+		assert.equal(isRepoRootUrl("http://github.com/o/n", "http://github.com/o/n.git"), false);
+	});
+
 	it("accepts a forge repo root and rejects a page inside one", () => {
 		assert.equal(isRepoRootUrl("https://github.com/o/n"), true);
 		assert.equal(isRepoRootUrl("https://github.com/o/n/issues"), false);
