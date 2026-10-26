@@ -203,6 +203,46 @@ describe("ensureCheckout", () => {
 		assert.notEqual(pinned, head, "two refs are two trees");
 	});
 
+	it("checks out a commit ref, which clone --branch cannot", async () => {
+		const root = await makeRepo();
+		const sha = git(root, "rev-parse", "HEAD");
+		await writeFile(join(root, "README.md"), "after the commit\n");
+		git(root, "commit", "--quiet", "-am", "second");
+		const scratch = await mkdtemp(join(tmpdir(), "repo-scout-scratch-"));
+		roots.push(root, scratch);
+		const identity = localRepoIdentity(root, undefined);
+		const { dir } = await ensureCheckout(identity, scratch, sha);
+		const readme = execFileSync("cat", [join(dir, "README.md")], { encoding: "utf8" });
+		assert.equal(readme, "hello\n", "the commit's tree, not the tip");
+	});
+
+	it("reports a refresh that cannot reach the ref", async () => {
+		const root = await makeRepo();
+		git(root, "tag", "v9.9.9");
+		const scratch = await mkdtemp(join(tmpdir(), "repo-scout-scratch-"));
+		roots.push(root, scratch);
+		const identity = localRepoIdentity(root, undefined);
+		const { dir } = await ensureCheckout(identity, scratch, "v9.9.9");
+		git(root, "tag", "-d", "v9.9.9");
+		await assert.rejects(refreshCheckout(dir, "v9.9.9"), /git (fetch|checkout) failed/);
+	});
+
+	it("re-clones a checkout whose origin is another repo, and says so", async () => {
+		const first = await makeRepo();
+		const second = await makeRepo();
+		await writeFile(join(second, "README.md"), "second\n");
+		git(second, "commit", "--quiet", "-am", "second");
+		const scratch = await mkdtemp(join(tmpdir(), "repo-scout-scratch-"));
+		roots.push(first, second, scratch);
+		const identity = localRepoIdentity(first, undefined);
+		await ensureCheckout(identity, scratch);
+		const moved = { ...identity, source: second };
+		const reused = await ensureCheckout(moved, scratch);
+		assert.match(reused.warning ?? "", /re-cloned/);
+		const readme = execFileSync("cat", [join(reused.dir, "README.md")], { encoding: "utf8" });
+		assert.equal(readme, "second\n", "the tree now belongs to the source asked for");
+	});
+
 	it("clones a local repo from its own path, even when its origin names a remote", async () => {
 		const root = await makeRepo();
 		const scratch = await mkdtemp(join(tmpdir(), "repo-scout-scratch-"));

@@ -118,22 +118,48 @@ export async function ensureCheckout(
 }
 
 const clone = async (identity: RepoIdentity, dir: string, pinned: string | undefined): Promise<void> => {
+	await mkdir(dir, { recursive: true });
+	if (pinned) {
+		// `clone --branch` accepts a branch or a tag, never a commit, so a pinned tree is built by
+		// fetching the ref itself and checking out what arrived.
+		await git(['init', '--quiet'], dir);
+		await git(['remote', 'add', 'origin', identity.source], dir);
+		await fetchRef(dir, pinned);
+		return;
+	}
 	const args = ['clone', '--quiet'];
 	args.push(...(identity.kind === 'local' ? ['--shared'] : ['--depth', '1']));
-	if (pinned) args.push('--branch', pinned);
 	args.push(identity.source, dir);
 	await git(args);
 };
 
-/** Best-effort refresh, so a long-lived scratch clone does not answer about old code. */
+/** Fetch one ref into `dir` and leave HEAD on it. Throws when git cannot. */
+const fetchRef = async (dir: string, ref: string): Promise<void> => {
+	const pinned = assertSafeRef(ref);
+	try {
+		await git(['fetch', '--depth', '1', '--quiet', 'origin', pinned], dir);
+		await git(['checkout', '--quiet', 'FETCH_HEAD'], dir);
+		return;
+	} catch {
+		// A server that refuses a shallow fetch of this name still serves its full history, which is
+		// how a bare commit ref is reached. Check out the name asked for, never FETCH_HEAD: when the
+		// ref is gone, FETCH_HEAD is whatever the default branch happened to be.
+		await git(['fetch', '--quiet', 'origin'], dir);
+		await git(['checkout', '--quiet', pinned], dir);
+	}
+};
+
+/**
+ * Move an existing tree to the requested ref. Throws on failure: the caller reports it, because a
+ * tree that quietly stayed at yesterday's commit is a confident answer about the wrong code.
+ */
 export async function refreshCheckout(dir: string, ref?: string): Promise<void> {
 	if (ref) {
-		await git(['fetch', '--depth', '1', '--quiet', 'origin', assertSafeRef(ref)], dir).catch(() => undefined);
-		await git(['reset', '--hard', '--quiet', 'FETCH_HEAD'], dir).catch(() => undefined);
+		await fetchRef(dir, ref);
 		return;
 	}
-	await git(['fetch', '--depth', '1', '--quiet', 'origin', 'HEAD'], dir).catch(() => undefined);
-	await git(['reset', '--hard', '--quiet', 'FETCH_HEAD'], dir).catch(() => undefined);
+	await git(['fetch', '--depth', '1', '--quiet', 'origin', 'HEAD'], dir);
+	await git(['reset', '--hard', '--quiet', 'FETCH_HEAD'], dir);
 }
 
 /** Where a checkout's own git remote points, for identifying a local repo by its origin. */
