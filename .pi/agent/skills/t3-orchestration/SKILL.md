@@ -98,7 +98,7 @@ Link a thread as `[title](t3-thread://v1/<threadId>)` with the exact `threadId`,
 
 The child starts with the `task` string and nothing else. A brief that assumes the parent's conversation produces a child that guesses. Carry four things: **the goal** (the artifact or answer), **the scope** (paths, globs, modules — name files, a child reads what it is pointed at), **the method** (how to verify: commands, the check to pass, the surface to drive), and **the report shape** (`summary` is the child's final message, so the shape is the contract).
 
-Point at files; do not inline them. When the child needs codebase knowledge, give it a crawler: fork the scout once per child with `t3_thread_fork` and name the fork id, per the `codebase-scout` skill.
+Point at files; do not inline them. When the child needs codebase knowledge, point it at `repo_scout`: one call per repo, cached per child, so a follow-up reuses the session.
 
 ### target
 

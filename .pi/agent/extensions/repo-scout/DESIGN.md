@@ -1,6 +1,6 @@
 # repo-scout: design
 
-Two pi tools replace the spawn/fork dance in the codebase-scout skill.
+Two pi tools replace the spawn/fork dance for codebase questions.
 
 | Tool | Input | Output |
 |---|---|---|
@@ -110,7 +110,7 @@ binding. The transcript is the same; the reader changes.
 Tools: `read`, `grep`, `find`, `ls`. No bash, no edit, no write: a question is answered by reading.
 `bash` would let a scout mutate its checkout and, worse, reach the network or the host.
 
-Resources: only the scout skills are loaded (`codebase-scout`, `library-source`), through a
+Resources: only `library-source` is loaded, through a
 `DefaultResourceLoader` with `noExtensions`, `noThemes`, `noContextFiles`. Extension discovery is
 off on purpose: loading this very extension inside its own scout session would recurse, and every
 extension load costs startup time for nothing.
@@ -122,8 +122,8 @@ own toolset is what makes the reading read-only.
 
 The agent loop the user is replacing forks the scout so it keeps the knowledge. Here the session file
 keeps it, and the first message of a fresh session carries the checkout path and the report contract
-(the exact `answer/findings/gaps/blockers/source` shape from `codebase-scout/SKILL.md`), so one tool
-call yields a report the caller can read without asking again.
+(the `answer/findings/gaps/blockers/source` shape the tool has always used), so one tool call yields
+a report the caller can read without asking again.
 
 ## The second tool: `package_repo`
 

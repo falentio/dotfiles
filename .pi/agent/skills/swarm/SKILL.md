@@ -30,7 +30,7 @@ Spawn all N workers in one message with `role: "general"`. Omit `tools.mcp__t3_c
 
 Every brief stands alone. Include the goal, scope, exact slice or race arm, how to verify, and what to report. Reports use `PASS`, `ISSUES`, or `BLOCKED` with evidence.
 
-When the workers need the codebase, give each a dedicated crawler: fork the scout once per worker and pass the fork id, per the **codebase-scout** skill.
+When the workers need the codebase, point each at `repo_scout`: one call per repo, cached per worker.
 
 If a worker drops out, proceed with N-1 and note it.
 

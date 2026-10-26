@@ -9,9 +9,9 @@
  *     second credential path.
  *   - **Read-only tools.** read, grep, find, ls. No bash (which reaches the network and the host),
  *     no edit or write (a scout answers questions; it does not change the code under study).
- *   - **The scout skills, and nothing else.** A resource loader with extensions and context files
- *     off: loading this extension inside its own scout would recurse, and the report contract the
- *     session opens with is the skill's, restated once in the first message.
+ *   - **The library skill, and nothing else.** A resource loader with extensions and context files
+ *     off: loading this extension inside its own scout would recurse, and the report contract is
+ *     restated inline, in the first message.
  */
 
 import { existsSync } from "node:fs";
@@ -32,10 +32,10 @@ import type { ScoutAdapter, ScoutConversation } from "./scout-registry.ts";
 /** Read-only by construction: a question is answered by reading. */
 export const SCOUT_TOOLS = ["read", "grep", "find", "ls"] as const;
 
-/** The skills a scout consults, resolved from the agent dir; absent ones are simply not loaded. */
-const SCOUT_SKILLS = ["codebase-scout", "library-source"] as const;
+/** The skill a scout consults, resolved from the agent dir; an absent one is simply not loaded. */
+const SCOUT_SKILLS = ["library-source"] as const;
 
-/** Every session opens with this: the report shape comes from codebase-scout. */
+/** Every session opens with this. The contract is inline, so no skill has to supply it. */
 export const REPORT_CONTRACT = `You are a codebase scout. Answer the question in the user's message by reading the checkout at your working directory.
 
 Reply with the scout report, and nothing else:

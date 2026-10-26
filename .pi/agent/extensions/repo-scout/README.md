@@ -62,10 +62,10 @@ with `turn continued` instead of `turn opened`.
 - **The caller's model.** `ctx.model` with the caller's `ModelRegistry`, so it authenticates exactly
   as the asking thread does. `model: "provider/id"` overrides it; `thinkingLevel` defaults to medium.
 - **Read-only.** `read`, `grep`, `find`, `ls`. No bash, no edit, no write.
-- **Only the scout skills.** The resource loader has extensions, themes, context files, and prompt
-  templates switched off, so loading this extension inside its own scout cannot recurse.
-- **A report, not a dump.** The first message carries the report contract from
-  `skills/codebase-scout`: 800 words, pointers only, no file contents or grep output.
+- **One skill, `library-source`.** The resource loader has extensions, themes, context files, and
+  prompt templates switched off, so loading this extension inside its own scout cannot recurse.
+- **A report, not a dump.** The first message carries the built-in report contract: 800 words,
+  pointers only, no file contents or grep output.
 
 ## The checkout it reads
 
