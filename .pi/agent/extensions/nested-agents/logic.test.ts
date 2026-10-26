@@ -12,6 +12,8 @@ import {
 	ENTRY_TYPE,
 	PRUNE_DIRS,
 	TRIGGER_TOOLS,
+} from "./config.ts";
+import {
 	canonicalIdentity,
 	deliveredFromContent,
 	pathFromInput,

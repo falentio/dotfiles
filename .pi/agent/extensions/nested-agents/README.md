@@ -11,6 +11,7 @@ load them from subdirectories. This extension fills that gap: read `packages/api
 | File | Role |
 |---|---|
 | `index.ts` | Wiring: subscribes to `session_start` and `tool_result`. Thin. |
+| `config.ts` | Settings: context-file names, pruned directories, entry type, trigger tools. |
 | `logic.ts` | All rules, pure and testable. No pi imports. |
 | `logic.test.ts` | Unit tests for the rules. |
 | `handler.test.ts` | Handler tests against a fake pi. |
@@ -44,7 +45,7 @@ node --test smoke.test.ts
 
 ## Pruned directories
 
-The walk never descends into a directory whose name is in `PRUNE_DIRS` (in `logic.ts`), grouped by
+The walk never descends into a directory whose name is in `PRUNE_DIRS` (in `config.ts`), grouped by
 the ecosystem that produces it: JS package managers, Rust, Haskell, Go, Elixir, Zig, Python, JVM,
 Apple, Dart, and the build output of Next, Nuxt, SvelteKit, Astro, Angular, Nx, Vite, Parcel, Remix,
 Expo, Storybook, Umi, Docusaurus, Fresh, SolidStart, the SSGs, the serverless platforms, and
@@ -56,9 +57,9 @@ source tree, so the list holds only names that are essentially never source.
 
 Deliberately **not** pruned, because they are real source in ordinary repos: `lib`, `public`,
 `assets`, `static`, `bin`, `pkg`, `docs`, `scripts`, `examples`, `packages`, `www`, `tmp`,
-`out`, `log`, `logs`, `.storybook`, `.vitepress`, and any config directory.
+`log`, `logs`, `.storybook`, `.vitepress`, and any config directory.
 
-To add or remove a name, edit `PRUNE_GROUPS` in `logic.ts` and add a case to the `PRUNE_DIRS`
+To add or remove a name, edit `PRUNE_GROUPS` in `config.ts` and add a case to the `PRUNE_DIRS`
 suite in `logic.test.ts`. The set is derived from the groups, so the two cannot drift.
 
 
