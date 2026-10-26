@@ -14,8 +14,7 @@ import { after, describe, it } from "node:test";
 import { fauxAssistantMessage, fauxProvider, fauxText } from "@earendil-works/pi-ai/providers/faux";
 import { ModelRegistry, ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { ScoutRegistry } from "../scout-registry.ts";
-import { ensureCheckout } from "../checkout.ts";
-import { buildRegistry, identifyRepo, identityFor, runRepoScout, sessionsDir } from "../tools.ts";
+import { buildRegistry, identifyRepo, prepareCheckout, runRepoScout, sessionsDir } from "../tools.ts";
 import { sessionFileName } from "../repo-id.ts";
 
 const git = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
@@ -34,6 +33,8 @@ const makeRepo = async (): Promise<string> => {
 	await writeFile(join(root, "index.ts"), "export const answer = 42;\n");
 	git(root, "add", ".");
 	git(root, "commit", "--quiet", "-m", "first");
+	// An origin that cannot be cloned: the pipeline must read this path, not go hunting for the remote.
+	git(root, "remote", "add", "origin", "https://github.com/example/local-smoke.git");
 	return root;
 };
 
@@ -78,9 +79,9 @@ describe("repo_scout over a real AgentSession", () => {
 		let now = 0;
 		let tick: (() => void) | undefined;
 		const built = buildRegistry({ source: () => source, log: { info: () => {}, warn: () => {}, error: () => {} } });
-		// Same registry, but a scratch dir and clock the test owns.
+		// The production checkout path and adapter, with a clock the test owns.
 		const registry = new ScoutRegistry({
-			prepare: async (key) => ({ dir: await ensureCheckout(identityFor(key), scratch), display: key }),
+			prepare: prepareCheckout,
 			adapter: built.adapter,
 			sessionFileFor: (key) => join(sessionsDir(), `${sessionFileName(key)}.jsonl`),
 			idleMs: 600_000,
@@ -127,7 +128,7 @@ describe("repo_scout over a real AgentSession", () => {
 		assert.equal(prompts[2], "back again?", "the replayed conversation is not re-primed");
 		const files = readdirSync(sessionsDir());
 		assert.equal(files.length, 1, "both conversations recorded to one session file");
-		assert.equal(identity.key.startsWith("local:"), true);
+		assert.equal(identity.key, "github.com/example/local-smoke");
 
 		await registry.shutdown();
 	});

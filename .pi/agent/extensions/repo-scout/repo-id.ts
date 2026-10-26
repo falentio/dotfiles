@@ -134,8 +134,9 @@ export function parseRemoteRepo(input: string): RepoIdentity {
 export function localRepoIdentity(absPath: string, origin: string | undefined): RepoIdentity {
 	if (origin) {
 		try {
-			// Keep the local path as the source: the worktree is what the scout is asked about.
-			return { ...parseRemoteRepo(origin), source: absPath };
+			// The key comes from the origin so a worktree shares its remote's session, but the code
+			// read is the local path: that is the tree the caller is asking about.
+			return { ...parseRemoteRepo(origin), source: absPath, kind: "local" };
 		} catch {
 			// An origin we cannot parse (a bare local path, a bare repo) is not an identity.
 		}

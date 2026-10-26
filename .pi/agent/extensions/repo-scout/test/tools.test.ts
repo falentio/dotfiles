@@ -13,6 +13,7 @@ import { after, describe, it } from "node:test";
 import { ensureCheckout, headSha, originOf } from "../checkout.ts";
 import { homedir } from "node:os";
 import { identifyRepo, runPackageRepo } from "../tools.ts";
+import { localRepoIdentity } from "../repo-id.ts";
 
 const git = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
 
@@ -90,6 +91,20 @@ describe("ensureCheckout", () => {
 		const sha = await headSha(dir);
 		assert.match(sha, /^[0-9a-f]{7,12}$/);
 		assert.equal(await ensureCheckout(identity, scratch), dir, "second call reuses the clone");
+	});
+
+	it("clones a local repo from its own path, even when its origin names a remote", async () => {
+		const root = await makeRepo();
+		const scratch = await mkdtemp(join(tmpdir(), "repo-scout-scratch-"));
+		roots.push(root, scratch);
+		// An origin that cannot be fetched: if the clone went to the remote, this test fails.
+		git(root, "remote", "add", "origin", "https://github.com/example/does-not-exist.git");
+		const identity = localRepoIdentity(root, await originOf(root));
+		assert.equal(identity.key, "github.com/example/does-not-exist");
+		assert.equal(identity.kind, "local");
+		assert.equal(identity.source, root);
+		const dir = await ensureCheckout(identity, scratch);
+		assert.ok(existsSync(join(dir, "README.md")));
 	});
 
 	it("reads the origin of a checkout", async () => {

@@ -62,8 +62,15 @@ export const identifyRepo = async (repo: string, cwd: string): Promise<RepoIdent
 export const identityFor = (key: string): RepoIdentity =>
 	key.startsWith("local:") ? localRepoIdentity(key.slice("local:".length), undefined) : parseRemoteRepo(key);
 
+/**
+ * The identity each key was last asked about. The key alone cannot say where a local checkout lives
+ * (it is derived from the origin), and without this a local repo would be cloned from its remote
+ * instead of read from the tree the caller is working in.
+ */
+const identities = new Map<string, RepoIdentity>();
+
 export const prepareCheckout = async (key: string): Promise<{ dir: string; display: string }> => {
-	const identity = identityFor(key);
+	const identity = identities.get(key) ?? identityFor(key);
 	const dir = await ensureCheckout(identity, reposDir());
 	// A checkout that sat on disk since yesterday should not answer about yesterday's code.
 	await refreshCheckout(dir);
@@ -132,6 +139,7 @@ export async function runRepoScout(input: {
 	const question = params.question?.trim();
 	if (!question) throw new Error("question is empty");
 	const identity = await identifyRepo(params.repo, cwd);
+	identities.set(identity.key, identity);
 	await mkdir(sessionsDir(), { recursive: true });
 	const result = await registry.run(identity.key, question);
 	return withSource(identity.display, result, await headSha(result.dir));
