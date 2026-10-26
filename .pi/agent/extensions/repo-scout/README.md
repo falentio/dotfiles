@@ -20,13 +20,14 @@ const report = await tools.repo_scout({
 });
 ```
 
-## One session per repo, ref, model, and thinking level
+## One session per repo and ref
 
-A conversation is keyed by four things: the canonical repo identity (`github.com/owner/name`,
+A conversation is keyed by two things: the canonical repo identity (`github.com/owner/name`,
 lowercased, `.git`/query/fragment stripped; a local checkout is keyed by its `origin`, so a worktree,
-the main clone, and the https URL all share one session), the `ref`, the model, and the thinking
-level. Change any of them and you get a different conversation, because an `AgentSession` is bound to
-the model it opened with.
+the main clone, and the https URL all share one session) and the `ref`. The model and thinking level
+are not part of the key: an `AgentSession` is bound to a model, so a question that arrives with a
+different one reopens the same transcript on that model and continues it. One repo at one version,
+one conversation, whichever model asks.
 
 A **`ref`** is part of the key: `github.com/o/n@v4.0.7` is a different conversation from
 `github.com/o/n`. Two refs are two trees, so they never share a checkout, a conversation, or a report.
@@ -42,11 +43,18 @@ with `turn continued` instead of `turn opened`.
 - **One question at a time.** Further questions queue in a FIFO behind the running one. Different
   repos run in parallel. A question is rejected only when the session is evicted or the process shuts
   down, and a turn that exceeds `PI_SCOUT_TURN_MS` (15 minutes) is aborted.
-- **The caller can cancel.** Aborting the tool call aborts the scout's turn.
+- **One process at a time.** A lock directory per repo and ref under `locks/` is taken before the
+  checkout is opened and held for the session's life. A second pi process asking about the same repo
+  and ref waits for it, up to `PI_SCOUT_LOCK_MS` (10 minutes), then fails and names the holder. The
+  holder proves it is alive with a heartbeat every 15s; a lock whose owner died is stolen after 45s.
+  Eviction and shutdown release it.
+- **The caller can cancel.** Aborting the tool call aborts the scout's turn, or stops it waiting for
+  the lock.
 - **Ten idle minutes, then evicted.** The clock restarts when a question settles, so a long crawl is
   never evicted mid-run. Eviction disposes the session.
-- **Eviction does not lose the cache.** The conversation is persisted, so the next question reopens
-  that file and continues the same history. A new conversation is only started the first time.
+- **Eviction does not lose the cache.** The file pi wrote is recorded in `sessions/keys/`, so the
+  next question, in this process or another one, reopens that file and continues the same history. A
+  new conversation is only started the first time.
 
 ## What the scout is
 
@@ -117,12 +125,15 @@ loopback, link-local, or internal name. Set `GITHUB_TOKEN` to raise the search r
 |---|---|
 | `~/.pi/scout/repos/<slug>-<digest>` | scratch checkouts, one per repo and ref |
 | `~/.pi/scout/sessions/<file>.jsonl` | scout conversations, reopened after eviction |
+| `~/.pi/scout/sessions/keys/<digest>.json` | the transcript each conversation key was written to |
+| `~/.pi/scout/locks/<digest>.lock` | the cross-process lock, one per repo and ref |
 
 | Variable | Effect |
 |---|---|
 | `PI_SCOUT_HOME` | moves both directories (tests set it) |
 | `PI_SCOUT_IDLE_MS` | idle window, default `600000` |
 | `PI_SCOUT_TURN_MS` | one turn's ceiling, default `900000` |
+| `PI_SCOUT_LOCK_MS` | how long a second process waits for the lock, default `600000` |
 | `GITHUB_TOKEN` / `GH_TOKEN` | authenticated GitHub search in `package_repo` |
 
 ## Files
@@ -132,6 +143,8 @@ loopback, link-local, or internal name. Set `GITHUB_TOKEN` to raise the search r
 | `index.ts` | Wiring: registers both tools, one registry per process, passes the model and signal, disposes on shutdown. |
 | `tools.ts` | Both tools as plain functions, plus paths, identity resolution, and the report header. |
 | `scout-registry.ts` | Sessions: identity key, queue, idle clock, deadline, eviction, reopen. |
+| `state-lock.ts` | The cross-process mutex: atomic mkdir, owner pid, heartbeat, steal by rename. |
+| `session-index.ts` | Conversation key to transcript path, one file per key. |
 | `repo-id.ts` | Canonical repo identity from every accepted spelling. |
 | `checkout.ts` | The scratch checkout: clone, refresh, origin, HEAD. |
 | `registry.ts` | Package name to repo URLs. Pure parsers plus the two fetches. |
@@ -142,7 +155,7 @@ loopback, link-local, or internal name. Set `GITHUB_TOKEN` to raise the search r
 
 ```sh
 cd ~/.pi/agent/extensions/repo-scout
-npm test          # 101 tests: parsers, registry queue/identity/abort, checkouts, and a full pipeline run
+npm test          # 112 tests: parsers, registry queue/lock/abort, checkouts, a two-process race, and a full pipeline run
 npm run typecheck
 ```
 
@@ -154,8 +167,10 @@ resolves pi's package names for the test run, the way the extension loader does.
 
 - **One repo per call.** Two repos are two calls (and two sessions); that is what keeps the cache whole.
 - **Reports are text.** `package_repo`'s output is line-oriented, not structured content.
-- **The registry lives in the pi process.** The key-to-session-file map is in memory, so a pi restart
-  starts a new conversation and leaves the previous transcript on disk. Two processes do not share a
-  conversation; each starts its own file.
+- **Cross-process means one host.** The lock checks a pid, which is only meaningful on the machine
+  that wrote it; a heartbeat covers a holder on another host, but a shared state root over NFS is not
+  a supported deployment.
+- **A second process waits, it does not take over.** Up to `PI_SCOUT_LOCK_MS`; after that it fails
+  and names the holder rather than opening a second session on the same tree.
 - **A self-hosted forge under a path prefix** (`https://host/git/owner/name`) is read as `host/git/owner`,
   because only GitLab handles nested groups.

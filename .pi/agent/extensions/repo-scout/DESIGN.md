@@ -33,17 +33,18 @@ the hash is what keeps two repos or two refs from sharing a tree. An existing di
 when its `origin` resolves to the same source the request names; a directory from another repo is
 discarded and cloned again, with a warning in the report.
 
-### 2. One conversation per repo, ref, model, and thinking level
+### 2. One conversation per repo and ref
 
 The identity is `repo.key` (every accepted spelling mapped to `github.com/owner/name`: lowercased,
 trailing `/`, `.git`, query and fragment stripped, scp style accepted; a local path uses its `origin`
 when it has one, else `realpath`).
 
-A conversation is keyed by that identity **plus the ref, the model, and the thinking level**. An
-`AgentSession` is bound to the model it opened with, so a thread that switches models must get a new
-conversation; anything less answers on the old model until an eviction, then silently switches. The
-key is computed from the request the caller sent, not recovered from a process-global map: the
-registry takes one `ScoutRequest` and derives everything from it.
+A conversation is keyed by that identity **plus the ref**. The model and thinking level are how the
+conversation is read, not which conversation it is, so a question that arrives with another model
+reopens the same transcript on that model. Keying on the model would satisfy the model binding at the
+cost of one conversation per model: two callers would crawl the same code twice and neither would see
+the other's work. The key is computed from the request the caller sent, not recovered from a
+process-global map: the registry takes one `ScoutRequest` and derives everything from it.
 
 One registry lives per pi process, not per `cwd`/model/thinking partition. A partition keyed the
 registry one way and the session file and checkout another, so two live sessions shared one transcript
@@ -83,8 +84,10 @@ that path. Remembering a guessed path instead starts a second file after every e
 exactly the cache eviction exists to preserve. `scout-registry.test.ts` pins this against an adapter
 that reports a different path than the one it was offered.
 
-The key-to-file map is in memory, so it does not survive a process restart: a new pi process starts a
-new conversation and leaves the old transcript on disk. That is the documented limit, not the design.
+The key-to-file map is persisted at `~/.pi/scout/sessions/keys/<digest>.json`, one file per key, so it
+survives a restart and is readable by the next process. One file per key also means the only writer is
+the process holding the repo lock: a single shared JSON map would need a read-modify-write merge, and a
+lost update would silently start a second transcript.
 
 A reopened conversation **replays** its history, so it already holds the opening contract and the
 earlier crawl: the adapter sends the bare question, and the report says `turn continued`. Only a
@@ -98,8 +101,9 @@ overrides it through the caller's `ModelRegistry`. The runtime comes from `ctx.m
 scout authenticates exactly as the caller does, with no second credential path. `thinkingLevel`
 (default `medium`) travels the same way.
 
-`updateModel` is not passed: a scout must not silently switch models. The model is part of the
-conversation key, so a different model is a different conversation, never a re-pointed one.
+`updateModel` is not passed: a scout must not silently switch models mid-conversation. Instead the
+registry reopens the recorded transcript on the model the next question names, then disposes the old
+binding. The transcript is the same; the reader changes.
 
 ### 6. The scout is a read-only agent
 
@@ -188,16 +192,41 @@ refused, because `git ls-remote` would otherwise become egress chosen by third-p
 then does the forge test run: two segments on `github.com` is a repo, two segments on `hub.docker.com`
 is a page. A `.git` suffix proves a git URL without bypassing either check.
 
+### 11. One live session per repo and ref, across processes
+
+pi runs one process per thread, so two threads can ask about one repo at once. Without a lock, both
+processes would open the same scratch tree and one would reset it under the other's live session, and
+both would append to the same transcript. The rule is one live session per repo and ref; everything
+else queues.
+
+The lock is a directory: `mkdir` is atomic across processes, and the winner writes `owner.json` with
+its pid and host, then touches it every 15 seconds. A waiter polls; if the owner is on this host and
+its pid is gone, or the heartbeat is older than 45 seconds, the lock is stale. Stealing renames the
+directory to a unique grave first, so two waiters cannot both claim it, then removes it and retries the
+`mkdir`. A kernel `flock` would be simpler, but Node exposes no binding for it, and a native
+dependency for one mutex is not worth the install.
+
+The lock is held from before the checkout opens until the session is evicted or the process exits, not
+per question: the tree and the transcript are the shared things, and both must stay still while another
+process reads them. A second process waits up to `PI_SCOUT_LOCK_MS` and then fails naming the holder.
+Within one process the lock is reentrant, counted per directory, so a second conversation on the same
+tree does not deadlock against itself.
+
+Crash safety is the pid check plus the heartbeat: a killed holder leaves a directory the next waiter
+can prove stale. A pid is only meaningful on the host that wrote it, so a lock from another host is
+left alone until its heartbeat ages out.
+
 ## Boundaries
 
 - Network boundaries live in `registry.ts` (`fetch`, `git ls-remote`) and `checkout.ts` (`git`),
   nowhere else; the parsing is pure and unit-tested with fixtures.
 - Session lifetime and queueing live in `scout-registry.ts` only; nothing else touches `AgentSession`.
+- Cross-process exclusion lives in `state-lock.ts`; the transcript index in `session-index.ts`.
 - `repo_scout` is read-only in effect but writes a scratch cache, so it is not declared read-only.
 
 ## Out of scope
 
 - Writing to the caller's worktree, or editing the repo under study.
 - Multi-repo questions in one call. Two calls, one per repo, stay cached separately.
-- Sharing one conversation across two pi processes.
+- A distributed lock: a shared state root across hosts has a heartbeat, not real mutual exclusion.
 - Pruning `~/.pi/scout`: a disk policy needs a number that the user has not set.
