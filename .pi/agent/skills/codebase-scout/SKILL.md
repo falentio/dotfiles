@@ -29,7 +29,8 @@ Do not spawn a subagent to crawl code. One `repo_scout` call replaces `delegate_
 
 ## Which repo
 
-- **A dependency** — get its repo from the package: `await tools.package_repo({ package: "zod", registry: "npm" })`, then pass a returned `url` to `repo_scout`. `confidence: stated` is the package's own manifest; `guess` is a name search and needs checking before you trust a finding.
+- **A dependency** — get its repo from the package: `await tools.package_repo({ package: "zod", source: "npm", version: "4.0.7" })`. Pass the `clone` line's url and ref to `repo_scout`. `confidence: stated` is the package's own manifest; `guess` is a name search, and it is never the `clone` target.
+- **The version matters** — `version` names the release; the returned `ref` is a git tag git confirmed, so `repo_scout({ repo, ref })` reads the code that shipped. No `ref` means no tag matched, and the default branch is what you get.
 - **A dependency whose source must sit at `~/.pi/source`** — run `library-source` first, then pass that path as `repo`. A local path is given a thin `--shared` clone, so it is read as it stands without edits shifting under the scout.
 - **This project** — pass the repo root or the git URL. The scout reads a scratch checkout, never the branch you are editing.
 
@@ -40,6 +41,7 @@ Do not spawn a subagent to crawl code. One `repo_scout` call replaces `delegate_
 | Sessions per repo | one, keyed by canonical identity |
 | Concurrency | one question at a time; later questions queue in order |
 | Idle eviction | 10 minutes after a question settles; the next question reopens the same conversation |
+| `ref` | a tag, branch, or commit; it is part of the session key, so `repo@v1.2.3` is its own conversation |
 | Tools the scout has | `read`, `grep`, `find`, `ls` — read-only, no bash, no edit |
 | Model | the caller's model; `model: "provider/id"` overrides it |
 

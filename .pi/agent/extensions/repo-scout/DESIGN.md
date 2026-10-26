@@ -115,6 +115,43 @@ Output is data: `{ package, registry, repos: [{ url, kind, source, confidence }]
 `kind` is `repository` (browsable git) or `tarball` (provenance only). Callers pass `url` straight to
 `repo_scout`.
 
+### 8. A ref is verified, never assumed
+
+Registries publish versions; git publishes tags; nothing maps one to the other. So `package_repo`
+proposes the tag names a version is usually published under (`v4.0.7`, `4.0.7`, `zod@4.0.7`,
+`serde-v1.0.229`) and then asks git: `ls-remote --tags --heads`. Only a ref git confirms is reported.
+No match means `ref none` plus the candidates, because inventing a tag is worse than admitting the
+mapping is unknown — a clone at a nonexistent ref fails loudly, but a clone at a *similar* tag returns
+a confident report about the wrong release.
+
+`repo_scout({ ref })` puts the ref in the session key and in the checkout directory
+(`<slug>@<ref>`). Two refs are two trees: sharing a directory would let a question about a release be
+answered by the default branch, and sharing a conversation would mix the two in one cache prefix.
+
+### 9. A guess is never a destination
+
+Name search exists for packages whose registry carries no repository at all (`@std/path` publishes no
+`githubRepository`; the search then returns unrelated repos named `path`). Reporting those URLs is
+useful; offering one as the clone target is not. A scout pointed at the wrong repo answers
+confidently about the wrong code, and nothing in the report says so.
+
+So `cloneTarget` and the rendered `clone` line take only `confidence: stated` repositories, and a
+guess-only result carries `no stated repository` as a warning. The guesses stay in `repos`, where a
+reader can verify one and pass it to `repo_scout` explicitly.
+
+### 10. Sources are a table, not a branch pile
+
+Each registry publishes a different field: npm a manifest `repository`, PyPI `project_urls`, crates.io
+`crate.repository`, JSR the version's `deno.json`, Docker Hub nothing but a free-text description. One
+pure parser per source (`reposFromManifest`, `reposFromPypi`, `reposFromJsrDenoJson`,
+`reposFromDockerhubHub`) keeps that knowledge testable with a fixture, and `discover()` is the only
+place that knows which endpoint to call.
+
+Every extracted URL goes through `isRepoRootUrl`. Publishers put docs sites, PyPI project pages, and
+bug trackers in `repository` often enough that trusting the field hands a caller an uncloneable URL.
+The test asks whether the *host* is a forge: two segments on `github.com` is a repo, two segments on
+`hub.docker.com` is a page. A URL the publisher wrote with a `.git` suffix passes regardless.
+
 ## Boundaries
 
 - Network boundaries live in `registry.ts` (`fetch`) and `checkout.ts` (`git`), nowhere else; the

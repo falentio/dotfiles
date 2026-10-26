@@ -1,0 +1,223 @@
+/**
+ * resolvePackageRepo over fake registries and a fake git: every source's shape, version selection, and
+ * the rule that a ref is only reported after git confirms it.
+ */
+
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import {
+	type RegistryDeps,
+	type RemoteRefs,
+	cloneTarget,
+	resolvePackageRepo,
+} from "../registry.ts";
+
+const NPM_PACKUMENT = {
+	"dist-tags": { latest: "4.0.7" },
+	versions: {
+		"4.0.7": { repository: { url: "git+https://github.com/colinhacks/zod.git" } },
+	},
+};
+
+const CRATE = {
+	crate: {
+		max_version: "1.0.229",
+		repository: "https://github.com/serde-rs/serde",
+		homepage: "https://serde.rs",
+	},
+};
+
+const PYPI = {
+	info: { version: "2.34.2", project_urls: { Source: "https://github.com/psf/requests" } },
+};
+
+const JSR_META = { latest: "1.1.6", versions: { "1.1.6": {}, "0.1.0": {} } };
+const JSR_DENO = { name: "@o/n", version: "1.1.6", githubRepository: "o/n" };
+
+const DOCKERHUB = {
+	description: "The image",
+	full_description: "Source: https://github.com/docker-library/postgres.",
+};
+
+type Fixtures = {
+	json?: Record<string, unknown>;
+	text?: Record<string, string>;
+	refs?: Record<string, RemoteRefs>;
+	/** URL prefixes that must 404, checked before the fixtures. */
+	missing?: string[];
+};
+
+const deps = (fixtures: Fixtures) => {
+	const requested: string[] = [];
+	const listed: string[] = [];
+	const impl: RegistryDeps = {
+		async fetchJson(url) {
+			requested.push(url);
+			if (fixtures.missing?.some((candidate) => url.startsWith(candidate))) {
+				throw new Error("GET " + url + " -> 404 Not Found");
+			}
+			const key = Object.keys(fixtures.json ?? {}).find((candidate) => url.startsWith(candidate));
+			if (!key) throw new Error("no fixture for " + url);
+			return fixtures.json?.[key];
+		},
+		async fetchText(url) {
+			requested.push(url);
+			const key = Object.keys(fixtures.text ?? {}).find((candidate) => url.startsWith(candidate));
+			if (!key) throw new Error("no fixture for " + url);
+			return fixtures.text?.[key] ?? "";
+		},
+		async lsRemote(url) {
+			listed.push(url);
+			return fixtures.refs?.[url] ?? { tags: [], branches: [] };
+		},
+	};
+	return { impl, requested, listed };
+};
+
+describe("resolvePackageRepo", () => {
+	it("npm: latest version, stated repo, and the confirmed tag", async () => {
+		const { impl, requested, listed } = deps({
+			json: { "https://registry.npmjs.org/zod": NPM_PACKUMENT },
+			refs: { "https://github.com/colinhacks/zod": { tags: ["v4.0.7"], branches: ["main"] } },
+		});
+		const result = await resolvePackageRepo({ package: "zod" }, impl);
+
+		assert.equal(result.source, "npm");
+		assert.equal(result.version, "4.0.7");
+		assert.equal(result.repos[0]?.url, "https://github.com/colinhacks/zod");
+		assert.equal(result.repos[0]?.ref, "v4.0.7");
+		assert.equal(result.repos[0]?.refKind, "tag");
+		assert.deepEqual(result.warnings, []);
+		assert.deepEqual(requested, ["https://registry.npmjs.org/zod"]);
+		assert.deepEqual(listed, ["https://github.com/colinhacks/zod"]);
+		assert.deepEqual(cloneTarget(result), { url: "https://github.com/colinhacks/zod", ref: "v4.0.7" });
+	});
+
+	it("npm: a requested version wins, and is looked up in that version's manifest", async () => {
+		const packument = {
+			"dist-tags": { latest: "4.0.7" },
+			versions: {
+				"4.0.7": { repository: { url: "https://github.com/colinhacks/zod" } },
+				"3.0.0": { repository: { url: "https://github.com/colinhacks/zod" } },
+			},
+		};
+		const { impl } = deps({
+			json: { "https://registry.npmjs.org/zod": packument },
+			refs: { "https://github.com/colinhacks/zod": { tags: ["v3.0.0"], branches: [] } },
+		});
+		const result = await resolvePackageRepo({ package: "zod", version: "3.0.0" }, impl);
+		assert.equal(result.version, "3.0.0");
+		assert.equal(result.repos[0]?.ref, "v3.0.0");
+	});
+
+	it("npm: no matching tag means no ref, the candidates, and a warning", async () => {
+		const { impl } = deps({
+			json: { "https://registry.npmjs.org/zod": NPM_PACKUMENT },
+			refs: { "https://github.com/colinhacks/zod": { tags: ["r4.0.7"], branches: [] } },
+		});
+		const result = await resolvePackageRepo({ package: "zod" }, impl);
+		assert.equal(result.repos[0]?.ref, null);
+		assert.deepEqual(result.repos[0]?.refCandidates, ["v4.0.7", "4.0.7", "zod@4.0.7"]);
+		assert.match(result.warnings.join("\n"), /no tag matched on https:\/\/github\.com\/colinhacks\/zod/);
+	});
+
+	it("npm: a tarball is not cloned and gets no ref", async () => {
+		const tarballOnly = {
+			"dist-tags": { latest: "1.0.0" },
+			versions: { "1.0.0": { dist: { tarball: "https://registry.npmjs.org/x/-/x-1.0.0.tgz" } } },
+		};
+		const { impl, listed } = deps({ json: { "https://registry.npmjs.org/x": tarballOnly } });
+		const result = await resolvePackageRepo({ package: "x" }, impl);
+		assert.equal(result.repos[0]?.kind, "tarball");
+		assert.equal(result.repos[0]?.ref, null);
+		assert.deepEqual(listed, [], "no git to ask for a tarball");
+		assert.equal(cloneTarget(result), null);
+	});
+
+	it("crate: reads repository and version, then the v-prefixed tag", async () => {
+		const { impl } = deps({
+			json: { "https://crates.io/api/v1/crates/serde": CRATE },
+			refs: { "https://github.com/serde-rs/serde": { tags: ["v1.0.229"], branches: [] } },
+		});
+		const result = await resolvePackageRepo({ package: "serde", source: "crate" }, impl);
+		assert.equal(result.version, "1.0.229");
+		assert.equal(result.repos[0]?.url, "https://github.com/serde-rs/serde");
+		assert.equal(result.repos[0]?.ref, "v1.0.229");
+	});
+
+	it("pypi: reads a Source project URL and its version", async () => {
+		const { impl } = deps({
+			json: { "https://pypi.org/pypi/requests/json": PYPI },
+			refs: { "https://github.com/psf/requests": { tags: ["v2.34.2"], branches: [] } },
+		});
+		const result = await resolvePackageRepo({ package: "requests", source: "pypi" }, impl);
+		assert.equal(result.version, "2.34.2");
+		assert.equal(result.repos[0]?.url, "https://github.com/psf/requests");
+		assert.equal(result.repos[0]?.via, "pypi-project-urls");
+		assert.equal(result.repos[0]?.ref, "v2.34.2");
+	});
+
+	it("jsr: reads the version deno.json for the repo, keeping the @ in its URLs", async () => {
+		const { impl, requested } = deps({
+			json: { "https://jsr.io/@o/n/meta.json": JSR_META },
+			text: { "https://jsr.io/@o/n/1.1.6/deno.json": JSON.stringify(JSR_DENO) },
+			refs: { "https://github.com/o/n": { tags: ["1.1.6"], branches: [] } },
+		});
+		const result = await resolvePackageRepo({ package: "@o/n", source: "jsr" }, impl);
+		assert.deepEqual(requested, ["https://jsr.io/@o/n/meta.json", "https://jsr.io/@o/n/1.1.6/deno.json"]);
+		assert.equal(result.version, "1.1.6");
+		assert.equal(result.repos[0]?.url, "https://github.com/o/n");
+		assert.equal(result.repos[0]?.via, "jsr-deno-json");
+		assert.equal(result.repos[0]?.ref, "1.1.6");
+	});
+
+	it("jsr: a deno.json without a repo falls back to a marked guess", async () => {
+		const { impl } = deps({
+			json: {
+				"https://jsr.io/@o/n/meta.json": JSR_META,
+				"https://api.github.com/search/repositories": { items: [{ html_url: "https://github.com/o/n" }] },
+			},
+			text: { "https://jsr.io/@o/n/1.1.6/deno.json": JSON.stringify({ name: "@o/n" }) },
+			refs: { "https://github.com/o/n": { tags: [], branches: [] } },
+		});
+		const result = await resolvePackageRepo({ package: "@o/n", source: "jsr" }, impl);
+		assert.equal(result.repos[0]?.confidence, "guess");
+		assert.match(result.warnings.join("\n"), /names no githubRepository/);
+		assert.match(result.warnings.join("\n"), /no stated repository/);
+		assert.equal(cloneTarget(result), null, "a guess is not a destination");
+	});
+
+	it("dockerhub: takes the repo out of the description and never claims a git ref", async () => {
+		const { impl } = deps({
+			json: { "https://hub.docker.com/v2/repositories/library/postgres/": DOCKERHUB },
+		});
+		const result = await resolvePackageRepo({ package: "library/postgres", source: "dockerhub" }, impl);
+		assert.equal(result.repos[0]?.url, "https://github.com/docker-library/postgres");
+		assert.equal(result.repos[0]?.ref, null);
+		assert.match(result.warnings.join("\n"), /a Docker tag names an image, not a git revision/);
+	});
+
+	it("dockerhub: warns when the version tag does not exist", async () => {
+		const { impl } = deps({
+			json: { "https://hub.docker.com/v2/repositories/library/postgres/": DOCKERHUB },
+			missing: ["https://hub.docker.com/v2/repositories/library/postgres/tags/"],
+		});
+		const result = await resolvePackageRepo(
+			{ package: "library/postgres", source: "dockerhub", version: "99" },
+			impl,
+		);
+		assert.match(result.warnings.join("\n"), /no tag 99/);
+	});
+
+	it("rejects an unknown source before any request", async () => {
+		const { impl, requested } = deps({});
+		await assert.rejects(resolvePackageRepo({ package: "x", source: "maven" as never }, impl), /unknown source: maven/);
+		assert.deepEqual(requested, []);
+	});
+
+	it("rejects a name the source cannot address", async () => {
+		const { impl } = deps({});
+		await assert.rejects(resolvePackageRepo({ package: "unscoped", source: "jsr" }, impl), /@scope\/name/);
+		await assert.rejects(resolvePackageRepo({ package: "noslash", source: "dockerhub" }, impl), /owner\/name/);
+	});
+});

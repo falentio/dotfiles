@@ -4,14 +4,20 @@ Two tools that replace the scout-subagent dance with one call.
 
 | Tool | Takes | Returns |
 |---|---|---|
-| `repo_scout` | a repo (URL, `host/owner/name`, `owner/name`, or a local path) and a question | the scout report: `answer`, findings anchored to `path:line`, gaps, blockers, and the checkout/commit that answered |
-| `package_repo` | a package name and a registry (`npm`, `jsr`) | the git repo URLs that serve it, each with provenance and confidence |
+| `repo_scout` | a repo (URL, `host/owner/name`, `owner/name`, or a local path), a question, and optionally a `ref` | the scout report: `answer`, findings anchored to `path:line`, gaps, blockers, and the checkout/commit that answered |
+| `package_repo` | a package name, a `source` (`npm`, `jsr`, `crate`, `pypi`, `dockerhub`), and optionally a `version` | the git repo URLs that serve it, each with provenance, a confirmed git `ref`, and the exact clone target |
 
 Both are `codemode` tools, so they are reached from codemode scripts:
 
 ```js
-const repo = await tools.package_repo({ package: "zod" });
-const report = await tools.repo_scout({ repo: "https://github.com/colinhacks/zod", question: "How does it validate a date-time?" });
+const at = await tools.package_repo({ package: "zod", version: "4.0.7" });
+// clone    https://github.com/colinhacks/zod ref=v4.0.7
+
+const report = await tools.repo_scout({
+  repo: "https://github.com/colinhacks/zod",
+  ref: "v4.0.7",
+  question: "How does it validate a date-time?",
+});
 ```
 
 ## One session per repo
@@ -19,6 +25,10 @@ const report = await tools.repo_scout({ repo: "https://github.com/colinhacks/zod
 A repo gets **one** `AgentSession`, keyed by its canonical identity (`github.com/owner/name`,
 lowercased, `.git`/query/fragment stripped; a local checkout is keyed by its `origin`, so a worktree,
 the main clone, and the https URL all share one session).
+
+A **`ref`** is part of that key: `github.com/o/n@v4.0.7` is a different conversation from
+`github.com/o/n`. Two refs are two trees, so they never share a checkout, a conversation, or a report.
+The ref is cloned with `--branch`, so the scout reads exactly that tag, branch, or commit.
 
 That session is the point. Every later question about the same repo appends to the same conversation,
 so the provider's prompt cache is reused instead of re-crawling from zero, and the report comes back
@@ -54,20 +64,47 @@ Every report ends with `repo`, `path`, `sha`, `thread` (the session file), and `
 
 ## package_repo
 
-Answers provenance, in order, stopping as soon as the manifest states a repository:
+```text
+package  zod
+source   npm
+version  3.22.4
+repos
+- https://github.com/colinhacks/zod  (repository, manifest, stated)  ref v3.22.4 (tag)
+clone    https://github.com/colinhacks/zod ref=v3.22.4
+```
 
-1. the manifest's own `repository`, `githubRepository`, then a `bugs`/`homepage` that is itself a repo
-   root — `stated`;
-2. the npm tarball, when nothing else is named — `kind: tarball`, provenance only, not browsable;
-3. a GitHub name search — `guess`, and labelled as one.
+**Sources.** `npm`, `jsr`, `crate` (crates.io), `pypi`, `dockerhub`. Each reads the field that registry
+actually publishes:
 
-`jsr` reads `https://jsr.io/@scope/name/meta.json`. Set `GITHUB_TOKEN` to raise the search rate limit.
+| Source | Endpoint | Repo comes from |
+|---|---|---|
+| `npm` | `registry.npmjs.org/<name>` | the version manifest's `repository`, else the tarball |
+| `jsr` | `jsr.io/@scope/name/meta.json`, then `/<version>/deno.json` | `githubRepository` in the version's `deno.json` |
+| `crate` | `crates.io/api/v1/crates/<name>` | `crate.repository`, then `homepage` |
+| `pypi` | `pypi.org/pypi/<name>/json` | `project_urls` Source/Code/Repository, then `home_page` |
+| `dockerhub` | `hub.docker.com/v2/repositories/<owner>/<name>/` | a repo link in the description (Docker Hub has no repo field) |
+
+**Version.** `version` picks the manifest to read and names the version in the result. When it is
+absent the registry's latest is used; a version the registry does not have comes back as a warning.
+
+**Ref.** Registries publish versions, not git tags, so a tag is a candidate (`v4.0.7`, `4.0.7`,
+`zod@4.0.7`, `serde-v1.0.229`, …) that is only reported after `git ls-remote` confirms it. No match
+means `ref none`, with the candidates listed so a caller can probe. A Docker tag never yields a git
+ref, and says so.
+
+**Clone target.** `clone` names the first repository the publisher *stated*. A name-search `guess` is
+never offered as a target: a scout pointed at the wrong repo returns a confident report about the
+wrong code. Guess-only results say `no stated repository` and omit the clone line.
+
+Every candidate goes through a repo-root test, because publishers put docs sites, PyPI project pages,
+and bug trackers in `repository` too — those cannot be cloned, so they are dropped rather than
+reported. Set `GITHUB_TOKEN` to raise the search rate limit.
 
 ## State and environment
 
 | Path | Holds |
 |---|---|
-| `~/.pi/scout/repos/<slug>` | scratch checkouts |
+| `~/.pi/scout/repos/<slug>` | scratch checkouts (a pinned ref appends `@<ref>`) |
 | `~/.pi/scout/sessions/<file>.jsonl` | scout conversations, reopened after eviction |
 
 | Variable | Effect |
