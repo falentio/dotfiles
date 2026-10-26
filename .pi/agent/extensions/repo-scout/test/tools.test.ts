@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
 import { checkoutDir, ensureCheckout, headSha, originOf, refreshCheckout } from "../checkout.ts";
-import { localRepoIdentity, parseRemoteRepo } from "../repo-id.ts";
+import { localRepoIdentity } from "../repo-id.ts";
 import type { PackageRepoResult } from "../registry.ts";
 import { identifyRepo, runPackageRepo } from "../tools.ts";
 

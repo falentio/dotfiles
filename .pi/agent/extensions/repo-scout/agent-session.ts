@@ -27,7 +27,7 @@ import {
 	createAgentSession,
 	getAgentDir,
 } from "@earendil-works/pi-coding-agent";
-import type { ScoutAdapter, ScoutConversation, ScoutThinking } from "./scout-registry.ts";
+import type { ScoutAdapter, ScoutConversation } from "./scout-registry.ts";
 
 /** Read-only by construction: a question is answered by reading. */
 export const SCOUT_TOOLS = ["read", "grep", "find", "ls"] as const;
