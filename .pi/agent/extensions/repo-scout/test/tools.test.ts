@@ -94,7 +94,7 @@ describe("runPackageRepo", () => {
 				warnings: ["no tag matched on https://github.com/o/ghost; tried v1.0.0"],
 			}),
 		);
-		assert.match(text, /ref none/);
+		assert.match(text, /ref none \(tried v1\.0\.0\)/);
 		assert.match(text, /^clone    https:\/\/github\.com\/o\/ghost ref=\(default branch\)$/m);
 		assert.match(text, /^warning  no tag matched/m);
 	});

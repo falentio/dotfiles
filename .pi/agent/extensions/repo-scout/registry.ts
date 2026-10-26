@@ -295,18 +295,6 @@ export function reposFromGithubSearch(payload: unknown): RepoRef[] {
 	return refs;
 }
 
-/** First-wins merge, deduped by URL. */
-export function mergeRepos(...groups: RepoRef[][]): RepoRef[] {
-	const merged: RepoRef[] = [];
-	for (const group of groups) {
-		for (const candidate of group) {
-			if (merged.some((existing) => existing.url === candidate.url)) continue;
-			merged.push(candidate);
-		}
-	}
-	return merged;
-}
-
 /**
  * Tag names worth trying for a published version, most likely first. Registries do not publish
  * git tags, so these are guesses that git then confirms or rejects.

@@ -12,7 +12,6 @@ import { localRepoIdentity, parseRemoteRepo, sessionFileName } from "../repo-id.
 import {
 	isRepoRootUrl,
 	matchRef,
-	mergeRepos,
 	normalizeRepoUrl,
 	npmManifest,
 	npmVersion,
@@ -325,11 +324,4 @@ describe("github search", () => {
 	});
 });
 
-describe("mergeRepos", () => {
-	it("keeps first-wins order", () => {
-		const stated = reposFromManifest({ repository: "https://github.com/o/a" });
-		const guess = reposFromGithubSearch({ items: [{ html_url: "https://github.com/o/a" }] });
-		assert.equal(mergeRepos(stated, guess).length, 1);
-		assert.equal(mergeRepos(stated, guess)[0]?.via, "manifest");
-	});
-});
+

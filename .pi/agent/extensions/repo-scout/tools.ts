@@ -19,7 +19,7 @@ import type { ModelRegistry } from '@earendil-works/pi-coding-agent';
 import { createAgentAdapter, type ScoutModelSource } from './agent-session.ts';
 import { ensureCheckout, headSha, originOf, refreshCheckout } from './checkout.ts';
 import { localRepoIdentity, parseRemoteRepo, sessionFileName, type RepoIdentity } from './repo-id.ts';
-import { PACKAGE_SOURCES, resolvePackageRepo, type PackageRepoResult, type PackageSource } from './registry.ts';
+import { PACKAGE_SOURCES, cloneTarget, resolvePackageRepo, type PackageRepoResult, type PackageSource } from './registry.ts';
 import { ScoutRegistry, type Logger, type ScoutAdapter, type ScoutResult } from './scout-registry.ts';
 
 /** Root of everything this extension writes. Overridable for tests and for a second mind. */
@@ -168,11 +168,14 @@ const isSource = (value: string): value is PackageSource =>
 	(PACKAGE_SOURCES as readonly string[]).includes(value);
 
 /** One repo line: URL, provenance, and the confirmed ref, if any. */
-const repoLine = (repo: PackageRepoResult['repos'][number]): string =>
-	[
-		'- ' + repo.url + '  (' + repo.kind + ', ' + repo.via + ', ' + repo.confidence + ')',
-		repo.ref ? 'ref ' + repo.ref + ' (' + repo.refKind + ')' : 'ref none',
-	].join('  ');
+const repoLine = (repo: PackageRepoResult['repos'][number]): string => {
+	const ref = repo.ref
+		? 'ref ' + repo.ref + ' (' + repo.refKind + ')'
+		: repo.refCandidates.length
+			? 'ref none (tried ' + repo.refCandidates.join(', ') + ')'
+			: 'ref none';
+	return ['- ' + repo.url + '  (' + repo.kind + ', ' + repo.via + ', ' + repo.confidence + ')', ref].join('  ');
+};
 
 /** A package name to repos at a ref, as text plus the structured result. */
 export async function runPackageRepo(
@@ -189,7 +192,7 @@ export async function runPackageRepo(
 
 	const result = await resolvePackage({ package: name, source, version });
 	// Only a stated repository is offered as a target; a guess is information, not a destination.
-	const target = result.repos.find((repo) => repo.kind === 'repository' && repo.confidence === 'stated');
+	const target = cloneTarget(result);
 	const lines = [
 		'package  ' + result.package,
 		'source   ' + result.source,
