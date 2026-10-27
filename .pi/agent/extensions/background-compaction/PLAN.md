@@ -143,7 +143,7 @@ Files: `index.ts`.
 
 Events: `session_start` (reset, restore later), `agent_settled` (`advance()`), `session_before_compact` (judge and hand over), `session_compact` (clear, record the leaf), `model_select` (invalidate), `session_shutdown` (abort). `advance()` calls `ctx.compact()` through `setTimeout(0)` with an idle recheck. Status strings are frozen in [SPEC.md](./SPEC.md) section 9. One command, `/precompute`, reports state and can force a run when idle.
 
-Check: `discoverAndLoadExtensions` clean, typecheck, and a live session compacts with no prompt after the summary completes. Record it per `control-cli`.
+Check: `discoverAndLoadExtensions` clean, typecheck, and a live session compacts with no prompt after the summary completes. `verify/session.test.ts` drives that live session through `createAgentSession` and a mock provider, and asserts the timing. The status line's TUI rendering stays unverified; the PR body records it as an open gap.
 
 ### Phase 5. Integration harness
 
@@ -168,7 +168,7 @@ Write a `precompute` custom entry when a summary is ready; restore it on `sessio
 
 Check: reopen the session file in a second process, let the agent settle, and confirm the compaction uses the stored summary with zero summary requests.
 
-Decide after Phase 5. Skip it if the restore path cannot be tested as cheaply.
+Decided after Phase 5: skipped. A stored summary needs a `precompute` custom entry, a restore path that revalidates the covered ids on load, and a second-process test that reopens the session file. That cost is out of scope for v1 ([SPEC.md](./SPEC.md) §1), so persistence stays a later phase with its own test.
 
 ### Phase 7. Docs and PR
 
