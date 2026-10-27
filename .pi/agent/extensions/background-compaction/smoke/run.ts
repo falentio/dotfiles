@@ -300,7 +300,7 @@ const PI_INSTALL = findPiInstall();
 async function loadFauxProvider(path: string): Promise<void> {
 	const jiti = createJiti(import.meta.url, {
 		moduleCache: false,
-		alias: piAliases(PI_INSTALL) as Record<string, string>,
+		alias: piAliases(PI_INSTALL),
 	});
 	const factory = (await jiti.import(path, { default: true })) as (pi: unknown) => void;
 	factory({ registerTool() {}, registerProvider() {} });
