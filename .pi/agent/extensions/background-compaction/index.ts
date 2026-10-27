@@ -255,8 +255,10 @@ function install(
 		});
 		if (verdict.kind === "skip") return;
 
-		state = { ...state, precompute: { status: "compacting" } };
-		setStatus(ctx);
+		if (compactionCallIssued) {
+			state = { ...state, precompute: { status: "compacting" } };
+			setStatus(ctx);
+		}
 		return {
 			compaction: {
 				summary: verdict.summary,
