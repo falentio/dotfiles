@@ -313,6 +313,10 @@ function statusFor(status: SessionState["precompute"]["status"]): string | undef
 			return "precompute: compacting...";
 		case "failed":
 			return "precompute: summary failed";
+		default: {
+			const exhaustive: never = status;
+			return exhaustive;
+		}
 	}
 }
 
