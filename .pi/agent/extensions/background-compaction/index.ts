@@ -44,7 +44,6 @@ export interface BackgroundCompactionDeps {
 	readonly summarize: Summarize;
 }
 
-// pi reports a cleared header as null; generateSummaryWithUsage takes strings.
 function summaryHeaders(headers: Record<string, string | null> | undefined): Record<string, string> | undefined {
 	return headers
 		? Object.fromEntries(Object.entries(headers).filter((entry): entry is [string, string] => entry[1] !== null))
