@@ -59,6 +59,7 @@ describe("repo_scout over a real AgentSession", () => {
 		roots.push(state);
 
 		const { faux, prompts } = fakeProvider();
+		const queuedBefore = faux.getPendingResponseCount();
 		const runtime = await ModelRuntime.create({ modelsPath: null, allowModelNetwork: false });
 		runtime.registerNativeProvider(faux.provider);
 		const modelRegistry = new ModelRegistry(runtime);
@@ -137,6 +138,7 @@ describe("repo_scout over a real AgentSession", () => {
 		const fourth = await runRepoScout({ params: { repo, question: "one more?" }, registry: other, cwd: repo, choice });
 		assert.match(fourth, /turn   continued/, "the new registry continues the recorded transcript");
 		assert.equal(prompts[3], "one more?", "and does not re-prime it");
+		assert.equal(queuedBefore - faux.getPendingResponseCount(), 4, "four turns consumed four queued responses");
 		await other.shutdown();
 	});
 });
