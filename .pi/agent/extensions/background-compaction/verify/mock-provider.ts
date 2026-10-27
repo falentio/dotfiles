@@ -1,6 +1,17 @@
 import { estimateTokens, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { createAssistantMessageEventStream, registerApiProvider } from "@earendil-works/pi-ai/compat";
-import type { AssistantMessage, Context, Model, Usage } from "@earendil-works/pi-ai/compat";
+import {
+	Type,
+	createAssistantMessageEventStream,
+	registerApiProvider,
+} from "@earendil-works/pi-ai/compat";
+import type {
+	Api,
+	AssistantMessage,
+	Context,
+	Model,
+	StreamFunction,
+	Usage,
+} from "@earendil-works/pi-ai/compat";
 
 export const VERIFY_LOG_KEY = "__backgroundCompactionVerifyLog";
 
@@ -8,6 +19,8 @@ export const SUMMARY_MARKER = "SUMMARY-MARKER";
 export const BLOAT_CHARS = 240_000;
 export const SUMMARY_DELAY_MS = 300;
 export const SLOW_DELAY_MS = 400;
+
+const bloatParameters = Type.Object({ chars: Type.Optional(Type.Number()) });
 
 export interface VerifyRequest {
 	seq: number;
@@ -67,7 +80,7 @@ function usageFor(context: Context): Usage {
 }
 
 function assistantMessage(
-	model: Model<string>,
+	model: Model<Api>,
 	content: AssistantMessage["content"],
 	stopReason: AssistantMessage["stopReason"],
 	usage: Usage,
@@ -92,7 +105,7 @@ function finish(
 	stream.push({ type: "done", reason, message });
 }
 
-function streamMock(model: Model<string>, context: Context) {
+const streamMock: StreamFunction = (model, context) => {
 	const stream = createAssistantMessageEventStream();
 	const log = currentLog();
 	const summary = isSummaryRequest(context);
@@ -155,7 +168,7 @@ function streamMock(model: Model<string>, context: Context) {
 
 export default function mockProvider(pi: ExtensionAPI): void {
 	registerApiProvider(
-		{ api: "bgc-mock-api", stream: streamMock as never, streamSimple: streamMock },
+		{ api: "bgc-mock-api", stream: streamMock, streamSimple: streamMock },
 		"bgc-mock-verify",
 	);
 	pi.registerProvider("bgc-mock", {
@@ -180,10 +193,9 @@ export default function mockProvider(pi: ExtensionAPI): void {
 		name: "bloat",
 		label: "Bloat",
 		description: "Return a large deterministic payload.",
-		parameters: { type: "object", properties: { chars: { type: "number" } } } as never,
+		parameters: bloatParameters,
 		execute: async (_toolCallId, params) => {
-			const requested = (params as { chars?: number }).chars;
-			const chars = typeof requested === "number" ? requested : BLOAT_CHARS;
+			const chars = params.chars ?? BLOAT_CHARS;
 			return { content: [{ type: "text", text: "b".repeat(chars) }], details: { chars } };
 		},
 	});
