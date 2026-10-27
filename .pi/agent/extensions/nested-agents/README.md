@@ -15,7 +15,8 @@ load them from subdirectories. This extension fills that gap: read `packages/api
 | `logic.ts` | All rules, pure and testable. No pi imports. |
 | `logic.test.ts` | Unit tests for the rules. |
 | `handler.test.ts` | Handler tests against a fake pi. |
-| `smoke.test.ts` | Drives the real pi binary; asserts on the session transcript. |
+| `smoke.test.ts` | Drives the real pi binary with a fake model; asserts on the session transcript. |
+| `smoke/faux-provider.ts` | The fake model: answers the read and edit calls the prompts ask for. |
 | `EVIDENCE.md` | The measurements and real-run logs behind the design. |
 
 ## Run the tests
@@ -23,12 +24,14 @@ load them from subdirectories. This extension fills that gap: read `packages/api
 ```sh
 cd ~/.pi/agent/extensions/nested-agents
 
-# Fast: 40 tests, no model calls, about a second.
-node --test logic.test.ts handler.test.ts
+# Fast: 122 tests, no model calls, about a second.
+node --test logic.test.ts handler.test.ts compaction.test.ts
 
-# Slow: 4 tests, real pi runs, about 90 seconds. Needs pi on PATH and working auth.
+# Slow: 8 tests, real pi runs with a fake model, about 10 seconds.
 node --test smoke.test.ts
 ```
+
+The smoke suite passes `-e smoke/faux-provider.ts --provider faux --model faux-1`, so it needs no auth and makes no network call. `PI_BIN` overrides the pi binary. Without it the suite uses `~/.vite-plus/bin/pi` when that exists, then falls back to `pi` on PATH.
 
 ## Behaviour
 

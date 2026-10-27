@@ -334,7 +334,7 @@ One table per rule in section 5 and each row in the section 4.3 table. Plus: gat
 
 ### 10.3 Integration: one real session
 
-A mock provider extension registers `pi.registerProvider({ streamSimple })`. It scripts an assistant turn that calls a test-only `bloat` tool returning large output, and a summary reply. The test opens `createAgentSession({ sessionManager: SessionManager.inMemory(), resourceLoader })` over a temp `agentDir` containing both extensions.
+A fake provider extension registers a pi-ai faux provider. It scripts an assistant turn that calls a test-only `bloat` tool returning large output, and a summary reply. The test opens `createAgentSession({ sessionManager: SessionManager.inMemory(), resourceLoader })` over a temp `agentDir` containing both extensions.
 
 Script: prompt until the gate is crossed, then wait for `agent_settled` and the summary.
 
@@ -344,13 +344,13 @@ Assertions:
 2. `compaction_start` fires after the last user turn and before any further prompt.
 3. The appended compaction entry has `fromHook: true` and `firstKeptEntryId === plan.keepEntryId`.
 4. The next prompt's first request contains the summary message followed by the kept tail.
-5. Invariant 12 holds, observed from the mock provider's request log.
+5. Invariant 12 holds, observed from the fake provider's request log.
 6. With `compactWhenReady: false`, no compaction until the threshold, then `fromHook: true`.
 7. With the extension disabled, `fromHook: false` and the summary request follows `compaction_start`.
 8. A prompt queued while the summary is running is not aborted; compaction happens at the following `agent_settled`, and the new turn appears in the kept tail.
 9. A turn large enough to push the tail past the limit makes the extension drop the summary and skip `ctx.compact()`.
 
-If `complete()` does not route through the mock stream function, register the model under an `api` name the mock provider owns rather than changing the extension.
+If `complete()` does not route through the faux stream function, register the model under an `api` name the fake provider owns rather than changing the extension.
 
 ## 11. Frozen versus free
 
