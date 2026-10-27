@@ -26,43 +26,35 @@ import {
 
 type Model = NonNullable<ExtensionContext["model"]>;
 
-export type Summarize = (
-	messages: Plan["messages"],
-	model: Model,
-	reserveTokens: number,
-	apiKey: string | undefined,
-	headers: Record<string, string> | undefined,
-	signal: AbortSignal,
-	customInstructions: string | undefined,
-	previousSummary: string | undefined,
-	thinkingLevel: ExtensionContext["thinkingLevel"],
-) => Promise<{ text: string; usage: Usage }>;
+export interface SummaryRequest {
+	readonly messages: Plan["messages"];
+	readonly model: Model;
+	readonly reserveTokens: number;
+	readonly apiKey: string | undefined;
+	readonly headers: Record<string, string> | undefined;
+	readonly signal: AbortSignal;
+	readonly customInstructions: string | undefined;
+	readonly previousSummary: string | undefined;
+	readonly thinkingLevel: ExtensionContext["thinkingLevel"];
+}
+
+export type Summarize = (request: SummaryRequest) => Promise<{ text: string; usage: Usage }>;
 
 export interface BackgroundCompactionDeps {
 	readonly summarize: Summarize;
 }
 
-const defaultSummarize: Summarize = (
-	messages,
-	model,
-	reserveTokens,
-	apiKey,
-	headers,
-	signal,
-	customInstructions,
-	previousSummary,
-	thinkingLevel,
-) =>
+const defaultSummarize: Summarize = (request) =>
 	generateSummaryWithUsage(
-		[...messages],
-		model,
-		reserveTokens,
-		apiKey,
-		headers,
-		signal,
-		customInstructions,
-		previousSummary,
-		thinkingLevel,
+		[...request.messages],
+		request.model,
+		request.reserveTokens,
+		request.apiKey,
+		request.headers,
+		request.signal,
+		request.customInstructions,
+		request.previousSummary,
+		request.thinkingLevel,
 	);
 
 export function createBackgroundCompaction(
@@ -153,17 +145,17 @@ function install(
 
 		let result: { text: string; usage: Usage };
 		try {
-			result = await summarize(
-				plan.messages,
-				ctx.model,
-				config.reserveTokens,
-				auth.apiKey,
-				auth.headers,
-				abort.signal,
-				undefined,
-				plan.previousSummary,
-				ctx.thinkingLevel,
-			);
+			result = await summarize({
+				messages: plan.messages,
+				model: ctx.model,
+				reserveTokens: config.reserveTokens,
+				apiKey: auth.apiKey,
+				headers: auth.headers,
+				signal: abort.signal,
+				customInstructions: undefined,
+				previousSummary: plan.previousSummary,
+				thinkingLevel: ctx.thinkingLevel,
+			});
 		} catch {
 			if (abort.signal.aborted) return;
 			state = recordSummaryFailure(state, plan, "rejected", config.maxFailures);

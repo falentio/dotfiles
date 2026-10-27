@@ -130,7 +130,7 @@ const model = {
 };
 
 interface SummaryCall {
-	args: Parameters<Summarize>;
+	request: Parameters<Summarize>[0];
 	resolve: (value: { text: string; usage: Usage }) => void;
 	reject: (error: Error) => void;
 }
@@ -167,13 +167,9 @@ function makeHarness(
 		},
 	} as unknown as ExtensionAPI;
 
-	const summarize: Summarize = (messages, summaryModel, reserve, apiKey, headers, signal, custom, previous, thinking) =>
+	const summarize: Summarize = (request) =>
 		new Promise((resolve, reject) => {
-			summaryCalls.push({
-				args: [messages, summaryModel, reserve, apiKey, headers, signal, custom, previous, thinking],
-				resolve,
-				reject,
-			});
+			summaryCalls.push({ request, resolve, reject });
 		});
 
 	const ctx = {
@@ -314,9 +310,18 @@ describe("event wiring", () => {
 		await settle(h);
 		expect(calls.length).toBe(1);
 		expect(lastStatus(h)).toBe("precompute: summarizing...");
-		expect(calls[0]?.args[2]).toBe(PRECOMPUTE_CONFIG.reserveTokens);
-		expect(calls[0]?.args[3]).toBe("test-key");
-		expect(calls[0]?.args[7]).toBeUndefined();
+		expect(calls[0]?.request.reserveTokens).toBe(PRECOMPUTE_CONFIG.reserveTokens);
+		expect(calls[0]?.request.apiKey).toBe("test-key");
+		expect(calls[0]?.request.previousSummary).toBeUndefined();
+	});
+
+	it("carries the plan's baseline summary, not the instructions", async () => {
+		const calls: SummaryCall[] = [];
+		const h = makeHarness({}, calls);
+		h.branch = [...branchEndingInCompaction(), user("next request")];
+		await settle(h);
+		expect(calls[0]?.request.customInstructions).toBeUndefined();
+		expect(calls[0]?.request.previousSummary).toBe("earlier summary");
 	});
 
 	it("keeps at most one summary in flight", async () => {
