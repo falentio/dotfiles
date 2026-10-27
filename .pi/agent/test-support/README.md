@@ -14,12 +14,12 @@ The linker refuses to delete a real directory where a link belongs: it stops and
 
 ## Suites on the faux model
 
-| Suite | Command | Result | Time |
-| --- | --- | --- | --- |
-| `nested-agents` unit | `node --test logic.test.ts handler.test.ts compaction.test.ts` | 122 pass | 0.6s |
-| `nested-agents` smoke | `node --test smoke.test.ts` | 8 pass | 7.9s |
-| `background-compaction` | `bun run test` | 148 pass | 41.2s |
-| `repo-scout` | `bun run test` | 126 pass | 4.2s |
-| `todos` | `bun run test` | 113 pass | 0.4s |
+| Suite | Command | Result |
+| --- | --- | --- |
+| `nested-agents` unit | `node --test logic.test.ts handler.test.ts compaction.test.ts` | 122 pass |
+| `nested-agents` smoke | `node --test smoke.test.ts` | 8 pass |
+| `background-compaction` | `bun run test` | 148 pass |
+| `repo-scout` | `bun run test` | 126 pass |
+| `todos` | `bun run test` | 113 pass |
 
-Measured against pi 1.4.0. The `nested-agents` smoke drives the real `pi` binary with a faux provider; every other suite runs in-process. No suite reaches a real provider, a network, or credentials.
+Measured against pi 1.4.0. The `nested-agents` smoke drives the real `pi` CLI with a faux provider; every other suite runs in-process. No suite reaches a real provider, a network, or credentials. Times vary per machine, so the counts are the record.
