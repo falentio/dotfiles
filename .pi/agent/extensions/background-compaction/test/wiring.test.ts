@@ -476,6 +476,18 @@ describe("event wiring", () => {
 		expect(normal).toBeDefined();
 	});
 
+	it("records a compact error as a failure", async () => {
+		const calls: SummaryCall[] = [];
+		const h = makeHarness({}, calls);
+		await settle(h);
+		calls[0]!.resolve({ text: "the summary", usage });
+		await flush();
+		expect(h.compactCalls.length).toBe(1);
+		const options = h.compactCalls[0] as unknown as { onError: () => void };
+		options.onError();
+		expect(lastStatus(h)).toBe("precompute: summary failed");
+	});
+
 	it("resets failures and the failed keep id on session_compact", async () => {
 		const calls: SummaryCall[] = [];
 		const h = makeHarness({}, calls);
