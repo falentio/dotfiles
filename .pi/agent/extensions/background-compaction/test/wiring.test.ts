@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import type {
+	CompactionEntry,
 	ExtensionAPI,
 	ExtensionContext,
 	SessionBeforeCompactEvent,
@@ -81,6 +82,38 @@ function giantBranch(): SessionEntry[] {
 function makeBranch(): SessionEntry[] {
 	nextId = 0;
 	return giantBranch();
+}
+
+function compaction(firstKeptEntryId: string): CompactionEntry {
+	nextId += 1;
+	return {
+		type: "compaction",
+		id: `c${nextId}`,
+		parentId: null,
+		timestamp: new Date(1_700_000_000_000 + nextId).toISOString(),
+		summary: "earlier summary",
+		firstKeptEntryId,
+		tokensBefore: 0,
+	};
+}
+
+function branchEndingInCompaction(): SessionEntry[] {
+	nextId = 0;
+	const tail = [user("kept tail"), assistant("a".repeat(160_000))];
+	return [...tail, compaction(tail[0]!.id)];
+}
+
+function customMessage(text: string): SessionEntry {
+	nextId += 1;
+	return {
+		type: "custom_message",
+		id: `m${nextId}`,
+		parentId: null,
+		timestamp: new Date(1_700_000_000_000 + nextId).toISOString(),
+		customType: "test",
+		content: text,
+		display: false,
+	};
 }
 
 const model = {
@@ -564,6 +597,29 @@ describe("/precompute", () => {
 		await h.commands.get("precompute")!("force", h.ctx);
 		await flush();
 		expect(calls.length).toBe(0);
+	});
+
+	it("force does nothing after a compaction without a user message", async () => {
+		const calls: SummaryCall[] = [];
+		const h = makeHarness({}, calls);
+		h.branch = [...branchEndingInCompaction(), customMessage("injected context")];
+		h.tokens = 1;
+		await settle(h);
+		expect(calls.length).toBe(0);
+		await h.commands.get("precompute")!("force", h.ctx);
+		await flush();
+		expect(calls.length).toBe(0);
+	});
+
+	it("force starts a summary after a user message follows a compaction", async () => {
+		const calls: SummaryCall[] = [];
+		const h = makeHarness({}, calls);
+		h.branch = [...branchEndingInCompaction(), user("next request")];
+		h.tokens = 1;
+		await settle(h);
+		await h.commands.get("precompute")!("force", h.ctx);
+		await flush();
+		expect(calls.length).toBe(1);
 	});
 });
 
