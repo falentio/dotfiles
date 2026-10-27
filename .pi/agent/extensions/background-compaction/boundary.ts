@@ -21,6 +21,8 @@ export function planPrecompute(
 	keepRecentTokens: number,
 	modelRef: string,
 ): Plan | undefined {
+	if (entries[entries.length - 1]?.type === "compaction") return undefined;
+
 	let boundaryStart = 0;
 	let previousSummary: string | undefined;
 

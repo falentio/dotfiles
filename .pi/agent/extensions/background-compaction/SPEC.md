@@ -1,6 +1,8 @@
 # Background compaction: frozen specification
 
-Version 1.1, freeze candidate. On approval this becomes the implementation contract. After that, anything marked FROZEN needs a version bump and an update to the tests that name it.
+Version 1.2, freeze candidate. On approval this becomes the implementation contract. After that, anything marked FROZEN needs a version bump and an update to the tests that name it.
+
+Changes in 1.2, found in review of the 1.1 draft: §4.2 returns undefined when the branch ends with a compaction entry, as `prepareCompaction` does; §10.1 gains that fixture.
 
 Changes in 1.1, found while implementing: `Limits` carries `enabled` and `compactWhenReady`; boundary planning skips compaction entries and zero-message entries; `/precompute` reports through `ui.notify` because command handlers return void; the state stays `ready` while `ctx.compact()` runs, and only an extension-issued compaction flips it to `compacting`.
 
@@ -81,14 +83,15 @@ The `minCeilingTokens` check is a floor on the window, not on the usage. A model
 
 FROZEN. `planPrecompute` mirrors pi's `prepareCompaction`:
 
-1. Take `entries = ctx.sessionManager.getBranch()`.
-2. Find the last `compaction` entry. If one exists, `boundaryStart` is the index of its `firstKeptEntryId`; when that id is absent from the branch, `boundaryStart` is the index after the compaction entry. Otherwise `boundaryStart = 0`.
-3. `cut = findCutPoint(entries, boundaryStart, entries.length, keepRecentTokens)`.
-4. `keepEntryId = entries[cut.firstKeptEntryIndex].id`.
-5. `messages` is the concatenation of `sessionEntryToContextMessages(entries[i])` for `i` in `[boundaryStart, cut.firstKeptEntryIndex)`, skipping compaction entries.
-6. `coveredEntryIds` holds the id of every entry that contributed messages, in order. Entries that project to no messages, and compaction entries, are skipped.
-7. `previousSummary` is the last compaction entry's `summary`, or undefined.
-8. Return undefined when `messages` is empty or `keepEntryId` is missing.
+1. Return undefined when the last entry is a `compaction` entry. Pi's `prepareCompaction` refuses that branch before it cuts anything.
+2. Take `entries = ctx.sessionManager.getBranch()`.
+3. Find the last `compaction` entry. If one exists, `boundaryStart` is the index of its `firstKeptEntryId`; when that id is absent from the branch, `boundaryStart` is the index after the compaction entry. Otherwise `boundaryStart = 0`.
+4. `cut = findCutPoint(entries, boundaryStart, entries.length, keepRecentTokens)`.
+5. `keepEntryId = entries[cut.firstKeptEntryIndex].id`.
+6. `messages` is the concatenation of `sessionEntryToContextMessages(entries[i])` for `i` in `[boundaryStart, cut.firstKeptEntryIndex)`, skipping compaction entries.
+7. `coveredEntryIds` holds the id of every entry that contributed messages, in order. Entries that project to no messages, and compaction entries, are skipped.
+8. `previousSummary` is the last compaction entry's `summary`, or undefined.
+9. Return undefined when `messages` is empty or `keepEntryId` is missing.
 
 A split turn is one summary for the extension, not two. The covered span includes pi's `turnPrefixMessages`.
 
@@ -321,7 +324,7 @@ Command `/precompute`:
 
 ### 10.1 Unit: boundary
 
-Fixtures: empty branch, one user message, one complete turn, five turns, branch after a compaction, a single turn larger than the budget, a budget larger than the history.
+Fixtures: empty branch, one user message, one complete turn, five turns, branch after a compaction, branch ending with a compaction entry, a single turn larger than the budget, a budget larger than the history.
 
 Assertions: invariant 2, invariant 3, invariant 1. Oracle is `prepareCompaction` from the installed package, loaded through `import.meta.resolve("@earendil-works/pi-coding-agent")` and `dist/core/compaction/compaction.js`. The test fails if a pi upgrade changes the cut rules.
 
