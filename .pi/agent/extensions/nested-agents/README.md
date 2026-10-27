@@ -15,7 +15,7 @@ load them from subdirectories. This extension fills that gap: read `packages/api
 | `logic.ts` | All rules, pure and testable. No pi imports. |
 | `logic.test.ts` | Unit tests for the rules. |
 | `handler.test.ts` | Handler tests against a fake pi. |
-| `smoke.test.ts` | Drives the real pi binary with a faux model; asserts on the session transcript. |
+| `smoke.test.ts` | Drives the real pi CLI with a faux model; asserts on the session transcript. |
 | `smoke/faux-provider.ts` | The faux model: answers the read and edit calls the prompts ask for. |
 | `EVIDENCE.md` | The measurements and real-run logs behind the design. |
 
