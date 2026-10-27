@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createJiti } from "jiti/static";
@@ -42,6 +42,120 @@ function modelFor(contextWindow: number) {
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 		contextWindow,
 		maxTokens: 4_096,
+	};
+}
+
+export interface RestartResult {
+	first: Result & { turns: number; tokens: number | null };
+	second: Result & { turns: number; tokens: number | null };
+	sessionFile: string;
+}
+
+export async function runTwice(scenario: Scenario): Promise<RestartResult> {
+	const cwd = mkdtempSync(join(tmpdir(), "bgc-project-"));
+	const agentDir = mkdtempSync(join(tmpdir(), "bgc-agent-"));
+	const extensionDir = join(agentDir, "extensions", "background-compaction");
+	mkdirSync(extensionDir, { recursive: true });
+	for (const file of ["index.ts", "boundary.ts", "state.ts", "package.json"]) {
+		copyFileSync(join(SOURCE, file), join(extensionDir, file));
+	}
+	writeFileSync(join(extensionDir, "config.ts"), readFileSync(join(SOURCE, "config.ts"), "utf8"));
+	copyFileSync(PROBE, join(agentDir, "extensions", "mock-provider.ts"));
+
+	const modelRuntime = await ModelRuntime.create({
+		authPath: join(agentDir, "auth.json"),
+		modelsPath: join(agentDir, "models.json"),
+	});
+	modelRuntime.registerProvider("bgc-mock", {
+		name: "Mock",
+		baseUrl: "http://127.0.0.1/mock",
+		apiKey: "test-key",
+		api: API,
+		models: [
+			{
+				id: "mock-model",
+				name: "Mock",
+				reasoning: false,
+				input: ["text"],
+				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+				contextWindow: 200_000,
+				maxTokens: 4_096,
+			},
+		],
+	});
+
+	await loadMockProvider(PROBE);
+	const sessionFile = join(cwd, "session.jsonl");
+	const first = await driveOne(scenario, { cwd, agentDir, modelRuntime, sessionFile, create: true });
+	const reopened = first.sessionFile;
+	const second = await driveOne(scenario, { cwd, agentDir, modelRuntime, sessionFile: reopened, create: false });
+	return {
+		first: { ...first.result, turns: first.turns, tokens: first.tokens },
+		second: { ...second.result, turns: second.turns, tokens: second.tokens },
+		sessionFile: reopened,
+	};
+}
+
+interface DriveOptions {
+	cwd: string;
+	agentDir: string;
+	modelRuntime: ModelRuntime;
+	sessionFile: string;
+	create: boolean;
+}
+
+async function driveOne(
+	scenario: Scenario,
+	options: DriveOptions,
+): Promise<{ result: Result; sessionFile: string; turns: number; tokens: number | null }> {
+	const sessionManager = options.create
+		? SessionManager.create(options.cwd, options.cwd)
+		: SessionManager.open(options.sessionFile, options.cwd, options.cwd);
+	(globalThis as Record<string, unknown>)[VERIFY_LOG_KEY] = emptyVerifyLog();
+	(globalThis as Record<string, unknown>).__probe = (globalThis as Record<string, unknown>)[VERIFY_LOG_KEY];
+	const { session } = await createAgentSession({
+		cwd: options.cwd,
+		agentDir: options.agentDir,
+		model: modelFor(200_000) as never,
+		modelRuntime: options.modelRuntime,
+		thinkingLevel: "off",
+		tools: ["bloat"],
+		sessionManager,
+		settingsManager: SettingsManager.inMemory({}),
+	});
+
+	const events: string[] = [];
+	session.subscribe((event) => {
+		if (event.type === "compaction_start") events.push(`start:${event.reason}`);
+		if (event.type === "compaction_end") events.push(`end:${event.reason}`);
+	});
+
+	const recorder = () => (globalThis as Record<string, unknown>)[VERIFY_LOG_KEY] as Probe;
+	let turns = 0;
+	for (let index = 1; index <= 4; index++) {
+		if (compactions(session.sessionManager).length > 0) break;
+		await session.prompt(`bloat turn ${index}`);
+		await session.waitForIdle();
+		await new Promise((resolve) => setTimeout(resolve, 1_200));
+		turns += 1;
+	}
+	const probe = recorder();
+	const requests = probe?.requests ?? [];
+	const file = session.sessionManager.getSessionFile();
+	return {
+		sessionFile: file ?? "missing",
+		turns,
+		tokens: session.getContextUsage()?.tokens ?? null,
+		result: {
+			summaryRequests: requests.filter((request) => request.summary).length,
+			compactions: compactions(session.sessionManager).map((entry) => ({
+				fromHook: entry.fromHook ?? false,
+				firstKeptEntryId: entry.firstKeptEntryId.slice(0, 8),
+				tokensBefore: entry.tokensBefore,
+			})),
+			events,
+			lastTexts: requests.at(-1)?.texts.length ?? 0,
+		},
 	};
 }
 

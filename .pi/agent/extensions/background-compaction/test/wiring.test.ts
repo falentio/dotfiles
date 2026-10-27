@@ -32,6 +32,7 @@ interface Harness {
 	idle: boolean;
 	pending: boolean;
 	compactCalls: unknown[];
+	appends: Array<{ customType: string }>;
 	ctx: ExtensionContext;
 }
 
@@ -144,12 +145,14 @@ function makeHarness(
 	const statuses: Harness["statuses"] = [];
 	const notices: string[] = [];
 	const compactCalls: unknown[] = [];
+	const appends: Array<{ customType: string }> = [];
 	const harness: Partial<Harness> = {
 		handlers,
 		commands,
 		statuses,
 		notices,
 		compactCalls,
+		appends,
 		branch: makeBranch(),
 		tokens: 160_000,
 		idle: true,
@@ -164,6 +167,9 @@ function makeHarness(
 		},
 		registerCommand: (name: string, options: { handler: (args: string, ctx: ExtensionContext) => Promise<unknown> }) => {
 			commands.set(name, options.handler);
+		},
+		appendEntry: (customType: string) => {
+			appends.push({ customType });
 		},
 	} as unknown as ExtensionAPI;
 
@@ -550,6 +556,21 @@ describe("event wiring", () => {
 		await flush();
 		expect(lastStatus(h)).toBe("precompute: summary failed");
 		await emit(h, "session_compact", compactionEvent(h));
+		expect(lastStatus(h)).toBeUndefined();
+		await settle(h);
+		expect(calls.length).toBe(2);
+	});
+
+	it("keeps a ready summary in memory only, so a restart writes it again", async () => {
+		const calls: SummaryCall[] = [];
+		const h = makeHarness({}, calls);
+		await settle(h);
+		calls[0]!.resolve({ text: "ready summary", usage });
+		await flush();
+		expect(lastStatus(h)).toBe("precompute: summary ready");
+		expect(h.appends).toEqual([]);
+
+		await emit(h, "session_start", { type: "session_start", reason: "startup" });
 		expect(lastStatus(h)).toBeUndefined();
 		await settle(h);
 		expect(calls.length).toBe(2);
