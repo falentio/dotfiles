@@ -58,8 +58,6 @@ export function governingChain(abs: string, cwd: string): string[] {
 	while (true) {
 		const rel = path.relative(root, dir);
 		if (rel === "" || rel.startsWith("..")) break;
-		// A file anywhere inside a pruned subtree gets no context: the prune rule must reject the
-		// whole path, not just the directory whose basename happens to be pruned.
 		if (rel.split(path.sep).some((segment) => PRUNE_DIRS.has(segment))) break;
 		const hit = contextFileIn(dir);
 		if (hit) chain.push(hit);
@@ -108,9 +106,6 @@ export function selectDeliveries(
 	delivered: ReadonlyMap<string, string>,
 ): Delivery[] {
 	const fresh: Delivery[] = [];
-	// Identities claimed by THIS batch. Two chain entries can share one identity when a parent and a
-	// child directory each link to the same file, so the batch needs its own dedupe set: checking
-	// only `delivered` would emit that file once per entry.
 	const claimed = new Set<string>();
 	for (const file of chainForInput(input, cwd)) {
 		let body: string;

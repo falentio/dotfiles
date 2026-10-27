@@ -1,8 +1,3 @@
-/**
- * The pure rules: repo identity, and each package registry parser against a fixture shaped like the
- * real response. No model, no network.
- */
-
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { mkdirSync, mkdtempSync, symlinkSync } from "node:fs";
@@ -27,7 +22,6 @@ import {
 	tarballFromNpmManifest,
 } from "../registry.ts";
 
-/** Every spelling of one repo, in the shapes callers actually pass. */
 describe("parseRemoteRepo", () => {
 	it("keeps a GitLab subgroup and drops the /-/ route", () => {
 		assert.equal(parseRemoteRepo("https://gitlab.com/g/sub/proj").key, "gitlab.com/g/sub/proj");

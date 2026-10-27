@@ -134,7 +134,8 @@ export default function todosExtension(pi: ExtensionAPI): void {
 			if (outcome.failed) throw new Error(outcome.summary);
 			if (!outcome.readOnly) {
 				setPhases(outcome.phases);
-				// appendEntry is a no-op without a session file, so only persist then.
+				// appendEntry still records in memory without a session file; only
+				// the snapshot is durable when a session file exists.
 				if (outcome.storage === "session") {
 					pi.appendEntry(TODO_SNAPSHOT_CUSTOM_TYPE, { phases: outcome.phases });
 				}
@@ -188,12 +189,6 @@ export default function todosExtension(pi: ExtensionAPI): void {
 		}
 	});
 
-	// Tracker-injected guidance (completion reminders, mid-run nudges) is
-	// only valid for the turn that consumes it; before every LLM call strip
-	// any such message a later real message superseded, so resumed/continued
-	// sessions never make the model answer an ancient "incomplete todos"
-	// reminder (it lives on in the session file; only the outgoing copy is
-	// filtered).
 	pi.on("context", async (event) => {
 		const pruned = pruneSupersededTrackerMessages(event.messages);
 		if (pruned.length === event.messages.length) return undefined;

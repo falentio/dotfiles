@@ -182,7 +182,6 @@ export class ScoutRegistry {
 			},
 			clearInterval: (handle) => clearInterval(handle as ReturnType<typeof setInterval>),
 		};
-		// An hour window must not mean an hour of slop: sweep at most every five minutes.
 		const sweepMs = options.sweepMs ?? Math.max(1_000, Math.min(300_000, Math.floor(this.idleMs / 3)));
 		this.sweep = this.timers.setInterval(() => this.sweepIdle(), sweepMs);
 	}
@@ -264,7 +263,6 @@ export class ScoutRegistry {
 	private async entryFor(key: string, request: ScoutRequest, signal?: AbortSignal): Promise<{ entry: Entry }> {
 		const existing = this.entries.get(key);
 		if (existing) {
-			// Re-insert so Map iteration order tracks recency.
 			this.entries.delete(key);
 			this.entries.set(key, existing);
 			return { entry: existing };
@@ -286,7 +284,6 @@ export class ScoutRegistry {
 		try {
 			const { dir, display, warning } = await this.options.checkout({ repo: request.repo, ref: request.ref });
 			const warnings: string[] = warning ? [warning] : [];
-			// A tree another live conversation reads must not move under it. Its opener refreshed it.
 			if (!this.owners.has(dir)) {
 				try {
 					await this.options.refresh(dir, request.ref);
@@ -304,7 +301,6 @@ export class ScoutRegistry {
 				conversation.dispose();
 				throw new Error("scout registry is closed");
 			}
-			// pi names the file it creates; remember what it wrote so a reopen continues that file.
 			const written = conversation.sessionFile();
 			if (written) await this.remember(key, written);
 			const entry: Entry = {
@@ -331,7 +327,6 @@ export class ScoutRegistry {
 			this.log.info(`scout: opened session for ${key} at ${dir}`);
 			return entry;
 		} finally {
-			// Opening failed or the registry closed: hand the tree back to the next process.
 			if (!handedOver) await release();
 		}
 	}
@@ -382,7 +377,6 @@ export class ScoutRegistry {
 			this.settle(entry);
 			return;
 		}
-		// Read freshness after a rebind: a rebind replays the transcript, so it is no longer new.
 		const fresh = entry.conversation.fresh();
 		let timer: ReturnType<typeof setTimeout> | undefined;
 		try {
@@ -430,11 +424,9 @@ export class ScoutRegistry {
 			model: waiter.model,
 			thinkingLevel: waiter.thinkingLevel,
 		});
-		// Open before disposing the old one: a failed open must leave the entry usable.
 		try {
 			entry.conversation.dispose();
 		} catch {
-			// The old conversation is being replaced either way.
 		}
 		entry.conversation = conversation;
 		entry.model = waiter.model;

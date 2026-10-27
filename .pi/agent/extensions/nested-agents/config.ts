@@ -29,7 +29,6 @@ export const CONTEXT_FILE_CANDIDATES = [
  */
 const PRUNE_GROUPS = {
 	vcs: [".git", ".hg", ".svn"],
-	// Package managers and vendored dependencies.
 	dependencies: [
 		"node_modules",
 		"bower_components",
@@ -41,18 +40,13 @@ const PRUNE_GROUPS = {
 		"Carthage",
 		".bundle",
 	],
-	// Generic build output.
 	build: ["dist", "build", "out", "obj", "coverage", ".nyc_output"],
-	// Rust (Cargo).
 	rust: ["target"],
 	haskell: ["dist-newstyle", ".stack-work"],
 	// Go. Go dependencies live in the module cache, not the repo, so only vendor applies (above).
 	go: [],
-	// Elixir and Erlang.
 	elixir: ["_build", "deps", "cover", ".elixir_ls"],
-	// Zig.
 	zig: ["zig-out", ".zig-cache"],
-	// Python.
 	python: [
 		"__pycache__",
 		".venv",
@@ -64,39 +58,24 @@ const PRUNE_GROUPS = {
 		".ruff_cache",
 		"htmlcov",
 	],
-	// JVM, Android, and Gradle.
 	jvm: [".gradle", "build"],
-	// Apple platforms.
 	apple: ["DerivedData", ".swiftpm", "build"],
-	// Dart and Flutter.
 	dart: [".dart_tool", ".pub-cache"],
-	// Next.js.
 	next: [".next", ".vercel", ".turbo", ".swc"],
-	// Nuxt and Nitro.
 	nuxt: [".nuxt", ".output", ".nitro", ".data"],
-	// SvelteKit.
 	sveltekit: [".svelte-kit"],
-	// Astro.
 	astro: [".astro"],
-	// Angular.
 	angular: [".angular"],
-	// Nx and Turborepo.
 	nx: [".nx"],
 	// Vite, Parcel, and the shared bundler caches.
 	bundlers: [".vite", ".parcel-cache", ".cache"],
 	// Remix, React Router, and other Vite SSR frameworks.
 	remix: [".cache"],
-	// Expo and React Native.
 	reactNative: [".expo"],
-	// Storybook.
 	storybook: ["storybook-static"],
-	// Umi and Dumi.
 	umi: [".umi", ".dumi"],
-	// Docusaurus.
 	docusaurus: [".docusaurus"],
-	// Deno Fresh.
 	fresh: ["_fresh"],
-	// SolidStart.
 	solid: [".vinxi"],
 	// Static site generators: Jekyll, Eleventy, Hugo, VitePress.
 	ssg: ["_site", ".jekyll-cache"],
@@ -113,7 +92,6 @@ const PRUNE_GROUPS = {
 	],
 	// Qwik, Stencil, Redwood, Blitz.
 	otherFrameworks: [".qwik", ".stencil", ".redwood", ".blitz"],
-	// Infrastructure as code.
 	terraform: [".terraform", ".terragrunt-cache"],
 } as const;
 

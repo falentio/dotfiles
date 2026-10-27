@@ -1,8 +1,3 @@
-/**
- * TodoTracker behavior: eager prelude, mid-run nudges, completion reminders,
- * and the awaiting-user heuristic. Ported from omp's todo-tracker semantics.
- */
-
 import { describe, expect, it } from "bun:test";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { AssistantMessage, TextContent } from "@earendil-works/pi-ai";
@@ -35,8 +30,6 @@ function makeTracker(overrides: {
 	activeTools?: string[];
 	pending?: boolean;
 }) {
-	// Mirrors the production wiring: the host owns the single canonical copy
-	// and the tracker reads/writes it through the host interface.
 	let phases: TodoPhase[] = [];
 	const host = {
 		config: () => ({ ...TODO_CONFIG, ...overrides.config }),
@@ -164,7 +157,6 @@ describe("takeMidRunNudge", () => {
 		const nudge = tracker.takeMidRunNudge(makeContext());
 		expect(nudge?.customType).toBe(MID_RUN_NUDGE_MESSAGE_TYPE);
 		expect(nudge?.content).toContain("1 todo item still open");
-		// Budget: a second nudge needs another 12 mutations.
 		expect(tracker.takeMidRunNudge(makeContext())).toBeNull();
 		for (let i = 0; i < 12; i++) tracker.onToolResult("write", false);
 		expect(tracker.takeMidRunNudge(makeContext())).not.toBeNull();
@@ -262,7 +254,6 @@ describe("checkCompletion", () => {
 		expect(reminder).toContain("- Work");
 		expect(reminder).toContain("  - a");
 		expect(reminder).toContain("  - b");
-		// blocked tasks are excluded from the reminder list
 		expect(reminder).not.toContain("  - c");
 		expect(reminder).toContain("(Reminder 1/3)");
 	});
@@ -283,7 +274,6 @@ describe("checkCompletion", () => {
 				assistantMessage("Stopped again."),
 			),
 		).toBeNull();
-		// Progress (any tool result) re-arms the reminder.
 		tracker.onToolResult("edit", false);
 		expect(
 			await tracker.checkCompletion(
@@ -301,9 +291,6 @@ describe("checkCompletion", () => {
 		expect(
 			await tracker.checkCompletion(makeContext(), assistantMessage("Stop.")),
 		).not.toBeNull();
-		// resetCycle runs on every before_agent_start. If it re-armed the
-		// awaiting-progress flag, each continuation would reset the budget and
-		// the reminder would loop. It must stay silent until a tool result.
 		for (let i = 0; i < 5; i++) {
 			tracker.resetCycle();
 			expect(
@@ -356,9 +343,6 @@ describe("checkCompletion", () => {
 	});
 
 	it("reads live host state, so reminders track external mutations", async () => {
-		// The tracker must not keep its own snapshot: completing a task outside
-		// the tracker (the todo tool writes the host copy) silences the
-		// reminder, and creating a task arms it.
 		const { tracker, setHostPhases } = makeTracker({
 			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
 		});
@@ -413,7 +397,6 @@ describe("checkCompletion", () => {
 				assistantMessage("API blew up.", "error"),
 			),
 		).toBeNull();
-		// A clean stop still reminds.
 		expect(
 			await tracker.checkCompletion(
 				makeContext(),

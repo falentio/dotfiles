@@ -53,16 +53,10 @@ export function formatSummary(
 			lines.push(`  - ${task.content} [${task.status}] (${task.phase})`);
 		}
 	}
-	// Closed = completed + abandoned, mirroring the per-phase `done` count.
 	const closedAll = tasks.filter(
 		(task) => task.status === "completed" || task.status === "abandoned",
 	).length;
 	const blockedAll = tasks.filter((task) => task.status === "blocked").length;
-	// The active phase is the EARLIEST one still holding open work, so the
-	// in-progress pointer can sit in a phase whose successors already have
-	// completed tasks. Detect that "worked ahead" case to explain the
-	// otherwise-surprising backward pointer instead of letting it read as a
-	// completed task reverting to pending.
 	const workedAhead = phases.some(
 		(phase, idx) =>
 			idx > currentIdx &&

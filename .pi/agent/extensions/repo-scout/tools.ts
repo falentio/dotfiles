@@ -54,7 +54,6 @@ export const identifyRepo = async (repo: string, cwd: string): Promise<RepoIdent
 	if (!trimmed) throw new Error('repo is empty');
 	const candidate = isAbsolute(trimmed) ? trimmed : resolve(cwd, trimmed);
 	if (existsSync(join(candidate, '.git'))) {
-		// A local checkout is known by its origin, so a worktree matches its remote's session.
 		return localRepoIdentity(candidate, await originOf(candidate));
 	}
 	return parseRemoteRepo(trimmed);
@@ -105,7 +104,6 @@ export const buildRegistry = (deps: {
 }): BuiltRegistry => {
 	const root = deps.stateRoot;
 	const adapter = createAgentAdapter({ getSource: deps.source, sessionsDir: sessionsDir(root) });
-	// The lock is keyed exactly like the conversation, so a ref gets its own lock and its own tree.
 	const lockDirFor = (request: { repo: RepoIdentity; ref?: string }): string =>
 		join(locksDir(root), digestKey(conversationKey(request)) + '.lock');
 	return {
@@ -201,7 +199,6 @@ export async function runPackageRepo(
 	const version = input.version?.trim() || undefined;
 
 	const result = await resolvePackage({ package: name, source, version });
-	// Only a stated repository is offered as a target; a guess is information, not a destination.
 	const target = cloneTarget(result);
 	const lines = [
 		'package  ' + result.package,
