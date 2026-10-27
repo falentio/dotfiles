@@ -1,8 +1,9 @@
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createJiti } from "jiti/static";
-import { VERIFY_LOG_KEY, emptyVerifyLog } from "./mock-provider.ts";
+import { findPiInstall, piAliases } from "../../../test-support/pi-install.mjs";
+import { FAUX_API, FAUX_MODEL, FAUX_PROVIDER, VERIFY_LOG_KEY, emptyVerifyLog } from "../faux-provider.ts";
 import {
 	createAgentSession,
 	ModelRuntime,
@@ -27,16 +28,16 @@ export interface Result {
 
 const HERE = import.meta.dir;
 const SOURCE = join(HERE, "..");
-const PROBE = join(HERE, "mock-provider.ts");
-const API = "bgc-mock-api";
+const PROBE = join(SOURCE, "faux-provider.ts");
+const FAUX_MESSAGE = join(SOURCE, "..", "..", "test-support", "faux-message.ts");
 
 function modelFor(contextWindow: number) {
 	return {
-		id: "mock-model",
-		name: "Mock model",
-		api: API,
-		provider: "bgc-mock",
-		baseUrl: "http://127.0.0.1/mock",
+		id: FAUX_MODEL,
+		name: "Faux model",
+		api: FAUX_API,
+		provider: FAUX_PROVIDER,
+		baseUrl: "http://127.0.0.1/faux",
 		reasoning: false,
 		input: ["text"] as const,
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -53,7 +54,11 @@ export interface RestartResult {
 
 function prepareAgentDir(agentDir: string, scenario: Scenario): void {
 	mkdirSync(join(agentDir, "extensions"), { recursive: true });
-	copyFileSync(PROBE, join(agentDir, "extensions", "mock-provider.ts"));
+	// The provider imports the shared message helpers by a path relative to its
+	// real home, so the temp tree needs that file at the same relative place.
+	mkdirSync(join(agentDir, "test-support"), { recursive: true });
+	copyFileSync(FAUX_MESSAGE, join(agentDir, "test-support", "faux-message.ts"));
+	copyFileSync(PROBE, join(agentDir, "extensions", "faux-provider.ts"));
 	if (scenario.extension !== "background-compaction") return;
 	const extensionDir = join(agentDir, "extensions", "background-compaction");
 	mkdirSync(extensionDir, { recursive: true });
@@ -82,15 +87,15 @@ export async function runTwice(scenario: Scenario): Promise<RestartResult> {
 		authPath: join(agentDir, "auth.json"),
 		modelsPath: join(agentDir, "models.json"),
 	});
-	modelRuntime.registerProvider("bgc-mock", {
-		name: "Mock",
-		baseUrl: "http://127.0.0.1/mock",
+	modelRuntime.registerProvider(FAUX_PROVIDER, {
+		name: "Faux",
+		baseUrl: "http://127.0.0.1/faux",
 		apiKey: "test-key",
-		api: API,
+		api: FAUX_API,
 		models: [
 			{
-				id: "mock-model",
-				name: "Mock",
+				id: FAUX_MODEL,
+				name: "Faux",
 				reasoning: false,
 				input: ["text"],
 				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -100,7 +105,7 @@ export async function runTwice(scenario: Scenario): Promise<RestartResult> {
 		],
 	});
 
-	await loadMockProvider(PROBE);
+	await loadFauxProvider(PROBE);
 	const sessionFile = join(cwd, "session.jsonl");
 	const first = await driveOne(scenario, { cwd, agentDir, modelRuntime, sessionFile, create: true, forcedTurns: 0 });
 	const reopened = first.sessionFile;
@@ -195,15 +200,15 @@ export async function run(scenario: Scenario): Promise<Result> {
 			join(agentDir, "models.json"),
 			JSON.stringify({
 				providers: {
-					"bgc-mock": {
-						name: "Mock",
-						baseUrl: "http://127.0.0.1/mock",
+					[FAUX_PROVIDER]: {
+						name: "Faux",
+						baseUrl: "http://127.0.0.1/faux",
 						apiKey: "test-key",
-						api: API,
+						api: FAUX_API,
 						models: [
 							{
-								id: "mock-model",
-								name: "Mock",
+								id: FAUX_MODEL,
+								name: "Faux",
 								reasoning: false,
 								input: ["text"],
 								cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -216,15 +221,15 @@ export async function run(scenario: Scenario): Promise<Result> {
 			}),
 		);
 	}
-	modelRuntime.registerProvider("bgc-mock", {
-		name: "Mock",
-		baseUrl: "http://127.0.0.1/mock",
+	modelRuntime.registerProvider(FAUX_PROVIDER, {
+		name: "Faux",
+		baseUrl: "http://127.0.0.1/faux",
 		apiKey: "test-key",
-		api: API,
+		api: FAUX_API,
 		models: [
 			{
-				id: "mock-model",
-				name: "Mock",
+				id: FAUX_MODEL,
+				name: "Faux",
 				reasoning: false,
 				input: ["text"],
 				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -235,7 +240,7 @@ export async function run(scenario: Scenario): Promise<Result> {
 	});
 
 	(globalThis as Record<string, unknown>)[VERIFY_LOG_KEY] = emptyVerifyLog();
-	await loadMockProvider(PROBE);
+	await loadFauxProvider(PROBE);
 	const { session } = await createAgentSession({
 		cwd,
 		agentDir,
@@ -290,21 +295,13 @@ function compactions(sessionManager: SessionManager) {
 	}>;
 }
 
-const PI_ROOT = join(import.meta.dir, "..", "..", "..", "..", "..", "node_modules", "@earendil-works", "pi-coding-agent");
-const AI_ROOT = join(PI_ROOT, "node_modules", "@earendil-works", "pi-ai", "dist");
+const PI_INSTALL = findPiInstall();
 
-function piAliases(): Record<string, string> {
-	return {
-		"@earendil-works/pi-coding-agent": join(PI_ROOT, "dist", "index.js"),
-		"@earendil-works/pi-ai/compat": join(AI_ROOT, "compat.js"),
-		"@earendil-works/pi-ai": join(AI_ROOT, "compat.js"),
-		"@earendil-works/pi-agent-core": join(PI_ROOT, "node_modules", "@earendil-works", "pi-agent-core", "dist", "index.js"),
-		"@earendil-works/pi-tui": join(PI_ROOT, "node_modules", "@earendil-works", "pi-tui", "dist", "index.js"),
-	};
-}
-
-async function loadMockProvider(path: string): Promise<void> {
-	const jiti = createJiti(import.meta.url, { moduleCache: false, alias: piAliases() });
+async function loadFauxProvider(path: string): Promise<void> {
+	const jiti = createJiti(import.meta.url, {
+		moduleCache: false,
+		alias: piAliases(PI_INSTALL),
+	});
 	const factory = (await jiti.import(path, { default: true })) as (pi: unknown) => void;
 	factory({ registerTool() {}, registerProvider() {} });
 }

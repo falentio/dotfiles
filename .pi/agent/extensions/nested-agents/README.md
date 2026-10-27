@@ -15,7 +15,8 @@ load them from subdirectories. This extension fills that gap: read `packages/api
 | `logic.ts` | All rules, pure and testable. No pi imports. |
 | `logic.test.ts` | Unit tests for the rules. |
 | `handler.test.ts` | Handler tests against a fake pi. |
-| `smoke.test.ts` | Drives the real pi binary; asserts on the session transcript. |
+| `smoke.test.ts` | Drives the real pi CLI with a faux model; asserts on the session transcript. |
+| `smoke/faux-provider.ts` | The faux model: answers the read and edit calls the prompts ask for. |
 | `EVIDENCE.md` | The measurements and real-run logs behind the design. |
 
 ## Run the tests
@@ -23,12 +24,14 @@ load them from subdirectories. This extension fills that gap: read `packages/api
 ```sh
 cd ~/.pi/agent/extensions/nested-agents
 
-# Fast: 40 tests, no model calls, about a second.
-node --test logic.test.ts handler.test.ts
+# Fast: 122 tests, no model calls, about a second.
+node --test logic.test.ts handler.test.ts compaction.test.ts
 
-# Slow: 4 tests, real pi runs, about 90 seconds. Needs pi on PATH and working auth.
+# Slow: 8 tests, real pi runs with a faux model, about 10 seconds.
 node --test smoke.test.ts
 ```
+
+The smoke suite passes `-e smoke/faux-provider.ts --provider faux --model faux-1`, so it needs no auth and makes no network call. It runs the CLI of the install `test-support/pi-install.mjs` resolves, the same install the other suites link, so `PI_INSTALL` pins it and `PI_BIN` overrides the command outright.
 
 ## Behaviour
 

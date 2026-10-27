@@ -10,23 +10,26 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { planPrecompute } from "../boundary.ts";
 import {
+	FAUX_API,
+	FAUX_MODEL,
+	FAUX_PROVIDER,
 	emptyVerifyLog,
 	SUMMARY_MARKER,
 	VERIFY_LOG_KEY,
 	type VerifyLog,
 	type VerifyRequest,
-} from "./mock-provider.ts";
+} from "../faux-provider.ts";
 
 const HERE = import.meta.dir;
 const SOURCE = join(HERE, "..");
-const MOCK_MODEL_REF = "bgc-mock/mock-model";
+const FAUX_MODEL_REF = `${FAUX_PROVIDER}/${FAUX_MODEL}`;
 
-const mockModel = {
-	id: "mock-model",
-	name: "Mock model",
-	api: "bgc-mock-api",
-	provider: "bgc-mock",
-	baseUrl: "http://127.0.0.1/mock",
+const fauxModel = {
+	id: FAUX_MODEL,
+	name: "Faux model",
+	api: FAUX_API,
+	provider: FAUX_PROVIDER,
+	baseUrl: "http://127.0.0.1/faux",
 	reasoning: false,
 	input: ["text"] as Array<"text" | "image">,
 	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -62,7 +65,9 @@ async function openSession(scenario: Scenario = {}): Promise<OpenSession> {
 	for (const file of ["index.ts", "config.ts", "boundary.ts", "state.ts", "package.json"]) {
 		await writeFile(join(extensionDir, file), await readFile(join(SOURCE, file), "utf8"));
 	}
-	await writeFile(join(agentDir, "extensions", "mock-provider.ts"), await readFile(join(HERE, "mock-provider.ts"), "utf8"));
+	await mkdir(join(agentDir, "test-support"), { recursive: true });
+	await writeFile(join(agentDir, "test-support", "faux-message.ts"), await readFile(join(SOURCE, "..", "..", "test-support", "faux-message.ts"), "utf8"));
+	await writeFile(join(agentDir, "extensions", "faux-provider.ts"), await readFile(join(SOURCE, "faux-provider.ts"), "utf8"));
 
 	const enabled = scenario.enabled ?? true;
 	const compactWhenReady = scenario.compactWhenReady ?? true;
@@ -82,7 +87,7 @@ async function openSession(scenario: Scenario = {}): Promise<OpenSession> {
 		cwd,
 		agentDir,
 		sessionManager: SessionManager.inMemory(cwd),
-		model: mockModel,
+		model: fauxModel,
 		thinkingLevel: "off",
 		tools: ["bloat"],
 	});
@@ -126,6 +131,10 @@ async function waitUntil<T>(read: () => T | undefined, timeoutMs = 8_000): Promi
 
 function summaryRequests(log: VerifyLog): VerifyRequest[] {
 	return log.requests.filter((request) => request.summary);
+}
+
+function waitForSummaryEnd(request: VerifyRequest): Promise<VerifyRequest> {
+	return waitUntil(() => (request.endedSeq === undefined ? undefined : request), 5_000);
 }
 
 function lastCompaction(session: OpenSession["session"]): CompactionEntry | undefined {
@@ -194,7 +203,7 @@ describe("one real session", () => {
 		async () => {
 			const open = await openSession();
 			const request = await driveToSummary(open);
-			const plan = planPrecompute(open.session.sessionManager.getBranch(), 20_000, MOCK_MODEL_REF);
+			const plan = planPrecompute(open.session.sessionManager.getBranch(), 20_000, FAUX_MODEL_REF);
 			expect(plan).toBeDefined();
 
 			const start = await waitUntil(() => compactionStart(open.log), 5_000);
@@ -210,6 +219,7 @@ describe("one real session", () => {
 			const lastPrompt = [...open.log.events].reverse().find((event) => event.kind === "prompt");
 			expect(lastPrompt?.seq).toBeLessThan(start.seq);
 
+			const keptPrompt = open.log.requests.filter((item) => !item.summary).at(-1)?.lastUserText;
 			markPrompt(open.log, "after compaction simple");
 			await open.session.prompt("after compaction simple");
 			await open.session.waitForIdle();
@@ -217,8 +227,10 @@ describe("one real session", () => {
 				() => open.log.requests.find((item) => !item.summary && item.lastUserText.includes("after compaction simple")),
 				2_000,
 			);
-			expect(next.texts[0]).toContain(SUMMARY_MARKER);
-			expect(next.texts.slice(1).some((text) => text.includes("done turn 3"))).toBe(true);
+			const summaryAt = next.texts.findIndex((text) => text.includes(SUMMARY_MARKER));
+			const keptAt = next.texts.findIndex((text) => text.includes(`done ${keptPrompt}`));
+			expect(summaryAt).toBeGreaterThanOrEqual(0);
+			expect(keptAt).toBeGreaterThan(summaryAt);
 		},
 		20_000,
 	);
@@ -227,10 +239,11 @@ describe("one real session", () => {
 		"keeps the summary ready without compacting when compactWhenReady is false",
 		async () => {
 			const open = await openSession({ compactWhenReady: false });
-			await driveToSummary(open);
-			const plan = planPrecompute(open.session.sessionManager.getBranch(), 20_000, MOCK_MODEL_REF);
+			const request = await driveToSummary(open);
+			const plan = planPrecompute(open.session.sessionManager.getBranch(), 20_000, FAUX_MODEL_REF);
 			expect(plan).toBeDefined();
 			expect(lastCompaction(open.session)).toBeUndefined();
+			await waitForSummaryEnd(request);
 
 			const entry = await driveWithMediumTurns(open, 4);
 			expect(entry.fromHook).toBe(true);
@@ -261,7 +274,7 @@ describe("one real session", () => {
 		async () => {
 			const open = await openSession();
 			await driveToSummary(open);
-			const plan = planPrecompute(open.session.sessionManager.getBranch(), 20_000, MOCK_MODEL_REF);
+			const plan = planPrecompute(open.session.sessionManager.getBranch(), 20_000, FAUX_MODEL_REF);
 			expect(plan).toBeDefined();
 
 			await open.session.prompt("slow simple turn");
@@ -291,7 +304,7 @@ describe("one real session", () => {
 		async () => {
 			const open = await openSession({ keepRecentTokens: 1_000, tailMin: 1_000 });
 			await driveToSummary(open);
-			const plan = planPrecompute(open.session.sessionManager.getBranch(), 1_000, MOCK_MODEL_REF);
+			const plan = planPrecompute(open.session.sessionManager.getBranch(), 1_000, FAUX_MODEL_REF);
 			expect(plan).toBeDefined();
 
 			markPrompt(open.log, "medium turn");

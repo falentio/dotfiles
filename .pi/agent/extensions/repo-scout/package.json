@@ -8,8 +8,8 @@
     ]
   },
   "scripts": {
-    "test": "node --import ./test/register.mjs --test test/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "test": "bun ../../test-support/link-pi.mjs && node --import ./test/register.mjs --test test/*.test.ts",
+    "typecheck": "bun ../../test-support/link-pi.mjs && tsc --noEmit"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",

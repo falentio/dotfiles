@@ -4,9 +4,11 @@ import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { piCommand } from "../../test-support/pi-install.mjs";
 
 const EXT_DIR = path.dirname(new URL(import.meta.url).pathname);
-const PI = process.env.PI_BIN ?? "pi";
+const FAUX_PROVIDER = path.join(EXT_DIR, "smoke", "faux-provider.ts");
+const PI = piCommand();
 
 let repo: string;
 let sessions: string;
@@ -17,20 +19,24 @@ function write(rel: string, body: string): void {
 	fs.writeFileSync(abs, body);
 }
 
-function runPi(sessionId: string, prompt: string, extraArgs: string[] = []): string {
+function runPi(sessionId: string, prompt: string, tools = "read"): string {
 	return execFileSync(
-		PI,
+		PI[0],
 		[
+			...PI.slice(1),
 			"-p",
 			"--no-mcp",
 			"--no-skills",
 			"--no-context-files",
+			"-e", FAUX_PROVIDER,
+			"--provider", "faux",
+			"--model", "faux-1",
+			"--tools", tools,
 			"--session-dir", sessions,
 			"--session-id", sessionId,
-			...extraArgs,
 			prompt,
 		],
-		{ cwd: repo, encoding: "utf-8", timeout: 240_000, stdio: ["ignore", "pipe", "pipe"] },
+		{ cwd: repo, encoding: "utf-8", timeout: 60_000, stdio: ["ignore", "pipe", "pipe"] },
 	);
 }
 
@@ -80,7 +86,7 @@ after(() => {
 	fs.rmSync(sessions, { recursive: true, force: true });
 });
 
-describe("smoke: live extension against real pi", () => {
+describe("smoke: live extension against real pi, faux model", () => {
 	test("loads by discovery and injects the governing chain on read", () => {
 		const output = runPi("smoke1", "Read packages/api/handler.ts. Then say DONE.");
 		const marks = markers("smoke1");
@@ -129,7 +135,7 @@ describe("smoke: live extension against real pi", () => {
 		runPi(
 			"smoke5",
 			"Use the edit tool on packages/api/handler.ts to replace the exact string \`return 1\` with \`return 5\`. Do not read the file first. Then say DONE.",
-			["--tools", "edit"],
+			"edit",
 		);
 		const marks = markers("smoke5");
 		assert.equal(marks.length, 2, "edit injected the governing chain");

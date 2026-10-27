@@ -93,8 +93,12 @@ function turn(text: string): SessionEntry[] {
 	return [user(`${text} question`), assistant(`${text} answer`)];
 }
 
+function link(entries: SessionEntry[]): SessionEntry[] {
+	return entries.map((entry, index) => ({ ...entry, parentId: index === 0 ? null : entries[index - 1]!.id }));
+}
+
 function fixture(name: string, entries: SessionEntry[], keepRecentTokens: number): Fixture {
-	return { name, entries, keepRecentTokens };
+	return { name, entries: link(entries), keepRecentTokens };
 }
 
 interface Fixture {

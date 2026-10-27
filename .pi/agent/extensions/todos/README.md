@@ -64,26 +64,14 @@ No JSON file, environment variable, or CLI flag is read.
 ## Develop
 
 pi provides `typebox`, `typebox/value`, and the `@earendil-works` packages at
-runtime, so the extension runs with no install. For `bun test` and `tsc`, link
-them into a local `node_modules`. `tsc` also needs Bun's type declarations
-because `tsconfig.json` sets `"types": ["bun"]`:
+runtime, so the extension runs with no install. For `bun test` and `tsc`, the
+shared linker symlinks the current pi install into `node_modules`. Both scripts
+run it first:
 
 ```sh
-PI=/home/kevin/.vite-plus/packages/@earendil-works/pi-coding-agent/fb5a591f-7d9d-49a5-9091-269ee178f46f/lib/node_modules/@earendil-works/pi-coding-agent
-NESTED=$PI/node_modules
-mkdir -p node_modules/@earendil-works node_modules/@types
-ln -s $NESTED/typebox node_modules/typebox
-ln -s $NESTED/@earendil-works/pi-ai node_modules/@earendil-works/pi-ai
-ln -s $PI node_modules/@earendil-works/pi-coding-agent
-ln -s /path/to/@types/bun node_modules/@types/bun
+bun run test        # links pi, then 113 tests
+bun run typecheck
 ```
 
-Replace the last path with a local `@types/bun` (Bun's own install ships one
-under its `node_modules/@types/bun`).
-
-Then run the checks:
-
-```sh
-bun test          # 113 tests
-tsc --noEmit
-```
+The linker is `test-support/pi-install.mjs`. It finds the newest install under
+`~/.vite-plus`, or uses `PI_INSTALL`, so it survives a pi update.
