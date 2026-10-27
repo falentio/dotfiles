@@ -4,11 +4,11 @@ import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { piCommand } from "../../test-support/pi-install.mjs";
 
 const EXT_DIR = path.dirname(new URL(import.meta.url).pathname);
 const FAUX_PROVIDER = path.join(EXT_DIR, "smoke", "faux-provider.ts");
-const VITE_PLUS_PI = path.join(os.homedir(), ".vite-plus", "bin", "pi");
-const PI = process.env.PI_BIN ?? (fs.existsSync(VITE_PLUS_PI) ? VITE_PLUS_PI : "pi");
+const PI = piCommand();
 
 let repo: string;
 let sessions: string;
@@ -21,8 +21,9 @@ function write(rel: string, body: string): void {
 
 function runPi(sessionId: string, prompt: string, tools = "read"): string {
 	return execFileSync(
-		PI,
+		PI[0],
 		[
+			...PI.slice(1),
 			"-p",
 			"--no-mcp",
 			"--no-skills",

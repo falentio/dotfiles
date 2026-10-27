@@ -31,7 +31,7 @@ node --test logic.test.ts handler.test.ts compaction.test.ts
 node --test smoke.test.ts
 ```
 
-The smoke suite passes `-e smoke/faux-provider.ts --provider faux --model faux-1`, so it needs no auth and makes no network call. `PI_BIN` overrides the pi binary. Without it the suite uses `~/.vite-plus/bin/pi` when that exists, then falls back to `pi` on PATH.
+The smoke suite passes `-e smoke/faux-provider.ts --provider faux --model faux-1`, so it needs no auth and makes no network call. It runs the CLI of the install `test-support/pi-install.mjs` resolves, the same install the other suites link, so `PI_INSTALL` pins it and `PI_BIN` overrides the command outright.
 
 ## Behaviour
 

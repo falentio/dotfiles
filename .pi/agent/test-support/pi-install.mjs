@@ -43,6 +43,13 @@ export function findPiInstall() {
 	throw new Error("Cannot find @earendil-works/pi-coding-agent. Set PI_INSTALL to its package directory.");
 }
 
+// One answer to "which pi": the install findPiInstall resolves, run by node.
+// PI_BIN overrides the command outright.
+export function piCommand(root) {
+	if (process.env.PI_BIN) return [process.env.PI_BIN];
+	return [process.execPath, join(root ?? findPiInstall(), "dist", "bundle", "cli.js")];
+}
+
 export function piAliases(root = findPiInstall()) {
 	const ai = join(root, "node_modules", "@earendil-works", "pi-ai", "dist");
 	return {
