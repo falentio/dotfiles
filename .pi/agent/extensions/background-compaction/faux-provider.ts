@@ -36,9 +36,9 @@ export function emptyVerifyLog(): VerifyLog {
 }
 
 function currentLog(): VerifyLog {
-	const global = globalThis as Record<string, unknown>;
-	if (!global[VERIFY_LOG_KEY]) global[VERIFY_LOG_KEY] = emptyVerifyLog();
-	return global[VERIFY_LOG_KEY] as VerifyLog;
+	const store = globalThis as Record<string, unknown>;
+	if (!store[VERIFY_LOG_KEY]) store[VERIFY_LOG_KEY] = emptyVerifyLog();
+	return store[VERIFY_LOG_KEY] as VerifyLog;
 }
 
 // pi asks for the history summary with <conversation>, and for a split turn
