@@ -44,6 +44,13 @@ export interface BackgroundCompactionDeps {
 	readonly summarize: Summarize;
 }
 
+// pi reports a cleared header as null; generateSummaryWithUsage takes strings.
+function summaryHeaders(headers: Record<string, string | null> | undefined): Record<string, string> | undefined {
+	return headers
+		? Object.fromEntries(Object.entries(headers).filter((entry): entry is [string, string] => entry[1] !== null))
+		: undefined;
+}
+
 const defaultSummarize: Summarize = (request) =>
 	generateSummaryWithUsage(
 		[...request.messages],
@@ -150,7 +157,7 @@ function install(
 				model: ctx.model,
 				reserveTokens: config.reserveTokens,
 				apiKey: auth.apiKey,
-				headers: auth.headers,
+				headers: summaryHeaders(auth.headers),
 				signal: abort.signal,
 				customInstructions: undefined,
 				previousSummary: plan.previousSummary,

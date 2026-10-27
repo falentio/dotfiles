@@ -161,7 +161,17 @@ export default function mockProvider(pi: ExtensionAPI): void {
 		baseUrl: "http://127.0.0.1/mock",
 		apiKey: "test-key",
 		api: FAUX_API,
-		models: [{ id: FAUX_MODEL, name: "Mock model", contextWindow: 200_000, maxTokens: 4_096 }],
+		models: [
+			{
+				id: FAUX_MODEL,
+				name: "Mock model",
+				reasoning: false,
+				input: ["text"],
+				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+				contextWindow: 200_000,
+				maxTokens: 4_096,
+			},
+		],
 	});
 
 	pi.registerTool({
