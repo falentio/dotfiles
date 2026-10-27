@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, mkdirSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, unlinkSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 
@@ -12,15 +12,14 @@ function newest(paths) {
 }
 
 function relink(link, source) {
-	// A dangling symlink from an older install throws here; remove it and relink.
-	try {
-		if (realpathSync(link) === realpathSync(source)) return;
-	} catch {}
+	if (existsSync(link) && realpathSync(link) === realpathSync(source)) return;
 	try {
 		const stat = lstatSync(link);
 		if (stat.isDirectory() && !stat.isSymbolicLink()) rmSync(link, { recursive: true, force: true });
 		else unlinkSync(link);
-	} catch {}
+	} catch (error) {
+		if (error.code !== "ENOENT") throw error;
+	}
 	symlinkSync(source, link, "dir");
 }
 
@@ -55,10 +54,6 @@ export function piAliases(root = findPiInstall()) {
 	};
 }
 
-// A tsconfig asks for bun's globals with types: ["bun"], which reads
-// @types/bun. The cache keeps that package outside the target, and its
-// bun-types reference resolves from its own directory, so the project gets the
-// linked bun-types plus a one-line @types/bun that points at it.
 function bunTypesDir() {
 	const cache = join(homedir(), ".bun", "install", "cache");
 	if (!existsSync(cache)) return undefined;
@@ -73,14 +68,7 @@ function bunTypesDir() {
 
 function linkBunTypes(modules) {
 	const source = bunTypesDir();
-	if (!source) return;
-	relink(join(modules, "bun-types"), source);
-	const types = join(modules, "@types", "bun");
-	try {
-		if (lstatSync(types).isSymbolicLink()) unlinkSync(types);
-	} catch {}
-	mkdirSync(types, { recursive: true });
-	writeFileSync(join(types, "index.d.ts"), '/// <reference types="bun-types" />\n');
+	if (source) relink(join(modules, "bun-types"), source);
 }
 
 export function linkPiInstall(target) {
