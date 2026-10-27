@@ -2,7 +2,7 @@
 
 Version 1.2, freeze candidate. On approval this becomes the implementation contract. After that, anything marked FROZEN needs a version bump and an update to the tests that name it.
 
-Changes in 1.2, found in review of the 1.1 draft: §4.2 returns undefined when the branch ends with a compaction entry, as `prepareCompaction` does; §10.1 gains that fixture.
+Changes in 1.2, found in review of the 1.1 draft: §4.2 returns undefined when the branch ends with a compaction entry, as `prepareCompaction` does; §9 states the force guard §4.4 already requires; §10.1 gains that fixture.
 
 Changes in 1.1, found while implementing: `Limits` carries `enabled` and `compactWhenReady`; boundary planning skips compaction entries and zero-message entries; `/precompute` reports through `ui.notify` because command handlers return void; the state stays `ready` while `ctx.compact()` runs, and only an extension-issued compaction flips it to `compacting`.
 
@@ -317,7 +317,7 @@ FROZEN strings.
 Command `/precompute`:
 
 - No argument: reports one paragraph with state, `tokens`, gate, ceiling, `keepEntryId` (first 8 characters), tail tokens, and `failures`, through `ctx.ui.notify`.
-- `force`: when idle and a plan exists, starts a summary even below the gate. Does nothing otherwise.
+- `force`: when idle, a user message follows the latest compaction entry, and a plan exists, starts a summary even below the gate. Does nothing otherwise.
 - Command handlers return void in pi, so the command reports through `ui.notify` and writes no status.
 
 ## 10. Test contract

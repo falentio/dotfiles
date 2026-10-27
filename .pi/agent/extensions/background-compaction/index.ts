@@ -286,16 +286,18 @@ function install(
 		description: "Report or force the background compaction precompute",
 		handler: async (args, ctx) => {
 			const trimmed = args.trim();
+			const branch = ctx.sessionManager.getBranch();
 			const canForce =
 				trimmed === "force" &&
 				config.enabled &&
 				ctx.isIdle() &&
 				!ctx.hasPendingMessages() &&
+				userMessageAfterCompaction(branch) &&
 				(state.precompute.status === "idle" || state.precompute.status === "failed");
 
 			if (canForce && ctx.model) {
 				const plan = planPrecompute(
-					ctx.sessionManager.getBranch(),
+					branch,
 					policy.keepRecentTokens,
 					modelRefOf(ctx.model) ?? "",
 				);

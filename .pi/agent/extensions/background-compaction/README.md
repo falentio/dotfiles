@@ -43,4 +43,4 @@ When a summary is dropped, pi's threshold compaction takes over with a fresh cut
 
 ## Command
 
-`/precompute` reports the state, tokens, gate, ceiling, keep entry, tail tokens, and failure count. `/precompute force` starts a summary below the gate when the agent is idle.
+`/precompute` reports the state, tokens, gate, ceiling, keep entry, tail tokens, and failure count. `/precompute force` starts a summary below the gate when the agent is idle and a user message follows the latest compaction.
