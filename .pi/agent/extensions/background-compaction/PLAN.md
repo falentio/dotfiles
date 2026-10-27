@@ -143,13 +143,13 @@ Files: `index.ts`.
 
 Events: `session_start` (reset, restore later), `agent_settled` (`advance()`), `session_before_compact` (judge and hand over), `session_compact` (clear, record the leaf), `model_select` (invalidate), `session_shutdown` (abort). `advance()` calls `ctx.compact()` through `setTimeout(0)` with an idle recheck. Status strings are frozen in [SPEC.md](./SPEC.md) section 9. One command, `/precompute`, reports state and can force a run when idle.
 
-Check: `discoverAndLoadExtensions` clean, typecheck, and a live session compacts with no prompt after the summary completes. `verify/session.test.ts` drives that live session through `createAgentSession` and a fake provider, and asserts the timing. The status line's TUI rendering stays unverified; the PR body records it as an open gap.
+Check: `discoverAndLoadExtensions` clean, typecheck, and a live session compacts with no prompt after the summary completes. `verify/session.test.ts` drives that live session through `createAgentSession` and a faux provider, and asserts the timing. The status line's TUI rendering stays unverified; the PR body records it as an open gap.
 
 ### Phase 5. Integration harness
 
-Files: `mock-provider.ts`, `verify/session.test.ts`.
+Files: `faux-provider.ts`, `verify/session.test.ts`.
 
-A fake provider extension registers a pi-ai faux provider and scripts three things: an assistant message that calls a `bloat` tool, a tool result with a large payload, and the summary reply. The test creates a temp `agentDir` with both extensions, opens `createAgentSession({ sessionManager: SessionManager.inMemory(), resourceLoader })`, drives prompts until the gate trips, then waits.
+A faux-provider extension registers a pi-ai faux provider and scripts three things: an assistant message that calls a `bloat` tool, a tool result with a large payload, and the summary reply. The test creates a temp `agentDir` with both extensions, opens `createAgentSession({ sessionManager: SessionManager.inMemory(), resourceLoader })`, drives prompts until the gate trips, then waits.
 
 Assertions:
 

@@ -18,18 +18,18 @@ import {
 	VERIFY_LOG_KEY,
 	type VerifyLog,
 	type VerifyRequest,
-} from "../mock-provider.ts";
+} from "../faux-provider.ts";
 
 const HERE = import.meta.dir;
 const SOURCE = join(HERE, "..");
-const MOCK_MODEL_REF = `${FAUX_PROVIDER}/${FAUX_MODEL}`;
+const FAUX_MODEL_REF = `${FAUX_PROVIDER}/${FAUX_MODEL}`;
 
-const mockModel = {
+const fauxModel = {
 	id: FAUX_MODEL,
-	name: "Mock model",
+	name: "Faux model",
 	api: FAUX_API,
 	provider: FAUX_PROVIDER,
-	baseUrl: "http://127.0.0.1/mock",
+	baseUrl: "http://127.0.0.1/faux",
 	reasoning: false,
 	input: ["text"] as Array<"text" | "image">,
 	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -65,7 +65,7 @@ async function openSession(scenario: Scenario = {}): Promise<OpenSession> {
 	for (const file of ["index.ts", "config.ts", "boundary.ts", "state.ts", "package.json"]) {
 		await writeFile(join(extensionDir, file), await readFile(join(SOURCE, file), "utf8"));
 	}
-	await writeFile(join(agentDir, "extensions", "mock-provider.ts"), await readFile(join(SOURCE, "mock-provider.ts"), "utf8"));
+	await writeFile(join(agentDir, "extensions", "faux-provider.ts"), await readFile(join(SOURCE, "faux-provider.ts"), "utf8"));
 
 	const enabled = scenario.enabled ?? true;
 	const compactWhenReady = scenario.compactWhenReady ?? true;
@@ -85,7 +85,7 @@ async function openSession(scenario: Scenario = {}): Promise<OpenSession> {
 		cwd,
 		agentDir,
 		sessionManager: SessionManager.inMemory(cwd),
-		model: mockModel,
+		model: fauxModel,
 		thinkingLevel: "off",
 		tools: ["bloat"],
 	});
@@ -201,7 +201,7 @@ describe("one real session", () => {
 		async () => {
 			const open = await openSession();
 			const request = await driveToSummary(open);
-			const plan = planPrecompute(open.session.sessionManager.getBranch(), 20_000, MOCK_MODEL_REF);
+			const plan = planPrecompute(open.session.sessionManager.getBranch(), 20_000, FAUX_MODEL_REF);
 			expect(plan).toBeDefined();
 
 			const start = await waitUntil(() => compactionStart(open.log), 5_000);
@@ -236,7 +236,7 @@ describe("one real session", () => {
 		async () => {
 			const open = await openSession({ compactWhenReady: false });
 			const request = await driveToSummary(open);
-			const plan = planPrecompute(open.session.sessionManager.getBranch(), 20_000, MOCK_MODEL_REF);
+			const plan = planPrecompute(open.session.sessionManager.getBranch(), 20_000, FAUX_MODEL_REF);
 			expect(plan).toBeDefined();
 			expect(lastCompaction(open.session)).toBeUndefined();
 			await waitForSummaryEnd(request);
@@ -270,7 +270,7 @@ describe("one real session", () => {
 		async () => {
 			const open = await openSession();
 			await driveToSummary(open);
-			const plan = planPrecompute(open.session.sessionManager.getBranch(), 20_000, MOCK_MODEL_REF);
+			const plan = planPrecompute(open.session.sessionManager.getBranch(), 20_000, FAUX_MODEL_REF);
 			expect(plan).toBeDefined();
 
 			await open.session.prompt("slow simple turn");
@@ -300,7 +300,7 @@ describe("one real session", () => {
 		async () => {
 			const open = await openSession({ keepRecentTokens: 1_000, tailMin: 1_000 });
 			await driveToSummary(open);
-			const plan = planPrecompute(open.session.sessionManager.getBranch(), 1_000, MOCK_MODEL_REF);
+			const plan = planPrecompute(open.session.sessionManager.getBranch(), 1_000, FAUX_MODEL_REF);
 			expect(plan).toBeDefined();
 
 			markPrompt(open.log, "medium turn");

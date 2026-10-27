@@ -1,6 +1,6 @@
 # Smoke suite
 
-Four scenarios through a real `createAgentSession`, each on its own temp `agentDir`. `run.ts` copies the extension and the shared `mock-provider.ts` into that directory, loads the fake provider, then drives the session until it compacts.
+Four scenarios through a real `createAgentSession`, each on its own temp `agentDir`. `run.ts` copies the extension and the shared `faux-provider.ts` into that directory, loads the faux provider, then drives the session until it compacts.
 
 Run it with:
 
@@ -8,7 +8,7 @@ Run it with:
 bun run test smoke
 ```
 
-`bun run test` first links the current pi install into `node_modules`, then runs `bun --no-install test`. The script passes `--no-install` so Bun cannot fetch a second copy of `@earendil-works/pi-ai`, where the fake provider would register into an instance pi never reads.
+`bun run test` first links the current pi install into `node_modules`, then runs `bun --no-install test`. The script passes `--no-install` so Bun cannot fetch a second copy of `@earendil-works/pi-ai`, where the faux provider would register into an instance pi never reads.
 
 The provider is pi-ai's own double: `registerFauxProvider` from `@earendil-works/pi-ai`. The response factory records each request, calls the test-only `bloat` tool, and answers summaries with `SUMMARY_MARKER`. It also strips the prompt-cache session id, because faux counts `cacheWrite` inside `input` and the double-count would move every compaction threshold.
 
@@ -23,7 +23,7 @@ The provider is pi-ai's own double: `registerFauxProvider` from `@earendil-works
 
 ## Why the harness masks pi-ai
 
-`loadMockProvider` registers pi's own module paths as jiti aliases, the same map pi's loader builds. Pi loads extensions through jiti with those aliases, so an extension that imports `@earendil-works/pi-ai/compat` reaches the same registry pi holds. Load the provider any other way and it registers into a second copy of the package, where `registerApiProvider` succeeds and every request still fails with "No API provider registered".
+`loadFauxProvider` registers pi's own module paths as jiti aliases, the same map pi's loader builds. Pi loads extensions through jiti with those aliases, so an extension that imports `@earendil-works/pi-ai/compat` reaches the same registry pi holds. Load the provider any other way and it registers into a second copy of the package, where `registerApiProvider` succeeds and every request still fails with "No API provider registered".
 
 The linker is `test-support/pi-install.mjs`. It finds the newest install under `~/.vite-plus` (or takes `PI_INSTALL`) and symlinks it into `node_modules`. It runs before `bun test` because Bun resolves a test file's imports before any preload, so a `bunfig.toml` preload is too late. The session the test creates and the provider the extension registers then share one copy.
 

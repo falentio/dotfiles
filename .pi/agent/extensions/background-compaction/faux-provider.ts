@@ -4,9 +4,9 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 export const VERIFY_LOG_KEY = "__backgroundCompactionVerifyLog";
 
-export const FAUX_API = "bgc-mock-api";
-export const FAUX_PROVIDER = "bgc-mock";
-export const FAUX_MODEL = "mock-model";
+export const FAUX_API = "bgc-faux-api";
+export const FAUX_PROVIDER = "bgc-faux";
+export const FAUX_MODEL = "faux-1";
 export const SUMMARY_MARKER = "SUMMARY-MARKER";
 export const BLOAT_CHARS = 240_000;
 export const SUMMARY_DELAY_MS = 300;
@@ -133,11 +133,11 @@ const respond = async (context: { systemPrompt?: string; messages: Array<{ role:
 	return message([toolCall("bloat", { chars })], "toolUse");
 };
 
-export default function mockProvider(pi: ExtensionAPI): void {
+export default function fauxProvider(pi: ExtensionAPI): void {
 	const faux = registerFauxProvider({
 		api: FAUX_API,
 		provider: FAUX_PROVIDER,
-		models: [{ id: FAUX_MODEL, name: "Mock model", contextWindow: 200_000, maxTokens: 4_096 }],
+		models: [{ id: FAUX_MODEL, name: "Faux model", contextWindow: 200_000, maxTokens: 4_096 }],
 	});
 	faux.setResponses(Array.from({ length: 64 }, () => respond));
 	// Faux counts cacheWrite inside input as well, so a cached prompt inflates
@@ -157,14 +157,14 @@ export default function mockProvider(pi: ExtensionAPI): void {
 	}
 
 	pi.registerProvider(FAUX_PROVIDER, {
-		name: "Background compaction mock",
-		baseUrl: "http://127.0.0.1/mock",
+		name: "Background compaction faux",
+		baseUrl: "http://127.0.0.1/faux",
 		apiKey: "test-key",
 		api: FAUX_API,
 		models: [
 			{
 				id: FAUX_MODEL,
-				name: "Mock model",
+				name: "Faux model",
 				reasoning: false,
 				input: ["text"],
 				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },

@@ -175,7 +175,7 @@ npm test          # 126 tests: parsers and every source, registry queue/lock/abo
 npm run typecheck
 ```
 
-The pipeline test runs a real `AgentSession` on a fake provider (`@earendil-works/pi-ai/providers/faux`),
+The pipeline test runs a real `AgentSession` on a faux provider (`@earendil-works/pi-ai/providers/faux`),
 so it proves open → continue → evict → reopen with no credentials and no network. `test/register.mjs`
 resolves pi's package names for the test run, the way the extension loader does.
 

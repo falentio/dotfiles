@@ -86,7 +86,7 @@ after(() => {
 	fs.rmSync(sessions, { recursive: true, force: true });
 });
 
-describe("smoke: live extension against real pi, fake model", () => {
+describe("smoke: live extension against real pi, faux model", () => {
 	test("loads by discovery and injects the governing chain on read", () => {
 		const output = runPi("smoke1", "Read packages/api/handler.ts. Then say DONE.");
 		const marks = markers("smoke1");

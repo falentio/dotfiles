@@ -12,7 +12,7 @@ The linker refuses to delete a real directory where a link belongs: it stops and
 
 `link-pi.mjs` runs the linker for `background-compaction`, `repo-scout`, `todos`, and `test-support` itself, and every suite that imports pi in-process calls it from its `test` and `typecheck` scripts. The `nested-agents` suites need no link: they drive the real `pi` CLI in its own process. Run `bun test` directly only after one link; Bun resolves a test file's imports before any preload, so a `bunfig.toml` preload is too late on a clean checkout.
 
-## Suites on the fake model
+## Suites on the faux model
 
 | Suite | Command | Result | Time |
 | --- | --- | --- | --- |

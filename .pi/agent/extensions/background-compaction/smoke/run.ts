@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createJiti } from "jiti/static";
 import { findPiInstall, piAliases } from "../../../test-support/pi-install.mjs";
-import { FAUX_API, FAUX_MODEL, FAUX_PROVIDER, VERIFY_LOG_KEY, emptyVerifyLog } from "../mock-provider.ts";
+import { FAUX_API, FAUX_MODEL, FAUX_PROVIDER, VERIFY_LOG_KEY, emptyVerifyLog } from "../faux-provider.ts";
 import {
 	createAgentSession,
 	ModelRuntime,
@@ -28,15 +28,15 @@ export interface Result {
 
 const HERE = import.meta.dir;
 const SOURCE = join(HERE, "..");
-const PROBE = join(SOURCE, "mock-provider.ts");
+const PROBE = join(SOURCE, "faux-provider.ts");
 
 function modelFor(contextWindow: number) {
 	return {
 		id: FAUX_MODEL,
-		name: "Mock model",
+		name: "Faux model",
 		api: FAUX_API,
 		provider: FAUX_PROVIDER,
-		baseUrl: "http://127.0.0.1/mock",
+		baseUrl: "http://127.0.0.1/faux",
 		reasoning: false,
 		input: ["text"] as const,
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -53,7 +53,7 @@ export interface RestartResult {
 
 function prepareAgentDir(agentDir: string, scenario: Scenario): void {
 	mkdirSync(join(agentDir, "extensions"), { recursive: true });
-	copyFileSync(PROBE, join(agentDir, "extensions", "mock-provider.ts"));
+	copyFileSync(PROBE, join(agentDir, "extensions", "faux-provider.ts"));
 	if (scenario.extension !== "background-compaction") return;
 	const extensionDir = join(agentDir, "extensions", "background-compaction");
 	mkdirSync(extensionDir, { recursive: true });
@@ -83,14 +83,14 @@ export async function runTwice(scenario: Scenario): Promise<RestartResult> {
 		modelsPath: join(agentDir, "models.json"),
 	});
 	modelRuntime.registerProvider(FAUX_PROVIDER, {
-		name: "Mock",
-		baseUrl: "http://127.0.0.1/mock",
+		name: "Faux",
+		baseUrl: "http://127.0.0.1/faux",
 		apiKey: "test-key",
 		api: FAUX_API,
 		models: [
 			{
 				id: FAUX_MODEL,
-				name: "Mock",
+				name: "Faux",
 				reasoning: false,
 				input: ["text"],
 				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -100,7 +100,7 @@ export async function runTwice(scenario: Scenario): Promise<RestartResult> {
 		],
 	});
 
-	await loadMockProvider(PROBE);
+	await loadFauxProvider(PROBE);
 	const sessionFile = join(cwd, "session.jsonl");
 	const first = await driveOne(scenario, { cwd, agentDir, modelRuntime, sessionFile, create: true, forcedTurns: 0 });
 	const reopened = first.sessionFile;
@@ -196,14 +196,14 @@ export async function run(scenario: Scenario): Promise<Result> {
 			JSON.stringify({
 				providers: {
 					[FAUX_PROVIDER]: {
-						name: "Mock",
-						baseUrl: "http://127.0.0.1/mock",
+						name: "Faux",
+						baseUrl: "http://127.0.0.1/faux",
 						apiKey: "test-key",
 						api: FAUX_API,
 						models: [
 							{
 								id: FAUX_MODEL,
-								name: "Mock",
+								name: "Faux",
 								reasoning: false,
 								input: ["text"],
 								cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -217,14 +217,14 @@ export async function run(scenario: Scenario): Promise<Result> {
 		);
 	}
 	modelRuntime.registerProvider(FAUX_PROVIDER, {
-		name: "Mock",
-		baseUrl: "http://127.0.0.1/mock",
+		name: "Faux",
+		baseUrl: "http://127.0.0.1/faux",
 		apiKey: "test-key",
 		api: FAUX_API,
 		models: [
 			{
 				id: FAUX_MODEL,
-				name: "Mock",
+				name: "Faux",
 				reasoning: false,
 				input: ["text"],
 				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -235,7 +235,7 @@ export async function run(scenario: Scenario): Promise<Result> {
 	});
 
 	(globalThis as Record<string, unknown>)[VERIFY_LOG_KEY] = emptyVerifyLog();
-	await loadMockProvider(PROBE);
+	await loadFauxProvider(PROBE);
 	const { session } = await createAgentSession({
 		cwd,
 		agentDir,
@@ -292,7 +292,7 @@ function compactions(sessionManager: SessionManager) {
 
 const PI_INSTALL = findPiInstall();
 
-async function loadMockProvider(path: string): Promise<void> {
+async function loadFauxProvider(path: string): Promise<void> {
 	const jiti = createJiti(import.meta.url, {
 		moduleCache: false,
 		alias: piAliases(PI_INSTALL) as Record<string, string>,
