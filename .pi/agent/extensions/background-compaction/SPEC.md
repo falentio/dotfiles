@@ -1,6 +1,8 @@
 # Background compaction: frozen specification
 
-Version 1, freeze candidate. On approval this becomes the implementation contract. After that, anything marked FROZEN needs a version bump and an update to the tests that name it.
+Version 1.1, freeze candidate. On approval this becomes the implementation contract. After that, anything marked FROZEN needs a version bump and an update to the tests that name it.
+
+Changes in 1.1, found while implementing: `Limits` carries `enabled` and `compactWhenReady`; boundary planning skips compaction entries and zero-message entries; `/precompute` reports through `ui.notify` because command handlers return void; the state stays `ready` while `ctx.compact()` runs, and only an extension-issued compaction flips it to `compacting`.
 
 Companion documents: [PLAN.md](./PLAN.md) for the investigation, the flow, and the build order.
 
@@ -83,8 +85,8 @@ FROZEN. `planPrecompute` mirrors pi's `prepareCompaction`:
 2. Find the last `compaction` entry. If one exists, `boundaryStart` is the index of its `firstKeptEntryId`; when that id is absent from the branch, `boundaryStart` is the index after the compaction entry. Otherwise `boundaryStart = 0`.
 3. `cut = findCutPoint(entries, boundaryStart, entries.length, keepRecentTokens)`.
 4. `keepEntryId = entries[cut.firstKeptEntryIndex].id`.
-5. `messages` is the concatenation of `sessionEntryToContextMessages(entries[i])` for `i` in `[boundaryStart, cut.firstKeptEntryIndex)`.
-6. `coveredEntryIds` is `entries[i].id` for the same range.
+5. `messages` is the concatenation of `sessionEntryToContextMessages(entries[i])` for `i` in `[boundaryStart, cut.firstKeptEntryIndex)`, skipping compaction entries.
+6. `coveredEntryIds` holds the id of every entry that contributed messages, in order. Entries that project to no messages, and compaction entries, are skipped.
 7. `previousSummary` is the last compaction entry's `summary`, or undefined.
 8. Return undefined when `messages` is empty or `keepEntryId` is missing.
 
@@ -119,6 +121,7 @@ FROZEN.
 - `advance()` runs on `agent_settled` and after a summary settles.
 - `advance()` returns `compact` only when the agent is idle, no messages are pending, `compactWhenReady` is true, and the judge returns `use`.
 - `ctx.compact()` is called from a `setTimeout(0)` callback. The callback re-checks `ctx.isIdle()` and `hasPendingMessages()` before issuing the call.
+- The state stays `ready` while `ctx.compact()` runs. The hook flips it to `compacting` only when the extension issued the call, so a foreign compaction that fails leaves the summary reusable.
 - A summary that completes while the agent is running stays `ready`. The next `agent_settled` acts on it.
 - After a compaction completes, no new summary starts until a user message exists after the latest compaction entry.
 
@@ -194,9 +197,9 @@ Event transitions, all side effects owned by `index.ts`:
 | summary rejected, not aborted | `running` | `failures++`, `lastFailedKeepId = plan.keepEntryId`, `failed`; if under budget the next `advance()` may retry |
 | summary rejected, aborted | any | ignore |
 | auth or configuration failure | `running` | `failures = maxFailures`, `failed`; no retry until a compaction resets the counters |
-| deferred compact callback | `ready` | idle and no pending → `compacting` and `ctx.compact()`; otherwise stay `ready` |
-| `ctx.compact()` error | `compacting` | `failures++`, `failed` |
-| `session_before_compact` | `ready` | judge; `use` → return the compaction; skip → return nothing |
+| deferred compact callback | `ready` | idle and no pending → `ctx.compact()` while staying `ready`; otherwise stay `ready` |
+| `ctx.compact()` error | `ready` | `failures++`, `failed` |
+| `session_before_compact` | `ready` | judge; `use` → return the compaction and, when the extension issued the call, move to `compacting`; skip → return nothing |
 | `session_compact` | any | abort any controller, reset to `idle`, `failures = 0`, `lastFailedKeepId = null` |
 | `model_select` | `running` or `ready` | abort, reset to `idle` |
 | `session_shutdown` | any | abort any controller, reset to `idle` |
@@ -251,6 +254,8 @@ export function advance(state: SessionState, snapshot: Snapshot, limits: Limits)
 
 // config.ts
 export interface Limits {
+  readonly enabled: boolean;
+  readonly compactWhenReady: boolean;
   readonly reserveTokens: number;
   readonly keepRecentTokens: number;
   readonly compactAtRatio: number;
@@ -308,9 +313,9 @@ FROZEN strings.
 
 Command `/precompute`:
 
-- No argument: returns one paragraph with state, `tokens`, gate, ceiling, `keepEntryId` (first 8 characters), tail tokens, and `failures`.
+- No argument: reports one paragraph with state, `tokens`, gate, ceiling, `keepEntryId` (first 8 characters), tail tokens, and `failures`, through `ctx.ui.notify`.
 - `force`: when idle and a plan exists, starts a summary even below the gate. Does nothing otherwise.
-- The handler returns a string and does not write status.
+- Command handlers return void in pi, so the command reports through `ui.notify` and writes no status.
 
 ## 10. Test contract
 
