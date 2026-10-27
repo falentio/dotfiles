@@ -11,7 +11,7 @@
  *   and pi's example extensions use — branching/rewinding always shows the
  *   correct todo state). The tool is `model-only`, so a codemode script cannot
  *   wrap the call and drop the record.
- * - **Eager prelude** (`todo.eager: "preferred" | "always"`): on the first
+ * - **Eager prelude** (`TODO_CONFIG.eager: "preferred" | "always"`): on the first
  *   turn, a hidden reminder asks the model to lay out a phased plan with a
  *   single `init` call before working. pi's extension API cannot force a
  *   `tool_choice`, so `"always"` injects a MUST-call reminder instead.
@@ -25,11 +25,11 @@
  * - **Completion reminder**: when the agent stops with incomplete todos and
  *   isn't waiting on the user, `agent_before_settle` appends a hidden message
  *   and continues the turn once, up to the reminder budget
- *   (`todo.reminders`, `todo.remindersMax`).
+ *   (`TODO_CONFIG.reminders`, `TODO_CONFIG.remindersMax`).
  *
- * Config lives in `<agent dir>/todo.json` (global) and `<cwd>/.pi/todo.json`
- * (project, trusted only): `enabled`, `reminders`, `remindersMax`, `eager`.
- * CLI flags take precedence over environment variables and JSON config.
+ * Settings live in `config.ts` as `TODO_CONFIG`: `enabled`, `reminders`,
+ * `remindersMax`, `eager`. No JSON file, environment variable, or CLI flag is
+ * read.
  *
  * @module todos
  */
@@ -44,12 +44,7 @@ import {
 	type ExtensionAPI,
 	type ExtensionToolContext,
 } from "@earendil-works/pi-coding-agent";
-import {
-	resolveTodoConfig,
-	TODO_CONFIG_DEFAULTS,
-	TODO_FLAGS,
-	type TodoConfig,
-} from "./config.ts";
+import { TODO_CONFIG } from "./config.ts";
 import { executeTodoOp } from "./execute.ts";
 import {
 	TODO_REMINDER_CUSTOM_TYPE,
@@ -71,29 +66,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export default function todosExtension(pi: ExtensionAPI): void {
-	pi.registerFlag(TODO_FLAGS.enabled, {
-		type: "string",
-		description:
-			"Enable or disable the todos tool (on|off). Overrides PI_TODO_ENABLED and todo.json.",
-	});
-	pi.registerFlag(TODO_FLAGS.reminders, {
-		type: "string",
-		description:
-			"Enable or disable incomplete-todo reminders (on|off). Overrides PI_TODO_REMINDERS and todo.json.",
-	});
-	pi.registerFlag(TODO_FLAGS.remindersMax, {
-		type: "string",
-		description:
-			"Maximum incomplete-todo reminders per cycle. Overrides PI_TODO_REMINDERS_MAX and todo.json.",
-	});
-	pi.registerFlag(TODO_FLAGS.eager, {
-		type: "string",
-		description:
-			"Todo eager mode (default|preferred|always). Overrides PI_TODO_EAGER and todo.json.",
-	});
-
 	let phases: TodoPhase[] = [];
-	let config: TodoConfig = TODO_CONFIG_DEFAULTS;
 	let lastAssistant: AssistantMessage | undefined;
 
 	function getPhases(): TodoPhase[] {
@@ -105,7 +78,7 @@ export default function todosExtension(pi: ExtensionAPI): void {
 	}
 
 	const tracker = new TodoTracker({
-		config: () => config,
+		config: () => TODO_CONFIG,
 		getPhases,
 		setPhases: (next: TodoPhase[]) => setPhases(next),
 		getBranch: (ctx) => ctx.sessionManager.getBranch(),
@@ -161,7 +134,8 @@ export default function todosExtension(pi: ExtensionAPI): void {
 			if (outcome.failed) throw new Error(outcome.summary);
 			if (!outcome.readOnly) {
 				setPhases(outcome.phases);
-				// appendEntry is a no-op without a session file, so only persist then.
+				// appendEntry still records in memory without a session file; only
+				// the snapshot is durable when a session file exists.
 				if (outcome.storage === "session") {
 					pi.appendEntry(TODO_SNAPSHOT_CUSTOM_TYPE, { phases: outcome.phases });
 				}
@@ -184,17 +158,7 @@ export default function todosExtension(pi: ExtensionAPI): void {
 	pi.registerTool(todoTool);
 
 	pi.on("session_start", async (_event, ctx) => {
-		const loaded = resolveTodoConfig(
-			ctx.cwd,
-			() => ctx.isProjectTrusted(),
-			(message) => {
-				if (ctx.hasUI) ctx.ui.notify(message, "warning");
-				else console.error(message);
-			},
-			(name) => pi.getFlag(name),
-		);
-		config = loaded.config;
-		if (!config.enabled) {
+		if (!TODO_CONFIG.enabled) {
 			const active = pi.getActiveTools();
 			if (active.includes("todo")) {
 				pi.setActiveTools(active.filter((name) => name !== "todo"));
@@ -225,12 +189,6 @@ export default function todosExtension(pi: ExtensionAPI): void {
 		}
 	});
 
-	// Tracker-injected guidance (completion reminders, mid-run nudges) is
-	// only valid for the turn that consumes it; before every LLM call strip
-	// any such message a later real message superseded, so resumed/continued
-	// sessions never make the model answer an ancient "incomplete todos"
-	// reminder (it lives on in the session file; only the outgoing copy is
-	// filtered).
 	pi.on("context", async (event) => {
 		const pruned = pruneSupersededTrackerMessages(event.messages);
 		if (pruned.length === event.messages.length) return undefined;

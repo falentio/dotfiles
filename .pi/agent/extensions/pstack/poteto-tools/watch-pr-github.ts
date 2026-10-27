@@ -1,4 +1,10 @@
 import { spawn } from "node:child_process";
+import {
+  BUGBOT_AUTHOR_TOKENS,
+  BUGBOT_BODY_TOKENS,
+  BUGBOT_CURSOR_AUTHOR,
+  CODE_REVIEW_GATE_NAME,
+} from "../config.ts";
 import type * as T from "./watch-pr-types.ts";
 import { nonEmpty, parsePrNumber } from "./watch-pr-types.ts";
 export const REVIEW_THREADS_QUERY =
@@ -261,11 +267,11 @@ function pendingOrGate(
   },
   reportedState: string
 ): T.Check {
-  return details.name === "Code Review Gate"
+  return details.name === CODE_REVIEW_GATE_NAME
     ? {
         ...details,
         kind: "code-review-gate",
-        name: "Code Review Gate",
+        name: CODE_REVIEW_GATE_NAME,
         reportedState,
       }
     : { ...details, kind: "pending", reportedState };
@@ -335,15 +341,9 @@ function isBugbot(comment: T.ReviewComment | null): boolean {
   const author = (comment.authorLogin ?? "").toLowerCase();
   const body = comment.body.toLowerCase();
   return (
-    author.includes("bugbot") ||
-    (author === "cursor" &&
-      [
-        "bugbot",
-        "cursor_automation_id",
-        "agentic security review",
-        "description start",
-        "severity",
-      ].some((token) => body.includes(token)))
+    BUGBOT_AUTHOR_TOKENS.some((token) => author.includes(token)) ||
+    (author === BUGBOT_CURSOR_AUTHOR &&
+      BUGBOT_BODY_TOKENS.some((token) => body.includes(token)))
   );
 }
 function passKey(comment: T.ReviewComment | null): string | null {

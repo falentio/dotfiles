@@ -1,8 +1,3 @@
-/**
- * Ported from Oh My Pi's `packages/coding-agent/test/tools/todo.test.ts`
- * (state-semantics subset, adapted to the pi extension's pure functions).
- */
-
 import { describe, expect, it } from "bun:test";
 import {
 	getCompletionTransitions,
@@ -12,7 +7,6 @@ import {
 import { executeTodoOp } from "../execute.ts";
 import type { TodoParams, TodoPhase } from "../types.ts";
 
-/** Run an op against a growing in-memory state, like the tool's execute. */
 function makeTool(initialPhases: TodoPhase[] = []) {
 	let phases = initialPhases;
 	return {
@@ -144,7 +138,6 @@ describe("TodoTool operations", () => {
 		const bTask = blocked.phases[0]?.tasks.find((task) => task.content === "b");
 		expect(bTask?.status).toBe("blocked");
 		expect(bTask?.blocker).toBe("waiting on sign-off");
-		// `a` stays the only open item; `b` leaves the remaining/open set but is surfaced as blocked.
 		expect(summaryText(blocked)).toContain("Remaining items (1):");
 		expect(summaryText(blocked)).toContain("1 blocked");
 
@@ -162,7 +155,6 @@ describe("TodoTool operations", () => {
 
 		const result = tool.run({ op: "block", task: "only" });
 
-		// `only` was in_progress; blocking it leaves no pending/in_progress, so normalization must not revive it.
 		expect(result.phases[0]?.tasks[0]?.status).toBe("blocked");
 	});
 
@@ -180,20 +172,16 @@ describe("TodoTool operations", () => {
 		const tasks = result.phases[0]?.tasks ?? [];
 		const byContent = (content: string) =>
 			tasks.find((task) => task.content === content);
-		// Completed/abandoned work is untouched; only the open task becomes blocked.
 		expect(byContent("a")?.status).toBe("completed");
 		expect(byContent("c")?.status).toBe("abandoned");
 		expect(byContent("b")?.status).toBe("blocked");
 		expect(byContent("b")?.blocker).toBe("waiting on infra");
-		// A completed task must never carry a blocker note.
 		expect(byContent("a")?.blocker).toBeUndefined();
 	});
 
 	it("re-blocking an already-blocked task refines its blocker note", () => {
 		const tool = makeTool();
 		tool.run({ op: "init", list: [{ phase: "Work", items: ["a", "b"] }] });
-		// First block with no reason, then block again to add one — the agent often
-		// learns what it's waiting on only after the initial block.
 		tool.run({ op: "block", task: "b" });
 		const first = tool.run({ op: "block", task: "b" });
 		expect(
@@ -219,7 +207,6 @@ describe("TodoTool operations", () => {
 		expect(summaryText(result)).toContain(
 			"block requires a task or phase target",
 		);
-		// Nothing was blocked — state is unchanged.
 		const tasks = result.phases[0]?.tasks ?? [];
 		expect(tasks.every((task) => task.status !== "blocked")).toBe(true);
 	});
@@ -234,14 +221,12 @@ describe("TodoTool operations", () => {
 		expect(summaryText(result)).toContain(
 			"unblock requires a task or phase target",
 		);
-		// The blocked task stays blocked — the targetless unblock was rejected.
 		expect(result.phases[0]?.tasks[0]?.status).toBe("blocked");
 	});
 
 	it("normalizes a multi-line blocker reason so the summary stays one line", () => {
 		const tool = makeTool();
 		tool.run({ op: "init", list: [{ phase: "Work", items: ["a"] }] });
-		// A blocker reason lifted from a multi-line external error or user question.
 		const blocked = tool.run({
 			op: "block",
 			task: "a",
@@ -250,8 +235,6 @@ describe("TodoTool operations", () => {
 		const stored = blocked.phases[0]?.tasks.find(
 			(task) => task.content === "a",
 		);
-		// Normalized at the source: whitespace runs (incl. newlines) collapse to
-		// single spaces, so every one-line consumer stays intact.
 		expect(stored?.blocker).toBe("waiting on user: line two indented three");
 	});
 
@@ -336,7 +319,6 @@ describe("TodoTool operations", () => {
 
 		const tasks = result.phases[0]?.tasks ?? [];
 		expect(tasks.map((task) => task.status)).toEqual(["pending", "pending"]);
-		// A read never normalizes or writes state back.
 		expect(tool.phases[0]?.tasks.map((task) => task.status)).toEqual([
 			"pending",
 			"pending",
@@ -437,8 +419,6 @@ describe("lenient op recovery", () => {
 		expect(initialized.failed).toBe(false);
 		expect(initialized.op).toBe("init");
 
-		// With existing todos the same shape is ambiguous (flat init would wipe
-		// the list; append lacks a phase) and must error instead of guessing.
 		const populated = makeTool([
 			{ name: "Work", tasks: [{ content: "First", status: "pending" }] },
 		]);
@@ -456,8 +436,6 @@ describe("lenient op recovery", () => {
 });
 
 describe("empty target safety", () => {
-	// An explicitly supplied empty task/phase must error and leave state
-	// untouched — never fall through to the "omit both = everything" path.
 	const initial = [
 		{
 			name: "Work",

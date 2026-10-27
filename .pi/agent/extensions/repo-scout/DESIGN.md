@@ -60,7 +60,7 @@ Two things end a turn other than an answer:
 
 - **The caller's abort signal.** It travels from the tool through the registry into the adapter, which
   calls `session.abort()`. A call whose signal is already aborted never opens a session.
-- **A per-turn deadline** (`PI_SCOUT_TURN_MS`, default fifteen minutes). On expiry the adapter is asked
+- **A per-turn deadline** (`SCOUT_CONFIG.turnMs`, fifteen minutes). On expiry the adapter is asked
   to abort and the caller gets a timeout error. Without it, a wedged provider pinned that repo's FIFO
   for the life of the process.
 
@@ -71,7 +71,7 @@ entry, so in practice that happens on shutdown or an explicit evict.
 
 `lastUsedAt` is set when a question settles (not when it starts, so a long crawl is not evicted
 mid-run). A sweeper ticks every `min(idleMs / 3, 5 minutes)` and evicts sessions idle past `idleMs`
-(default 3_600_000, env `PI_SCOUT_IDLE_MS`). Eviction disposes the session and drops the entry.
+(`SCOUT_CONFIG.idleMs`, 3_600_000). Eviction disposes the session and drops the entry.
 
 Prompt cache survives eviction because the conversation is **persisted**: the session manager writes
 into `~/.pi/scout/sessions/` (a directory of its own, so pi's session listing stays clean). On the next
@@ -220,7 +220,7 @@ dependency for one mutex is not worth the install.
 
 The lock is held from before the checkout opens until the session is evicted or the process exits, not
 per question: the tree and the transcript are the shared things, and both must stay still while another
-process reads them. A second process waits up to `PI_SCOUT_LOCK_MS` and then fails naming the holder. Shutdown aborts
+process reads them. A second process waits up to `SCOUT_CONFIG.lockWaitMs` and then fails naming the holder. Shutdown aborts
 a wait in progress, so closing pi is never stuck behind another process's session. Within one process
 the lock is reentrant, counted per directory, so a second conversation on the same tree does not
 deadlock against itself.

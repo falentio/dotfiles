@@ -1,7 +1,3 @@
-/**
- * Unit tests for the nested-agents extension logic.
- * Run: node --test ~/.pi/agent/extensions/nested-agents/logic.test.ts
- */
 import { test, describe, before, after } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
@@ -12,6 +8,8 @@ import {
 	ENTRY_TYPE,
 	PRUNE_DIRS,
 	TRIGGER_TOOLS,
+} from "./config.ts";
+import {
 	canonicalIdentity,
 	deliveredFromContent,
 	pathFromInput,
@@ -26,7 +24,6 @@ import {
 
 let root: string;
 
-/** Build a repo tree under the shared temp root. */
 function write(rel: string, body: string): string {
 	const abs = path.join(root, rel);
 	fs.mkdirSync(path.dirname(abs), { recursive: true });
@@ -52,7 +49,6 @@ before(() => {
 	write("claudeonly/CLAUDE.md", "CLAUDE RULES");
 	write("claudeonly/file.ts", "export const c = 1;");
 
-	// One nested context file per pruned ecosystem, plus control dirs that must NOT be pruned.
 	write("rust/proj/target/debug/AGENTS.md", "RUST TARGET");
 	write("rust/proj/src/AGENTS.md", "RUST SRC");
 	write("haskell/proj/dist-newstyle/AGENTS.md", "HASKELL DIST");
@@ -81,7 +77,6 @@ before(() => {
 	write("dart/proj/.dart_tool/AGENTS.md", "DART");
 	write("apple/proj/DerivedData/AGENTS.md", "DERIVED DATA");
 	write("vcs/proj/.git/AGENTS.md", "GIT DIR");
-	// Controls: real source directories that share a name with something generated elsewhere.
 	write("control/lib/AGENTS.md", "LIB IS SOURCE");
 	write("control/public/AGENTS.md", "PUBLIC IS SOURCE");
 	write("control/assets/AGENTS.md", "ASSETS IS SOURCE");
@@ -232,8 +227,6 @@ describe("pathFromInput", () => {
 
 describe("TRIGGER_TOOLS", () => {
 	test("includes read, write, and edit", () => {
-		// Regression: edit was excluded on the false premise that it fires an internal read. It reads
-		// through its own fs call, so editing without reading first injected nothing.
 		assert.deepEqual([...TRIGGER_TOOLS].sort(), ["edit", "read", "write"]);
 	});
 
@@ -267,7 +260,7 @@ describe("selectDeliveries", () => {
 		assert.ok(fresh[0].path.endsWith("packages/api/AGENTS.md"));
 		assert.ok(fresh[0].body.includes("EDITED"));
 
-		write("packages/api/AGENTS.md", "API RULES"); // restore for later tests
+		write("packages/api/AGENTS.md", "API RULES");
 	});
 
 	test("delivers nothing for a file with no governing context", () => {
@@ -335,7 +328,6 @@ describe("collectDelivered", () => {
 });
 
 describe("PRUNE_DIRS", () => {
-	// Each case: a context file inside a pruned subtree must yield no chain.
 	const prunedCases: Array<[string, string]> = [
 		["rust target", "rust/proj/target/debug/AGENTS.md"],
 		["haskell dist-newstyle", "haskell/proj/dist-newstyle/AGENTS.md"],
@@ -374,8 +366,6 @@ describe("PRUNE_DIRS", () => {
 		});
 	}
 
-	// A source directory that happens to share a name with a generated one elsewhere must still
-	// resolve. These are tracked source in real repos; pruning them would silently drop context.
 	const sourceCases = ["lib", "public", "assets", "static", "bin", "pkg", "docs", "scripts", "examples", "packages", ".storybook"];
 
 	for (const name of sourceCases) {
@@ -387,7 +377,6 @@ describe("PRUNE_DIRS", () => {
 	}
 
 	test("a source file next to a pruned subtree still resolves", () => {
-		// rust/proj/src is not pruned even though rust/proj/target is.
 		assert.deepEqual(governingChain(path.join(root, "rust/proj/src/AGENTS.md"), root), [
 			path.join(root, "rust/proj/src/AGENTS.md"),
 		]);
@@ -472,7 +461,6 @@ describe("collectDelivered identity and block recovery", () => {
 		const link = path.join(root, "collect/link/AGENTS.md");
 		fs.mkdirSync(path.dirname(link), { recursive: true });
 		fs.symlinkSync(real, link);
-		// A marker stored under the symlinked path must dedup against the real path.
 		const delivered = collectDelivered([
 			{ type: "custom", customType: ENTRY_TYPE, data: { path: link, id: link, hash: "h" } },
 		]);
@@ -520,8 +508,6 @@ describe("collectDelivered identity and block recovery", () => {
 
 describe("one batch never repeats an identity", () => {
 	test("a parent and child linking to the same file deliver it once", () => {
-		// Regression: selectDeliveries checked only `delivered`, not its own batch, so a chain with
-		// two entries sharing one identity emitted that file twice in a single injection.
 		const shared = write("batch/shared.md", "SHARED RULES");
 		const parent = path.join(root, "batch/pkg");
 		const child = path.join(root, "batch/pkg/sub");

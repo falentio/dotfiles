@@ -15,19 +15,14 @@
  *      results. A fresh process starts from the transcript, not from empty, and a compaction that
  *      drops a marker still leaves the block to be found.
  *
- * All rules live in ./logic.ts and are unit-tested by ./logic.test.ts. This file is the wiring.
+ * All settings live in ./config.ts, all rules in ./logic.ts, and both are unit-tested by
+ * ./logic.test.ts. This file is the wiring.
  */
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import {
-	ENTRY_TYPE,
-	TRIGGER_TOOLS,
-	collectDelivered,
-	renderInstructions,
-	selectDeliveries,
-} from "./logic.ts";
+import { ENTRY_TYPE, TRIGGER_TOOLS } from "./config.ts";
+import { collectDelivered, renderInstructions, selectDeliveries } from "./logic.ts";
 
 export default function nestedAgents(pi: ExtensionAPI) {
-	/** canonical identity -> content hash already delivered to the model */
 	let delivered = new Map<string, string>();
 
 	/**
@@ -43,8 +38,6 @@ export default function nestedAgents(pi: ExtensionAPI) {
 		rebuildFromTranscript(ctx);
 	});
 
-	// A compaction rewrites the transcript and can drop the marker entries for files whose blocks it
-	// kept, or drop both. Rebuilding afterwards re-arms anything no longer provably present.
 	pi.on("session_compact", async (_event, ctx) => {
 		rebuildFromTranscript(ctx);
 	});

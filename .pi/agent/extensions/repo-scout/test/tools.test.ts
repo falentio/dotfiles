@@ -1,8 +1,3 @@
-/**
- * The tools over real inputs: repo identification and ref keys (no network), package_repo's
- * validation and rendering (a fake resolver), and the scratch checkout (a real local git repo).
- */
-
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -13,7 +8,7 @@ import { after, describe, it } from "node:test";
 import { checkoutDir, ensureCheckout, headSha, originOf, refreshCheckout } from "../checkout.ts";
 import { localRepoIdentity } from "../repo-id.ts";
 import type { PackageRepoResult } from "../registry.ts";
-import { identifyRepo, idleMs, runPackageRepo } from "../tools.ts";
+import { identifyRepo, runPackageRepo } from "../tools.ts";
 
 const git = (cwd: string, ...args: string[]) =>
 	execFileSync("git", args, { cwd, encoding: "utf8", env: { ...process.env, GIT_AUTHOR_DATE: "2020-01-01T00:00:00Z", GIT_COMMITTER_DATE: "2020-01-01T00:00:00Z" } }).trim();
@@ -247,7 +242,6 @@ describe("ensureCheckout", () => {
 		const root = await makeRepo();
 		const scratch = await mkdtemp(join(tmpdir(), "repo-scout-scratch-"));
 		roots.push(root, scratch);
-		// An origin that cannot be fetched: if the clone went to the remote, this test fails.
 		git(root, "remote", "add", "origin", "https://github.com/example/does-not-exist.git");
 		const identity = localRepoIdentity(root, await originOf(root));
 		assert.equal(identity.key, "github.com/example/does-not-exist");
@@ -276,20 +270,5 @@ describe("ensureCheckout", () => {
 		assert.equal(await originOf(root), "https://github.com/o/n");
 		const bare = await makeRepo();
 		assert.equal(await originOf(bare), undefined);
-	});
-});
-
-describe("session timing", () => {
-	it("keeps a session for one idle hour by default", () => {
-		const saved = process.env.PI_SCOUT_IDLE_MS;
-		delete process.env.PI_SCOUT_IDLE_MS;
-		try {
-			assert.equal(idleMs(), 3_600_000);
-			process.env.PI_SCOUT_IDLE_MS = "5000";
-			assert.equal(idleMs(), 5000);
-		} finally {
-			if (saved === undefined) delete process.env.PI_SCOUT_IDLE_MS;
-			else process.env.PI_SCOUT_IDLE_MS = saved;
-		}
 	});
 });

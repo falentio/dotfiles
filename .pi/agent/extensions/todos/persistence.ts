@@ -39,8 +39,6 @@ function validPersistedPhases(value: unknown): TodoPhase[] | undefined {
 	return clonePhases(value);
 }
 
-// Validated even when empty — a deliberate `[]` clear survives as-is.
-
 /** Scan a session branch (oldest-first as returned by `getBranch()`) for the
  *  latest todo snapshot, scanning from the end backward.
  *

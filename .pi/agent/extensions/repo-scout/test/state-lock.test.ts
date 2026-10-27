@@ -1,8 +1,3 @@
-/**
- * The cross-process mutex: one holder per lock directory, waiters queue, a dead holder is stolen,
- * and a real second node process waits for this one before it proceeds.
- */
-
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -95,7 +90,6 @@ describe("acquireLock", () => {
 		const before = (await readFile(join(dir, "owner.json"), "utf8")).length;
 		await new Promise((resolve) => setTimeout(resolve, 90));
 		assert.equal((await readFile(join(dir, "owner.json"), "utf8")).length, before);
-		// A second process would still see a fresh mtime, so the lock is not stolen.
 		const mtime = (await import("node:fs/promises")).stat;
 		assert.ok((await mtime(join(dir, "owner.json"))).mtimeMs > 0);
 		await release();

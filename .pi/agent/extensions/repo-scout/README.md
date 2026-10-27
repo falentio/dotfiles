@@ -42,10 +42,10 @@ with `turn continued` instead of `turn opened`.
 
 - **One question at a time.** Further questions queue in a FIFO behind the running one. Different
   repos run in parallel. A question is rejected only when the session is evicted or the process shuts
-  down, and a turn that exceeds `PI_SCOUT_TURN_MS` (15 minutes) is aborted.
+  down, and a turn that exceeds `SCOUT_CONFIG.turnMs` (15 minutes) is aborted.
 - **One process at a time.** A lock directory per repo and ref under `locks/` is taken before the
   checkout is opened and held for the session's life. A second pi process asking about the same repo
-  and ref waits for it, up to `PI_SCOUT_LOCK_MS` (10 minutes), then fails and names the holder. The
+  and ref waits for it, up to `SCOUT_CONFIG.lockWaitMs` (10 minutes), then fails and names the holder. The
   holder proves it is alive with a heartbeat every 15s; a lock whose owner died is stolen after 45s.
   Eviction and shutdown release it.
 - **The caller can cancel.** Aborting the tool call aborts the scout's turn, or stops it waiting for
@@ -128,7 +128,7 @@ and bug trackers in `repository` too: those cannot be cloned, so they are droppe
 names the URL. The URL must be https on a public host, so package metadata cannot point git at a
 loopback, link-local, or internal name. Set `GITHUB_TOKEN` to raise the search rate limit.
 
-## State and environment
+## State
 
 | Path | Holds |
 |---|---|
@@ -137,19 +137,26 @@ loopback, link-local, or internal name. Set `GITHUB_TOKEN` to raise the search r
 | `~/.pi/scout/sessions/keys/<digest>.json` | the transcript each conversation key was written to |
 | `~/.pi/scout/locks/<digest>.lock` | the cross-process lock, one per repo and ref |
 
-| Variable | Effect |
-|---|---|
-| `PI_SCOUT_HOME` | moves both directories (tests set it) |
-| `PI_SCOUT_IDLE_MS` | idle window, default `3600000` |
-| `PI_SCOUT_TURN_MS` | one turn's ceiling, default `900000` |
-| `PI_SCOUT_LOCK_MS` | how long a second process waits for the lock, default `600000` |
-| `GITHUB_TOKEN` / `GH_TOKEN` | authenticated GitHub search in `package_repo` |
+## Configuration
+
+Settings live in `config.ts` as `SCOUT_CONFIG`:
+
+| Field | Value | Effect |
+|---|---|---|
+| `stateRoot` | `~/.pi/scout` | root of the checkouts, conversations, and locks |
+| `idleMs` | `3600000` | idle window before a conversation is evicted |
+| `turnMs` | `900000` | one turn's ceiling |
+| `lockWaitMs` | `600000` | how long a second process waits for the repo lock |
+
+`GITHUB_TOKEN` / `GH_TOKEN` are credentials for authenticated GitHub search in `package_repo`, not
+settings.
 
 ## Files
 
 | File | Role |
 |---|---|
 | `index.ts` | Wiring: registers both tools, one registry per process, passes the model and signal, disposes on shutdown. |
+| `config.ts` | Settings: the state root, idle window, turn ceiling, and lock wait. |
 | `tools.ts` | Both tools as plain functions, plus paths, identity resolution, and the report header. |
 | `scout-registry.ts` | Sessions: identity key, queue, idle clock, deadline, eviction, reopen. |
 | `state-lock.ts` | The cross-process mutex: atomic mkdir, owner pid, heartbeat, steal by rename. |
@@ -179,7 +186,7 @@ resolves pi's package names for the test run, the way the extension loader does.
 - **Cross-process means one host.** The lock checks a pid, which is only meaningful on the machine
   that wrote it; a heartbeat covers a holder on another host, but a shared state root over NFS is not
   a supported deployment.
-- **A second process waits, it does not take over.** Up to `PI_SCOUT_LOCK_MS`; after that it fails
+- **A second process waits, it does not take over.** Up to `SCOUT_CONFIG.lockWaitMs`; after that it fails
   and names the holder rather than opening a second session on the same tree.
 - **A self-hosted forge under a path prefix** (`https://host/git/owner/name`) is read as `host/git/owner`,
   because only GitLab handles nested groups.

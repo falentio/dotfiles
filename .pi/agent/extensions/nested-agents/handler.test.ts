@@ -1,17 +1,10 @@
-/**
- * Handler-level tests: drive the real default export in index.ts with a fake pi and fake ctx.
- * This covers the wiring the pure-logic tests cannot: which events are subscribed, what is
- * appended, and what is returned to the model.
- *
- * Run: node --test ~/.pi/agent/extensions/nested-agents/handler.test.ts
- */
 import { test, describe, before, after } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import nestedAgents from "./index.ts";
-import { ENTRY_TYPE } from "./logic.ts";
+import { ENTRY_TYPE } from "./config.ts";
 
 let root: string;
 
@@ -22,7 +15,6 @@ function write(rel: string, body: string): string {
 	return abs;
 }
 
-/** Minimal fake of the ExtensionAPI surface the extension uses. */
 function makePi() {
 	const handlers = new Map<string, Array<(event: any, ctx: any) => any>>();
 	const entries: Array<{ customType: string; data: unknown }> = [];
@@ -118,8 +110,6 @@ describe("extension wiring", () => {
 	});
 
 	test("edit DOES inject (the edit tool reads via fs, not the read tool)", async () => {
-		// Regression: with only the edit tool available, a model that edits without reading first got
-		// no context at all. Verified against real pi before the fix.
 		const { pi, emit, entries } = makePi();
 		nestedAgents(pi);
 		const result = await emit(
@@ -134,8 +124,6 @@ describe("extension wiring", () => {
 	});
 
 	test("a file_path alias resolves the same as path (pi's renderers accept both)", async () => {
-		// Regression: models sometimes emit the legacy file_path field. pi's own renderers read
-		// args.file_path ?? args.path, so the extension must too.
 		const { pi, emit } = makePi();
 		nestedAgents(pi);
 		const result = await emit(
@@ -207,7 +195,7 @@ describe("extension wiring", () => {
 		assert.ok(!text.includes("PACKAGES RULES"), "unchanged sibling is not re-sent");
 		assert.equal(entries.length, 3, "two initial markers plus one for the change");
 
-		write("packages/api/AGENTS.md", "API RULES"); // restore
+		write("packages/api/AGENTS.md", "API RULES");
 	});
 });
 
@@ -216,7 +204,6 @@ describe("resume via session_start", () => {
 		const { pi, emit } = makePi();
 		nestedAgents(pi);
 
-		// Simulate a resumed session: the transcript already carries the markers.
 		const prior = [
 			{ type: "custom", customType: ENTRY_TYPE, data: { path: path.join(root, "packages/AGENTS.md"), hash: "stale-a" } },
 			{ type: "custom", customType: ENTRY_TYPE, data: { path: path.join(root, "packages/api/AGENTS.md"), hash: "stale-b" } },
@@ -229,7 +216,6 @@ describe("resume via session_start", () => {
 			{ toolName: "read", input: { path: "packages/api/handler.ts" }, content: [] },
 			ctx,
 		);
-		// The recorded hashes are deliberately stale, so content changed -> both re-inject.
 		assert.ok(result);
 	});
 
@@ -272,8 +258,6 @@ describe("resume via session_start", () => {
 
 describe("never inject the same file twice", () => {
 	test("same file through two logical paths (symlink) injects once", async () => {
-		// Regression: dedup keyed on the path string, so a symlinked alias injected the same file
-		// twice. Keying on canonical identity fixes it.
 		const aliasDir = path.join(root, "symlinked");
 		const realDir = path.join(root, "realpkg");
 		fs.mkdirSync(realDir, { recursive: true });
@@ -295,13 +279,10 @@ describe("never inject the same file twice", () => {
 	});
 
 	test("a resume in a NEW process rebuilds from the transcript, not from empty", async () => {
-		// Regression: the map is process-local, so a new process started empty and re-injected.
-		// A fresh extension instance must recover state from the transcript alone.
 		const { pi: pi1, emit: emit1, entries } = makePi();
 		nestedAgents(pi1);
 		await emit1("tool_result", { toolName: "read", input: { path: "packages/api/handler.ts" }, content: [] }, makeCtx());
 
-		// Second process: a brand-new extension instance, handed the prior transcript.
 		const transcript = entries.map((e) => ({
 			type: "custom",
 			customType: e.customType,
@@ -325,7 +306,6 @@ describe("never inject the same file twice", () => {
 		const ctx = makeCtx();
 		await emit("tool_result", { toolName: "read", input: { path: "packages/api/handler.ts" }, content: [] }, ctx);
 
-		// A session_start with an EMPTY transcript means nothing is provably delivered any more.
 		const emptyCtx = makeCtx([]);
 		await emit("session_start", { type: "session_start", reason: "new" }, emptyCtx);
 		const result = await emit(
@@ -337,8 +317,6 @@ describe("never inject the same file twice", () => {
 	});
 
 	test("an injected block in a tool result counts as delivered, even with no marker", async () => {
-		// Regression for the compaction hazard: compaction can drop the marker entry while keeping
-		// the tool result that carries the block. Recovering from the block closes that gap.
 		const { pi, emit } = makePi();
 		nestedAgents(pi);
 
@@ -365,7 +343,6 @@ describe("never inject the same file twice", () => {
 			{ toolName: "read", input: { path: "packages/api/handler.ts" }, content: [] },
 			ctx,
 		);
-		// packages/AGENTS.md is not in the block, so it is still fresh; packages/api/AGENTS.md is not.
 		const text = result.content.map((c: any) => c.text).join("");
 		assert.ok(text.includes("PACKAGES RULES"), "the file with no block is still delivered");
 		assert.ok(!text.includes("API RULES"), "the file with a surviving block is not re-sent");
@@ -377,8 +354,6 @@ describe("never inject the same file twice", () => {
 		const ctx = makeCtx();
 		await emit("tool_result", { toolName: "read", input: { path: "packages/api/handler.ts" }, content: [] }, ctx);
 
-		// Compaction kept the content but dropped our markers: the transcript now carries only the
-		// tool result, with no block for these files, so both must be re-armed.
 		const compactedCtx = makeCtx([
 			{ type: "message", message: { role: "toolResult", content: [{ type: "text", text: "summary" }] } },
 		]);
@@ -391,7 +366,6 @@ describe("never inject the same file twice", () => {
 		assert.ok(result, "after a compaction that lost the record, the file is delivered again");
 	});
 	test("one tool_result never repeats an identity across the chain", async () => {
-		// Same hazard at the handler level: the injected block must contain each file once.
 		const shared = path.join(root, "h-batch/shared.md");
 		fs.mkdirSync(path.dirname(shared), { recursive: true });
 		fs.writeFileSync(shared, "SHARED BATCH RULES");

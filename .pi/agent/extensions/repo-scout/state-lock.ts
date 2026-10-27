@@ -14,13 +14,14 @@
 import { hostname } from 'node:os';
 import { mkdir, readFile, rename, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { SCOUT_CONFIG } from './config.ts';
 
 export type LockOptions = {
 	/** The lock path. Usually <stateRoot>/locks/<digest>.lock. */
 	dir: string;
 	/** What is locked, for the timeout message. */
 	label: string;
-	/** How long to wait for the holder. Default ten minutes. */
+	/** How long to wait for the holder. Defaults to `SCOUT_CONFIG.lockWaitMs`. */
 	waitMs?: number;
 	/** Poll interval while waiting. */
 	pollMs?: number;
@@ -33,7 +34,6 @@ export type ReleaseLock = () => Promise<void>;
 
 type Owner = { pid: number; host: string; at: number };
 
-const DEFAULT_WAIT_MS = 600_000;
 const DEFAULT_POLL_MS = 250;
 const DEFAULT_HEARTBEAT_MS = 15_000;
 const STALE_FACTOR = 3;
@@ -133,7 +133,7 @@ export const acquireLock = async (options: LockOptions, signal?: AbortSignal): P
 	}
 
 	await mkdir(dirname(options.dir), { recursive: true });
-	const waitMs = options.waitMs ?? DEFAULT_WAIT_MS;
+	const waitMs = options.waitMs ?? SCOUT_CONFIG.lockWaitMs;
 	const pollMs = options.pollMs ?? DEFAULT_POLL_MS;
 	const heartbeatMs = options.heartbeatMs ?? DEFAULT_HEARTBEAT_MS;
 	const started = Date.now();

@@ -162,15 +162,11 @@ const realPath = (path: string): string => {
 };
 
 export function localRepoIdentity(absPath: string, origin: string | undefined): RepoIdentity {
-	// One directory, however the caller spelled its path: a symlink and its target are one repo.
 	const source = realPath(absPath);
 	if (origin) {
 		try {
-			// The key comes from the origin so a worktree shares its remote's session, but the code
-			// read is the local path: that is the tree the caller is asking about.
 			return { ...parseRemoteRepo(origin), source, kind: "local" };
 		} catch {
-			// An origin we cannot parse (a bare local path, a bare repo) is not an identity.
 		}
 	}
 	const key = `local:${source}`;

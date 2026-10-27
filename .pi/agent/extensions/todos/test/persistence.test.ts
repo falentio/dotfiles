@@ -1,8 +1,3 @@
-/**
- * Persistence: branch replay of todo state.
- * Ported from omp's `getLatestTodoPhasesFromEntries` semantics.
- */
-
 import { describe, expect, it } from "bun:test";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import {
@@ -143,8 +138,6 @@ describe("getLatestTodoPhasesFromEntries", () => {
 	});
 
 	it("skips structurally invalid phases instead of crashing, custom entry", () => {
-		// A hand-edited/corrupt session file must not take the extension down:
-		// fall through to the previous durable record.
 		const corrupt = [{ name: "X", tasks: "not-an-array" }];
 		const entries = [
 			messageEntry("toolResult", "todo", { phases: phasesC }),

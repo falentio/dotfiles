@@ -11,50 +11,28 @@
  */
 
 import { existsSync } from 'node:fs';
-import { mkdir } from 'node:fs/promises';
-import { homedir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import type { ThinkingLevel } from '@earendil-works/pi-agent-core';
 import type { Model } from '@earendil-works/pi-ai/compat';
 import type { ModelRegistry } from '@earendil-works/pi-coding-agent';
 import { createAgentAdapter, type ScoutModelSource } from './agent-session.ts';
 import { ensureCheckout, headSha, originOf, refreshCheckout } from './checkout.ts';
+import { SCOUT_CONFIG } from './config.ts';
 import { localRepoIdentity, parseRemoteRepo, sessionFileName, type RepoIdentity } from './repo-id.ts';
 import { PACKAGE_SOURCES, cloneTarget, resolvePackageRepo, type PackageRepoResult, type PackageSource } from './registry.ts';
 import { conversationKey, ScoutRegistry, type Logger, type ScoutAdapter, type ScoutResult } from './scout-registry.ts';
 import { digestKey, readSessionIndex, writeSessionIndex } from './session-index.ts';
 import { acquireLock } from './state-lock.ts';
 
-/** Root of everything this extension writes. Overridable for tests and for a second mind. */
-export const stateRoot = (): string => {
-	const override = process.env.PI_SCOUT_HOME;
-	return override ? resolve(override) : join(homedir(), '.pi', 'scout');
-};
+/** Root of everything this extension writes. Defaults to the configured root. */
+export const stateRoot = (root: string = SCOUT_CONFIG.stateRoot): string => resolve(root);
 
-export const reposDir = (): string => join(stateRoot(), 'repos');
-export const sessionsDir = (): string => join(stateRoot(), 'sessions');
+export const reposDir = (root?: string): string => join(stateRoot(root), 'repos');
+export const sessionsDir = (root?: string): string => join(stateRoot(root), 'sessions');
 /** One lock per repo and ref, so two pi processes queue instead of opening two sessions. */
-export const locksDir = (): string => join(stateRoot(), 'locks');
+export const locksDir = (root?: string): string => join(stateRoot(root), 'locks');
 /** The transcript index, one file per conversation key. */
-export const sessionsIndexDir = (): string => join(sessionsDir(), 'keys');
-
-/** One hour of inactivity, as asked. PI_SCOUT_IDLE_MS moves it. */
-export const idleMs = (): number => {
-	const raw = Number(process.env.PI_SCOUT_IDLE_MS);
-	return Number.isFinite(raw) && raw > 0 ? raw : 3_600_000;
-};
-
-/** One turn's ceiling. PI_SCOUT_TURN_MS moves it. */
-export const turnMs = (): number => {
-	const raw = Number(process.env.PI_SCOUT_TURN_MS);
-	return Number.isFinite(raw) && raw > 0 ? raw : 900_000;
-};
-
-/** How long a second process waits for the lock. PI_SCOUT_LOCK_MS moves it. */
-export const lockWaitMs = (): number => {
-	const raw = Number(process.env.PI_SCOUT_LOCK_MS);
-	return Number.isFinite(raw) && raw > 0 ? raw : 600_000;
-};
+export const sessionsIndexDir = (root?: string): string => join(sessionsDir(root), 'keys');
 
 /** The report plus its provenance, so the caller sees which tree and commit answered. */
 const withSource = (repo: string, result: ScoutResult, currentSha: string): string =>
@@ -76,15 +54,17 @@ export const identifyRepo = async (repo: string, cwd: string): Promise<RepoIdent
 	if (!trimmed) throw new Error('repo is empty');
 	const candidate = isAbsolute(trimmed) ? trimmed : resolve(cwd, trimmed);
 	if (existsSync(join(candidate, '.git'))) {
-		// A local checkout is known by its origin, so a worktree matches its remote's session.
 		return localRepoIdentity(candidate, await originOf(candidate));
 	}
 	return parseRemoteRepo(trimmed);
 };
 
 /** Clone the tree for a request when it is missing, and verify an existing tree belongs to it. */
-export const checkoutFor = async (request: { repo: RepoIdentity; ref?: string }): Promise<{ dir: string; display: string; warning?: string }> => {
-	const { dir, warning } = await ensureCheckout(request.repo, reposDir(), request.ref);
+export const checkoutFor = async (
+	request: { repo: RepoIdentity; ref?: string },
+	root?: string,
+): Promise<{ dir: string; display: string; warning?: string }> => {
+	const { dir, warning } = await ensureCheckout(request.repo, reposDir(root), request.ref);
 	return { dir, display: request.ref ? request.repo.display + '@' + request.ref : request.repo.display, warning };
 };
 
@@ -119,11 +99,13 @@ export const buildRegistry = (deps: {
 	/** Read per conversation open, for the provider runtime. */
 	source: () => ScoutModelSource;
 	log?: Logger;
+	/** Root of the checkouts, sessions, and locks. Defaults to SCOUT_CONFIG.stateRoot. */
+	stateRoot?: string;
 }): BuiltRegistry => {
-	const adapter = createAgentAdapter({ getSource: deps.source, sessionsDir: sessionsDir() });
-	// The lock is keyed exactly like the conversation, so a ref gets its own lock and its own tree.
+	const root = deps.stateRoot;
+	const adapter = createAgentAdapter({ getSource: deps.source, sessionsDir: sessionsDir(root) });
 	const lockDirFor = (request: { repo: RepoIdentity; ref?: string }): string =>
-		join(locksDir(), digestKey(conversationKey(request)) + '.lock');
+		join(locksDir(root), digestKey(conversationKey(request)) + '.lock');
 	return {
 		adapter,
 		registry: new ScoutRegistry({
@@ -132,18 +114,18 @@ export const buildRegistry = (deps: {
 					{
 						dir: lockDirFor(request),
 						label: 'the scout for ' + (request.ref ? request.repo.display + '@' + request.ref : request.repo.display),
-						waitMs: lockWaitMs(),
+						waitMs: SCOUT_CONFIG.lockWaitMs,
 					},
 					signal,
 				),
-			checkout: checkoutFor,
+			checkout: (request) => checkoutFor(request, root),
 			refresh: refreshCheckout,
 			adapter,
-			sessionFileFor: (key) => readSessionIndex(sessionsIndexDir(), key),
-			newSessionFile: (key) => join(sessionsDir(), sessionFileName(key)),
-			rememberSession: (key, file) => writeSessionIndex(sessionsIndexDir(), key, file),
-			idleMs: idleMs(),
-			turnMs: turnMs(),
+			sessionFileFor: (key) => readSessionIndex(sessionsIndexDir(root), key),
+			newSessionFile: (key) => join(sessionsDir(root), sessionFileName(key)),
+			rememberSession: (key, file) => writeSessionIndex(sessionsIndexDir(root), key, file),
+			idleMs: SCOUT_CONFIG.idleMs,
+			turnMs: SCOUT_CONFIG.turnMs,
 			log: deps.log,
 		}),
 	};
@@ -169,7 +151,6 @@ export async function runRepoScout(input: {
 	const identity = await identifyRepo(params.repo, cwd);
 	const ref = params.ref?.trim() || undefined;
 	const model = params.model ? resolveModel(choice, params.model) : choice.model;
-	await mkdir(sessionsDir(), { recursive: true });
 	const result = await registry.run(
 		{
 			repo: identity,
@@ -218,7 +199,6 @@ export async function runPackageRepo(
 	const version = input.version?.trim() || undefined;
 
 	const result = await resolvePackage({ package: name, source, version });
-	// Only a stated repository is offered as a target; a guess is information, not a destination.
 	const target = cloneTarget(result);
 	const lines = [
 		'package  ' + result.package,

@@ -1,8 +1,3 @@
-/**
- * resolvePackageRepo over fake registries and a fake git: every source's shape, version selection, and
- * the rule that a ref is only reported after git confirms it.
- */
-
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
@@ -96,7 +91,6 @@ type Fixtures = {
 	json?: Record<string, unknown>;
 	text?: Record<string, string>;
 	refs?: Record<string, RemoteRefs>;
-	/** URL prefixes that must 404, checked before the fixtures. */
 	missing?: string[];
 };
 
