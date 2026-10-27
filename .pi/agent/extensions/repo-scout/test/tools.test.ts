@@ -1,8 +1,3 @@
-/**
- * The tools over real inputs: repo identification and ref keys (no network), package_repo's
- * validation and rendering (a fake resolver), and the scratch checkout (a real local git repo).
- */
-
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -247,7 +242,6 @@ describe("ensureCheckout", () => {
 		const root = await makeRepo();
 		const scratch = await mkdtemp(join(tmpdir(), "repo-scout-scratch-"));
 		roots.push(root, scratch);
-		// An origin that cannot be fetched: if the clone went to the remote, this test fails.
 		git(root, "remote", "add", "origin", "https://github.com/example/does-not-exist.git");
 		const identity = localRepoIdentity(root, await originOf(root));
 		assert.equal(identity.key, "github.com/example/does-not-exist");

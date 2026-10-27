@@ -21,7 +21,6 @@ export const sessionIndexPath = (indexDir: string, key: string): string => join(
 export const readSessionIndex = async (indexDir: string, key: string): Promise<string | undefined> => {
 	try {
 		const parsed = JSON.parse(await readFile(sessionIndexPath(indexDir, key), "utf8")) as { key?: string; file?: string };
-		// A digest collision must not hand one conversation another's transcript.
 		if (parsed.key !== key || typeof parsed.file !== "string") return undefined;
 		return parsed.file;
 	} catch {

@@ -1,9 +1,3 @@
-/**
- * The whole pipeline over a real `AgentSession` on a fake provider: the first question opens a
- * session in a scratch clone, the second continues it, and an evicted session is reopened from its
- * file. No credentials and no network beyond a local git repo.
- */
-
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -36,16 +30,13 @@ const makeRepo = async (): Promise<string> => {
 	await writeFile(join(root, "index.ts"), "export const answer = 42;\n");
 	git(root, "add", ".");
 	git(root, "commit", "--quiet", "-m", "first");
-	// An origin that cannot be cloned: the pipeline must read this path, not go hunting for the remote.
 	git(root, "remote", "add", "origin", "https://github.com/example/local-smoke.git");
 	return root;
 };
 
-/** A provider that answers with a fixed report and records every prompt it was sent. */
 const fakeProvider = () => {
 	const prompts: string[] = [];
 	const faux = fauxProvider({ models: [{ id: "scout-fake", name: "Fake scout" }] });
-	// One scripted response per model call to come: open, continue, reopen.
 	const respond = (context: { messages: Array<{ content: unknown }> }) => {
 		const last = context.messages[context.messages.length - 1];
 		const text =
@@ -68,17 +59,14 @@ describe("repo_scout over a real AgentSession", () => {
 		roots.push(state);
 
 		const { faux, prompts } = fakeProvider();
-		// The caller's registry, with the fake provider standing in for a real one.
 		const runtime = await ModelRuntime.create({ modelsPath: null, allowModelNetwork: false });
 		runtime.registerNativeProvider(faux.provider);
-		// The facade the extension gets, backed by the fake runtime.
 		const modelRegistry = new ModelRegistry(runtime);
 		const source = { model: faux.getModel(), modelRegistry };
 
 		let now = 0;
 		let tick: (() => void) | undefined;
 		const built = buildRegistry({ source: () => source, log: { info: () => {}, warn: () => {}, error: () => {} }, stateRoot: state });
-		// The production checkout, lock, index, and adapter, with a clock the test owns.
 		const registryFor = () =>
 			new ScoutRegistry({
 				acquire: (request) =>
@@ -124,14 +112,12 @@ describe("repo_scout over a real AgentSession", () => {
 		assert.match(second, /turn   continued/);
 		assert.equal(registry.size(), 1);
 
-		// The scout saw the opening message first, then the bare follow-up.
 		assert.equal(prompts.length, 2);
 		assert.match(prompts[0] ?? "", /^Repository: /);
 		assert.match(prompts[0] ?? "", /Checkout: /);
 		assert.match(prompts[0] ?? "", /what is exported\?$/);
 		assert.equal(prompts[1], "and again?");
 
-		// Idle past the window: evicted, then reopened from the same conversation file.
 		now += 3_600_001;
 		tick?.();
 		assert.equal(registry.size(), 0);
@@ -147,7 +133,6 @@ describe("repo_scout over a real AgentSession", () => {
 		await registry.shutdown();
 		assert.deepEqual(readdirSync(locksDir(state)), [], "shutdown releases the repo lock");
 
-		// A fresh registry is what another pi process starts with: same state root, same index.
 		const other = registryFor();
 		const fourth = await runRepoScout({ params: { repo, question: "one more?" }, registry: other, cwd: repo, choice });
 		assert.match(fourth, /turn   continued/, "the new registry continues the recorded transcript");

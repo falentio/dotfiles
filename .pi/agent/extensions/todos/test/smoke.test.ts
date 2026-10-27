@@ -1,10 +1,3 @@
-/**
- * Smoke test: the extension factory runs against a recording ExtensionAPI
- * stub and registers the tool and events it should, and the event handlers
- * actually dispatch: session sync, eager prelude injection, reminders,
- * context pruning, and the mid-run nudge.
- */
-
 import { describe, expect, it } from "bun:test";
 import type {
 	ExtensionAPI,
@@ -66,7 +59,6 @@ describe("todos extension factory", () => {
 
 		const args = { list: [{ phase: "Work", items: ["a"] }] };
 		expect(tool.prepareArguments?.(args)).toEqual({ ...args, op: "init" });
-		// Uninferable shapes pass through and fail schema validation.
 		expect(tool.prepareArguments?.({ task: "x" })).toEqual({ task: "x" });
 	});
 
@@ -107,7 +99,6 @@ describe("todos extension factory", () => {
 		const text =
 			result.content.find((part) => part.type === "text")?.text ?? "";
 		expect(text).toContain("from branch");
-		// The result carries the phases; the snapshot entry is what a resume reads.
 		expect((result.details as { phases: unknown }).phases).toEqual(phases);
 	});
 
@@ -194,9 +185,6 @@ describe("todos extension factory", () => {
 		}>;
 	}
 
-	// P1 regression: the tracker and the tool must share one canonical state,
-	// so completing via the tool silences reminders; these reproduce the
-	// "stale reminder … scaffold session" bug.
 	it("does not remind about todos the tool already completed", async () => {
 		const { api, handlers, tools } = makeRecordingAPI();
 		todosExtension(api);
@@ -307,8 +295,6 @@ describe("todos extension factory", () => {
 			undefined,
 			ctx as ExtensionToolContext,
 		);
-		// Completing between prompts and settling again sends nothing new —
-		// resetCycle() must not resurrect stale tasks on the next prompt.
 		await dispatch(
 			handlers,
 			"before_agent_start",
@@ -446,7 +432,6 @@ describe("todos extension factory", () => {
 			role: "assistant",
 			content: [{ type: "text", text: "All done." }],
 		};
-		// A reminder the assistant already answered leaves outgoing context.
 		const [filtered] = (await dispatch(
 			handlers,
 			"context",
@@ -454,8 +439,6 @@ describe("todos extension factory", () => {
 			ctx,
 		)) as [{ messages: unknown[] }];
 		expect(filtered?.messages).toEqual([assistant]);
-		// A trailing reminder (the turn it triggered is in flight) stays: the
-		// handler returns undefined = context left untouched.
 		const [unchanged] = await dispatch(
 			handlers,
 			"context",
@@ -477,7 +460,6 @@ describe("todos extension factory", () => {
 		};
 		todosExtension(api);
 
-		// Seed state via session_start with an existing todo.
 		const ctx = makeContext(
 			{ cwd: "/tmp/project" },
 			{
@@ -496,7 +478,6 @@ describe("todos extension factory", () => {
 			ctx,
 		);
 
-		// 12 successful mutating tool results cross the nudge threshold.
 		for (let i = 0; i < 12; i++) {
 			await dispatch(
 				handlers,

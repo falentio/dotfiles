@@ -1,9 +1,3 @@
-/**
- * Shared test stubs: a recording ExtensionAPI and an ExtensionContext factory.
- * The real pi runtime is not loaded in tests; these stand in for the host so
- * the extension factory and its event handlers can be exercised directly.
- */
-
 import type {
 	ExtensionAPI,
 	ExtensionContext,

@@ -83,7 +83,6 @@ const ageOf = async (dir: string): Promise<number> => {
 		try {
 			return Date.now() - (await stat(path)).mtimeMs;
 		} catch {
-			// fall through to the next candidate
 		}
 	}
 	return 0;

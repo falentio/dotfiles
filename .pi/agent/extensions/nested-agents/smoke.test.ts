@@ -1,10 +1,3 @@
-/**
- * Smoke test: drive the REAL pi binary against the LIVE installed extension (no -e flag, so this
- * also proves discovery works) and assert on the session transcript.
- *
- * Slower than the unit tests (each pi run is a real model call). Run explicitly:
- *   node --test ~/.pi/agent/extensions/nested-agents/smoke.test.ts
- */
 import { test, describe, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -24,7 +17,6 @@ function write(rel: string, body: string): void {
 	fs.writeFileSync(abs, body);
 }
 
-/** Run pi in print mode. Returns combined output; the transcript is written under `sessions`. */
 function runPi(sessionId: string, prompt: string, extraArgs: string[] = []): string {
 	return execFileSync(
 		PI,
@@ -42,7 +34,6 @@ function runPi(sessionId: string, prompt: string, extraArgs: string[] = []): str
 	);
 }
 
-/** All markers recorded in the session transcript for a session id. */
 function markers(sessionId: string): Array<{ path: string; hash: string }> {
 	const dir = sessions;
 	const files = fs.readdirSync(dir).filter((f) => f.includes(sessionId));
@@ -57,14 +48,12 @@ function markers(sessionId: string): Array<{ path: string; hash: string }> {
 					out.push({ path: entry.data.path, hash: entry.data.hash });
 				}
 			} catch {
-				// partial line
 			}
 		}
 	}
 	return out;
 }
 
-/** Count of injected project_instructions blocks in a transcript. */
 function injectedBlocks(sessionId: string): number {
 	const files = fs.readdirSync(sessions).filter((f) => f.includes(sessionId));
 	let n = 0;
@@ -136,8 +125,6 @@ describe("smoke: live extension against real pi", () => {
 	});
 
 	test("editing WITHOUT reading first still injects (regression)", () => {
-		// Before the fix this injected nothing: the edit tool reads through its own fs call, not
-		// through the read tool, so excluding edit meant an edit-only model saw no context.
 		write("packages/api/handler.ts", "export const handler = () => Effect.gen(function* () { return 1; });\n");
 		runPi(
 			"smoke5",
@@ -154,8 +141,6 @@ describe("smoke: live extension against real pi", () => {
 		);
 	});
 	test("the same file is never injected twice across a resume in a new process", () => {
-		// The strongest form of the guarantee: three separate pi processes on one session, reading the
-		// same file each time. Only the first may inject.
 		runPi("smoke6", "Read packages/api/handler.ts. Then say DONE.");
 		const after1 = markers("smoke6").length;
 		assert.ok(after1 > 0, "first process injected");
@@ -167,14 +152,13 @@ describe("smoke: live extension against real pi", () => {
 	});
 
 	test("a symlinked path to the same file does not inject twice", () => {
-		// Same file reachable two ways: the real path and a symlinked directory.
 		write("linked-real/AGENTS.md", "# Linked rules\n\nLINKED-RULE-TEXT.\n");
 		write("linked-real/file.ts", "export const l = 1;\n");
 		fs.mkdirSync(path.join(repo, "linked-alias"), { recursive: true });
 		try {
 			fs.symlinkSync(path.join(repo, "linked-real/AGENTS.md"), path.join(repo, "linked-alias/AGENTS.md"));
 		} catch {
-			return; // symlinks unavailable: skip
+			return;
 		}
 		write("linked-alias/other.ts", "export const o = 1;\n");
 
@@ -183,8 +167,6 @@ describe("smoke: live extension against real pi", () => {
 		assert.equal(marks.length, 1, "the same file via two paths produced one marker");
 	});
 	test("one batch with a shared-identity chain injects the file once", () => {
-		// Real-pi regression: a parent and child directory linking to the same file must yield one
-		// block, not two.
 		const shared = path.join(repo, "batch-real/shared.md");
 		fs.mkdirSync(path.dirname(shared), { recursive: true });
 		fs.writeFileSync(shared, "SHARED BATCH RULES");
@@ -193,7 +175,7 @@ describe("smoke: live extension against real pi", () => {
 			fs.symlinkSync(shared, path.join(repo, "batch-real/pkg/AGENTS.md"));
 			fs.symlinkSync(shared, path.join(repo, "batch-real/pkg/sub/AGENTS.md"));
 		} catch {
-			return; // symlinks unavailable: skip
+			return;
 		}
 		fs.writeFileSync(path.join(repo, "batch-real/pkg/sub/file.ts"), "export const x = 1;");
 

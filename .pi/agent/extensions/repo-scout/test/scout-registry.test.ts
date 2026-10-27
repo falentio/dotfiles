@@ -1,9 +1,3 @@
-/**
- * The registry's contract: one conversation per repo and ref however many models ask, one question
- * at a time, one cross-process lock per conversation, evicted when idle, reopened from the session
- * file after an eviction. Every test drives a fake clock, so none wait.
- */
-
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { Model } from "@earendil-works/pi-ai/compat";
@@ -34,7 +28,6 @@ const request = (question: string, overrides: Partial<ScoutRequest> = {}): Scout
 	...overrides,
 });
 
-/** A conversation that answers whatever the next queued answer says, and records what it saw. */
 class FakeConversation implements ScoutConversation {
 	readonly questions: string[] = [];
 	aborted = false;
@@ -337,7 +330,6 @@ describe("ScoutRegistry", () => {
 	});
 
 	it("reopens the file pi actually wrote, not the name it was offered", async () => {
-		// pi names the session file it creates, so the adapter reports a different path than the guess.
 		const opened: Array<string | undefined> = [];
 		const adapter: ScoutAdapter = {
 			async open(_repo, _dir, sessionFile) {

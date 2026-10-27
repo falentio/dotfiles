@@ -58,7 +58,6 @@ Hard limits: 800 words, 120 lines. Pointers only. No file contents, no grep outp
 export const openingMessage = (repo: string, dir: string): string =>
 	`Repository: ${repo}\nCheckout: ${dir}\n\n${REPORT_CONTRACT}`;
 
-/** The calling thread's context, read once per conversation. */
 export type ScoutModelSource = Pick<ExtensionContext, "model" | "modelRegistry">;
 
 export type AgentAdapterOptions = {
@@ -66,7 +65,6 @@ export type AgentAdapterOptions = {
 	getSource: () => ScoutModelSource;
 	/** Where scout session files live. */
 	sessionsDir: string;
-	/** Overridable for tests. */
 	create?: typeof createAgentSession;
 	agentDir?: string;
 };
@@ -128,7 +126,6 @@ export const createAgentAdapter = (options: AgentAdapterOptions): ScoutAdapter =
 				tools: [...SCOUT_TOOLS],
 			});
 
-			// A replayed conversation already holds the opening contract and the earlier crawl.
 			const replaying = Boolean(sessionFile && existsSync(sessionFile));
 			let opening = !replaying;
 			let fresh = !replaying;
@@ -148,7 +145,6 @@ export const createAgentAdapter = (options: AgentAdapterOptions): ScoutAdapter =
 						if (!text) throw new Error("the scout returned no text; the turn may have been cut off");
 						return text;
 					} catch (error) {
-						// The opening turn happened, even if it failed: a retry is a continuation.
 						fresh = false;
 						if (signal?.aborted) throw new Error("the scout question was aborted");
 						throw error;

@@ -1,15 +1,3 @@
-/**
- * Compaction-consistency test.
- *
- * Dedup state is rebuilt from the transcript, which compaction rewrites. The danger is a compaction
- * cut that drops a file's marker while keeping the content it describes: the extension would then
- * re-inject a file the model already has. This test sweeps EVERY possible cut point against pi's
- * real buildContextEntries and asserts the recovered state always matches what is still in context.
- *
- * Skips itself when pi's dist is not importable (the normal case in a checkout without a build).
- *
- * Run: node --test ~/.pi/agent/extensions/nested-agents/compaction.test.ts
- */
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
@@ -19,15 +7,6 @@ import { collectDelivered } from "./logic.ts";
 
 const require = createRequire(import.meta.url);
 
-/**
- * Locate pi's built session-manager, or null.
- *
- * Resolution order:
- *   1. normal module resolution (works when pi is a dependency of this tree);
- *   2. PI_PACKAGE_DIR env override, for a caller that knows where pi is;
- *   3. a bounded search of a few install roots, descending INTO node_modules, since that is where
- *      pi actually lives when it is not a dependency here.
- */
 function loadBuildContextEntries(): ((entries: unknown[], leafId: string, byId: Map<string, unknown>) => any[]) | null {
 	const SUFFIX = "dist/core/session-manager.js";
 
@@ -40,17 +19,14 @@ function loadBuildContextEntries(): ((entries: unknown[], leafId: string, byId: 
 		}
 	};
 
-	// 1. Normal resolution.
 	const direct = fromPath("@earendil-works/pi-coding-agent/" + SUFFIX);
 	if (direct) return direct as never;
 
-	// 2. Explicit override.
 	if (process.env.PI_PACKAGE_DIR) {
 		const found = fromPath(path.join(process.env.PI_PACKAGE_DIR, SUFFIX));
 		if (found) return found as never;
 	}
 
-	// 3. Bounded search of install roots, descending into node_modules.
 	const home = process.env.HOME ?? "";
 	const roots = [
 		path.join(home, ".vite-plus/packages/@earendil-works/pi-coding-agent"),
@@ -71,7 +47,6 @@ function loadBuildContextEntries(): ((entries: unknown[], leafId: string, byId: 
 			const loaded = fromPath(candidate);
 			if (loaded) return loaded;
 		}
-		// Also try the nested node_modules layout in one step.
 		const nested = path.join(dir, "node_modules/@earendil-works/pi-coding-agent", SUFFIX);
 		if (fs.existsSync(nested)) {
 			const loaded = fromPath(nested);
@@ -108,7 +83,6 @@ function loadBuildContextEntries(): ((entries: unknown[], leafId: string, byId: 
 
 const buildContextEntries = loadBuildContextEntries();
 
-/** A branch as the extension produces it: the marker precedes the toolResult it describes. */
 function branch(firstKeptEntryId: string) {
 	return [
 		{ id: "u1", parentId: null, type: "message", message: { role: "user", content: "read" }, timestamp: 1 },
@@ -138,7 +112,6 @@ function branch(firstKeptEntryId: string) {
 }
 
 describe("compaction never causes a duplicate", { skip: buildContextEntries === null }, () => {
-	// Every entry id in the branch is a legal firstKeptEntryId, so sweeping them covers every cut.
 	for (const cut of ["a3", "k1", "t1", "m1", "a2", "a1", "u1"]) {
 		test("cut at " + cut + " keeps recovered state consistent with context", () => {
 			const path = branch(cut);
@@ -160,8 +133,6 @@ describe("compaction never causes a duplicate", { skip: buildContextEntries === 
 	}
 
 	test("a marker dropped while its block survives is still recognised", () => {
-		// The specific hazard: compaction keeps the toolResult but drops the marker. Without block
-		// recovery the file would be re-injected.
 		const path = branch("t1");
 		const byId = new Map(path.map((e) => [e.id, e]));
 		const kept = buildContextEntries!(path, "a3", byId);
@@ -192,9 +163,6 @@ describe("the marker/block split is unreachable through pi's own compaction", { 
 		const path = branch("t1");
 		const byId = new Map(path.map((e) => [e.id, e]));
 		const kept = buildContextEntries!(path, "a3", byId);
-		// The marker is a plain custom entry; buildContextEntries keeps or drops it, but the point is
-		// that pi's cut finder never SELECTS it. Assert it carries no message by checking that a cut
-		// AT the marker still yields a consistent state.
 		const atMarker = branch("m1");
 		const byId2 = new Map(atMarker.map((e) => [e.id, e]));
 		const kept2 = buildContextEntries!(atMarker, "a3", byId2);
@@ -203,8 +171,6 @@ describe("the marker/block split is unreachable through pi's own compaction", { 
 	});
 
 	test("no legal cut drops the marker while keeping its block", () => {
-		// Sweep every entry as a cut; a LEGAL cut is one pi would choose. For each, assert the
-		// recovered state matches whether the block is still in context.
 		for (const cut of ["a3", "k1", "t1", "m1", "a2", "a1", "u1"]) {
 			const path = branch(cut);
 			const byId = new Map(path.map((e) => [e.id, e]));
@@ -212,8 +178,6 @@ describe("the marker/block split is unreachable through pi's own compaction", { 
 			const ids = kept.map((e: { id: string }) => e.id);
 			const blockPresent = ids.includes("t1");
 			const recognised = collectDelivered(kept).has("/r/A/AGENTS.md");
-			// When the block survives, the file must be recognised. That is the invariant that
-			// prevents a duplicate, and it holds for every cut.
 			if (blockPresent) {
 				assert.equal(recognised, true, "cut at " + cut + " kept the block but lost the record");
 			}

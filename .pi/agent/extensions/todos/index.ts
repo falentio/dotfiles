@@ -1,39 +1,3 @@
-/**
- * todos — an Oh My Pi (OMP)-style todo tool and tracker for pi.
- *
- * Replicates the OMP todo experience as a pi extension package:
- *
- * - **`todo` tool** (`init|start|done|rm|drop|block|unblock|append|view`)
- *   with phased lists, auto-promotion of the next task, completion
- *   transitions, and strict batch semantics. Every successful mutation writes
- *   a `todo_snapshot` session entry, and state is reconstructed from the
- *   newest snapshot on the session branch (the same durable-record pattern OMP
- *   and pi's example extensions use — branching/rewinding always shows the
- *   correct todo state). The tool is `model-only`, so a codemode script cannot
- *   wrap the call and drop the record.
- * - **Eager prelude** (`TODO_CONFIG.eager: "preferred" | "always"`): on the first
- *   turn, a hidden reminder asks the model to lay out a phased plan with a
- *   single `init` call before working. pi's extension API cannot force a
- *   `tool_choice`, so `"always"` injects a MUST-call reminder instead.
- * - **`todo-discipline` skill**: a load-on-demand skill at
- *   `<agent dir>/skills/todo-discipline` that mandates phased `init` before
- *   work and per-task `done` marking as each task finishes (not retro-batched
- *   at the end).
- * - **Mid-run nudge**: after 12 mutating tool results, a hidden steer
- *   message asks the agent to mark finished tasks done (≤2 per prompt
- *   cycle).
- * - **Completion reminder**: when the agent stops with incomplete todos and
- *   isn't waiting on the user, `agent_before_settle` appends a hidden message
- *   and continues the turn once, up to the reminder budget
- *   (`TODO_CONFIG.reminders`, `TODO_CONFIG.remindersMax`).
- *
- * Settings live in `config.ts` as `TODO_CONFIG`: `enabled`, `reminders`,
- * `remindersMax`, `eager`. No JSON file, environment variable, or CLI flag is
- * read.
- *
- * @module todos
- */
-
 import type {
 	AgentToolResult,
 	AgentToolUpdateCallback,
@@ -134,7 +98,6 @@ export default function todosExtension(pi: ExtensionAPI): void {
 			if (outcome.failed) throw new Error(outcome.summary);
 			if (!outcome.readOnly) {
 				setPhases(outcome.phases);
-				// appendEntry is a no-op without a session file, so only persist then.
 				if (outcome.storage === "session") {
 					pi.appendEntry(TODO_SNAPSHOT_CUSTOM_TYPE, { phases: outcome.phases });
 				}
@@ -188,12 +151,6 @@ export default function todosExtension(pi: ExtensionAPI): void {
 		}
 	});
 
-	// Tracker-injected guidance (completion reminders, mid-run nudges) is
-	// only valid for the turn that consumes it; before every LLM call strip
-	// any such message a later real message superseded, so resumed/continued
-	// sessions never make the model answer an ancient "incomplete todos"
-	// reminder (it lives on in the session file; only the outgoing copy is
-	// filtered).
 	pi.on("context", async (event) => {
 		const pruned = pruneSupersededTrackerMessages(event.messages);
 		if (pruned.length === event.messages.length) return undefined;

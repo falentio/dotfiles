@@ -118,9 +118,6 @@ export function isTodoPhase(value: unknown): value is TodoPhase {
 			candidate.status !== "blocked"
 		)
 			return false;
-		// An optional blocker that is present but wrongly typed (legacy or
-		// hand-edited snapshot) is external data, so validate its shape before
-		// trusting it rather than letting a bad value through.
 		return (
 			candidate.blocker === undefined ||
 			typeof candidate.blocker === "string"
@@ -177,10 +174,6 @@ function getTaskTargets(
 	entry: TodoParams,
 	errors: string[],
 ): TodoItem[] {
-	// Branch on `!== undefined`, not truthiness: an explicitly supplied empty
-	// target must resolve (and error) as such — with truthiness `""` silently
-	// falls through to the "omit both = everything" path, turning
-	// `{op:"rm", task:""}` into "delete every task".
 	if (entry.task !== undefined) {
 		const hit = resolveTaskOrError(phases, entry.task, errors);
 		return hit ? [hit.task] : [];
@@ -207,10 +200,6 @@ function normalizeSingleLine(value: string): string {
 }
 
 function initPhases(entry: TodoParams, errors: string[]): TodoPhase[] {
-	// Models routinely flatten the single-phase init into `{op:"init", items:[...]}`
-	// (optionally with a bare `phase`) instead of the canonical
-	// `list: [{phase, items}]`. Accept that shape by synthesizing a one-phase list
-	// so a common, recoverable mistake isn't a hard error.
 	const list =
 		entry.list ??
 		(entry.items && entry.items.length > 0
@@ -220,9 +209,6 @@ function initPhases(entry: TodoParams, errors: string[]): TodoPhase[] {
 		errors.push("Missing list for init operation");
 		return [];
 	}
-	// Duplicate phase names / task contents would be permanently unaddressable
-	// (every targeting op resolves the first match), so reject them up front —
-	// detected AFTER normalization so `a  b` and `a b` collide correctly.
 	const seenPhases = new Set<string>();
 	const seenTasks = new Set<string>();
 	const normalized: Array<{ phase: string; items: string[] }> = [];
@@ -280,8 +266,6 @@ function appendItems(
 		return phases;
 	}
 
-	// Validate the whole batch before mutating so a failing op reports every
-	// duplicate and leaves nothing half-applied.
 	const seen = new Set<string>();
 	let hasDuplicate = false;
 	for (const content of normalizedItems) {
@@ -367,16 +351,8 @@ function applyEntry(
 				errors.push("block requires a task or phase target");
 				return phases;
 			}
-			// Collapse whitespace runs (incl. newlines) to single spaces: a blocker
-			// note rides on one summary line, so an embedded newline from a
-			// multi-line external error or user question would corrupt the rendered
-			// line. Normalizing here keeps every consumer one-line-safe.
 			const reason = entry.reason?.replace(/\s+/g, " ").trim() || undefined;
 			for (const task of getTaskTargets(phases, entry, errors)) {
-				// Only actionable open work can be blocked: blocking a phase must not
-				// reopen completed/abandoned tasks or erase finished progress. An
-				// already-blocked task stays eligible so a later block can refine its
-				// blocker note (e.g. first blocked without a reason, then with one).
 				if (
 					task.status !== "pending" &&
 					task.status !== "in_progress" &&

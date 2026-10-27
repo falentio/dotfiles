@@ -1,9 +1,3 @@
-/**
- * The cross-process contract, with two real node processes: the second waits for the first to
- * release the repo lock, then continues the transcript the first recorded, even on another model.
- * No fake here but the model call itself.
- */
-
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -110,7 +104,6 @@ describe("two processes on one repo and ref", () => {
 		roots.push(root);
 
 		const first = spawn(root, { MODEL: "m1", QUESTION: "first", HOLD_MS: "700" });
-		// Overlap: the second process starts while the first is answering, and must not open.
 		await new Promise((resolve) => setTimeout(resolve, 150));
 		const second = spawn(root, { MODEL: "m2", QUESTION: "second", HOLD_MS: "0" });
 
