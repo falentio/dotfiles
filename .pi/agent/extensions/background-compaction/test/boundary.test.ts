@@ -115,6 +115,13 @@ const afterCompaction = [
 	...turn("new"),
 ];
 const largeTurn = [user("large"), assistant("a".repeat(4_000)), toolResult("b".repeat(4_000)), assistant("done")];
+const largeTail = [user("kept tail"), assistant("a".repeat(160_000))];
+const endsWithCompaction = [
+	...turn("old one"),
+	...turn("old two"),
+	...largeTail,
+	compaction("earlier summary", largeTail[0]!.id),
+];
 
 const fixtures: Fixture[] = [
 	fixture("empty branch", [], 20_000),
@@ -131,6 +138,7 @@ const fixtures: Fixture[] = [
 		...turn("new"),
 	], 8),
 	fixture("single turn larger than the budget", largeTurn, 10),
+	fixture("branch ending with a compaction entry", endsWithCompaction, 20_000),
 ];
 
 function oraclePlan(f: Fixture): OraclePreparation | undefined {
