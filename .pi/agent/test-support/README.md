@@ -8,7 +8,9 @@
 
 The helper takes the newest install, or `PI_INSTALL` when set. `piAliases` returns the same path map for jiti and Node loaders, so a test's session and an extension's provider register into one copy of `pi-ai`.
 
-`link-pi.mjs` runs the linker for `background-compaction`, `repo-scout`, and `todos`. The `test` and `typecheck` scripts call it first. Run `bun test` directly only after one link; Bun resolves a test file's imports before any preload, so a `bunfig.toml` preload is too late on a clean checkout.
+The linker refuses to delete a real directory where a link belongs: it stops and names the path, so a `node_modules` from a real install survives.
+
+`link-pi.mjs` runs the linker for `background-compaction`, `repo-scout`, `todos`, and `test-support` itself. The `test` and `typecheck` scripts call it first. Run `bun test` directly only after one link; Bun resolves a test file's imports before any preload, so a `bunfig.toml` preload is too late on a clean checkout.
 
 ## Suites on the fake model
 

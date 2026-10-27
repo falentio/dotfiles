@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, mkdirSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, unlinkSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, realpathSync, statSync, symlinkSync, unlinkSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 
@@ -15,8 +15,10 @@ function relink(link, source) {
 	if (existsSync(link) && realpathSync(link) === realpathSync(source)) return;
 	try {
 		const stat = lstatSync(link);
-		if (stat.isDirectory() && !stat.isSymbolicLink()) rmSync(link, { recursive: true, force: true });
-		else unlinkSync(link);
+		if (stat.isDirectory() && !stat.isSymbolicLink()) {
+			throw new Error(`Refusing to delete ${link}: a real directory is there, not a link. Remove it, then link again.`);
+		}
+		unlinkSync(link);
 	} catch (error) {
 		if (error.code !== "ENOENT") throw error;
 	}
