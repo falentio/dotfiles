@@ -5,3 +5,4 @@ const extensions = join(import.meta.dir, "..", "extensions");
 for (const name of ["background-compaction", "repo-scout", "todos"]) {
 	linkPiInstall(join(extensions, name));
 }
+linkPiInstall(import.meta.dir);

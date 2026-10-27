@@ -65,6 +65,8 @@ async function openSession(scenario: Scenario = {}): Promise<OpenSession> {
 	for (const file of ["index.ts", "config.ts", "boundary.ts", "state.ts", "package.json"]) {
 		await writeFile(join(extensionDir, file), await readFile(join(SOURCE, file), "utf8"));
 	}
+	await mkdir(join(agentDir, "test-support"), { recursive: true });
+	await writeFile(join(agentDir, "test-support", "faux-message.ts"), await readFile(join(SOURCE, "..", "..", "test-support", "faux-message.ts"), "utf8"));
 	await writeFile(join(agentDir, "extensions", "faux-provider.ts"), await readFile(join(SOURCE, "faux-provider.ts"), "utf8"));
 
 	const enabled = scenario.enabled ?? true;

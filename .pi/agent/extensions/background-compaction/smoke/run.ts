@@ -29,6 +29,7 @@ export interface Result {
 const HERE = import.meta.dir;
 const SOURCE = join(HERE, "..");
 const PROBE = join(SOURCE, "faux-provider.ts");
+const FAUX_MESSAGE = join(SOURCE, "..", "..", "test-support", "faux-message.ts");
 
 function modelFor(contextWindow: number) {
 	return {
@@ -53,6 +54,10 @@ export interface RestartResult {
 
 function prepareAgentDir(agentDir: string, scenario: Scenario): void {
 	mkdirSync(join(agentDir, "extensions"), { recursive: true });
+	// The provider imports the shared message helpers by a path relative to its
+	// real home, so the temp tree needs that file at the same relative place.
+	mkdirSync(join(agentDir, "test-support"), { recursive: true });
+	copyFileSync(FAUX_MESSAGE, join(agentDir, "test-support", "faux-message.ts"));
 	copyFileSync(PROBE, join(agentDir, "extensions", "faux-provider.ts"));
 	if (scenario.extension !== "background-compaction") return;
 	const extensionDir = join(agentDir, "extensions", "background-compaction");
