@@ -1,8 +1,9 @@
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createJiti } from "jiti/static";
-import { VERIFY_LOG_KEY, emptyVerifyLog } from "./mock-provider.ts";
+import { findPiInstall, piAliases } from "../../../test-support/pi-install.mjs";
+import { FAUX_API, FAUX_MODEL, FAUX_PROVIDER, VERIFY_LOG_KEY, emptyVerifyLog } from "../mock-provider.ts";
 import {
 	createAgentSession,
 	ModelRuntime,
@@ -27,15 +28,14 @@ export interface Result {
 
 const HERE = import.meta.dir;
 const SOURCE = join(HERE, "..");
-const PROBE = join(HERE, "mock-provider.ts");
-const API = "bgc-mock-api";
+const PROBE = join(SOURCE, "mock-provider.ts");
 
 function modelFor(contextWindow: number) {
 	return {
-		id: "mock-model",
+		id: FAUX_MODEL,
 		name: "Mock model",
-		api: API,
-		provider: "bgc-mock",
+		api: FAUX_API,
+		provider: FAUX_PROVIDER,
 		baseUrl: "http://127.0.0.1/mock",
 		reasoning: false,
 		input: ["text"] as const,
@@ -82,14 +82,14 @@ export async function runTwice(scenario: Scenario): Promise<RestartResult> {
 		authPath: join(agentDir, "auth.json"),
 		modelsPath: join(agentDir, "models.json"),
 	});
-	modelRuntime.registerProvider("bgc-mock", {
+	modelRuntime.registerProvider(FAUX_PROVIDER, {
 		name: "Mock",
 		baseUrl: "http://127.0.0.1/mock",
 		apiKey: "test-key",
-		api: API,
+		api: FAUX_API,
 		models: [
 			{
-				id: "mock-model",
+				id: FAUX_MODEL,
 				name: "Mock",
 				reasoning: false,
 				input: ["text"],
@@ -195,14 +195,14 @@ export async function run(scenario: Scenario): Promise<Result> {
 			join(agentDir, "models.json"),
 			JSON.stringify({
 				providers: {
-					"bgc-mock": {
+					[FAUX_PROVIDER]: {
 						name: "Mock",
 						baseUrl: "http://127.0.0.1/mock",
 						apiKey: "test-key",
-						api: API,
+						api: FAUX_API,
 						models: [
 							{
-								id: "mock-model",
+								id: FAUX_MODEL,
 								name: "Mock",
 								reasoning: false,
 								input: ["text"],
@@ -216,14 +216,14 @@ export async function run(scenario: Scenario): Promise<Result> {
 			}),
 		);
 	}
-	modelRuntime.registerProvider("bgc-mock", {
+	modelRuntime.registerProvider(FAUX_PROVIDER, {
 		name: "Mock",
 		baseUrl: "http://127.0.0.1/mock",
 		apiKey: "test-key",
-		api: API,
+		api: FAUX_API,
 		models: [
 			{
-				id: "mock-model",
+				id: FAUX_MODEL,
 				name: "Mock",
 				reasoning: false,
 				input: ["text"],
@@ -290,21 +290,13 @@ function compactions(sessionManager: SessionManager) {
 	}>;
 }
 
-const PI_ROOT = join(import.meta.dir, "..", "..", "..", "..", "..", "node_modules", "@earendil-works", "pi-coding-agent");
-const AI_ROOT = join(PI_ROOT, "node_modules", "@earendil-works", "pi-ai", "dist");
-
-function piAliases(): Record<string, string> {
-	return {
-		"@earendil-works/pi-coding-agent": join(PI_ROOT, "dist", "index.js"),
-		"@earendil-works/pi-ai/compat": join(AI_ROOT, "compat.js"),
-		"@earendil-works/pi-ai": join(AI_ROOT, "compat.js"),
-		"@earendil-works/pi-agent-core": join(PI_ROOT, "node_modules", "@earendil-works", "pi-agent-core", "dist", "index.js"),
-		"@earendil-works/pi-tui": join(PI_ROOT, "node_modules", "@earendil-works", "pi-tui", "dist", "index.js"),
-	};
-}
+const PI_INSTALL = findPiInstall();
 
 async function loadMockProvider(path: string): Promise<void> {
-	const jiti = createJiti(import.meta.url, { moduleCache: false, alias: piAliases() });
+	const jiti = createJiti(import.meta.url, {
+		moduleCache: false,
+		alias: piAliases(PI_INSTALL) as Record<string, string>,
+	});
 	const factory = (await jiti.import(path, { default: true })) as (pi: unknown) => void;
 	factory({ registerTool() {}, registerProvider() {} });
 }
