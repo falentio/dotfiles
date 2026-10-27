@@ -104,12 +104,12 @@ describe("derived limits", () => {
 		expect(value).toMatchObject({
 			enabled: PRECOMPUTE_CONFIG.enabled,
 			compactWhenReady: PRECOMPUTE_CONFIG.compactWhenReady,
-			reserveTokens: PRECOMPUTE_CONFIG.reserveTokens,
 			keepRecentTokens: PRECOMPUTE_CONFIG.keepRecentTokens,
-			compactAtRatio: PRECOMPUTE_CONFIG.compactAtRatio,
 			minCeilingTokens: PRECOMPUTE_CONFIG.minCeilingTokens,
 			maxFailures: PRECOMPUTE_CONFIG.maxFailures,
 		});
+		expect(value.ceiling(200_000)).toBe(ceiling(200_000));
+		expect(value.gate(200_000)).toBe(gate(200_000));
 		expect(value.tail(200_000)).toBe(tailLimit(200_000));
 	});
 });

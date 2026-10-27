@@ -110,11 +110,8 @@ export function advance(state: SessionState, snapshot: Snapshot, limits: Limits)
 		return { kind: "wait" };
 	}
 	if (snapshot.tokens === null) return { kind: "wait" };
-
-	const ceiling = snapshot.contextWindow - limits.reserveTokens;
-	if (ceiling < limits.minCeilingTokens) return { kind: "wait" };
-	const gate = Math.floor(limits.compactAtRatio * ceiling);
-	if (snapshot.tokens < gate) return { kind: "wait" };
+	if (limits.ceiling(snapshot.contextWindow) < limits.minCeilingTokens) return { kind: "wait" };
+	if (snapshot.tokens < limits.gate(snapshot.contextWindow)) return { kind: "wait" };
 	if (!snapshot.userMessageSinceCompaction) return { kind: "wait" };
 
 	const plan =

@@ -350,16 +350,16 @@ describe("recordSummaryFailure", () => {
 });
 
 describe("invalid limits typing is impossible", () => {
-	it("limits exposes only the frozen policy fields and the tail function", () => {
+	it("limits exposes the frozen policy fields and the derived functions", () => {
 		const value = limits(config());
 		expect(Object.keys(value).sort()).toEqual([
-			"compactAtRatio",
+			"ceiling",
 			"compactWhenReady",
 			"enabled",
+			"gate",
 			"keepRecentTokens",
 			"maxFailures",
 			"minCeilingTokens",
-			"reserveTokens",
 			"tail",
 		]);
 	});

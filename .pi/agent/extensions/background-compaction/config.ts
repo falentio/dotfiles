@@ -25,11 +25,11 @@ export const PRECOMPUTE_CONFIG = {
 export interface Limits {
 	readonly enabled: boolean;
 	readonly compactWhenReady: boolean;
-	readonly reserveTokens: number;
-	readonly keepRecentTokens: number;
-	readonly compactAtRatio: number;
 	readonly minCeilingTokens: number;
 	readonly maxFailures: number;
+	readonly keepRecentTokens: number;
+	readonly ceiling: (contextWindow: number) => number;
+	readonly gate: (contextWindow: number) => number;
 	readonly tail: (contextWindow: number) => number;
 }
 
@@ -94,11 +94,11 @@ export function limits(config: PrecomputeConfig = PRECOMPUTE_CONFIG): Limits {
 	return {
 		enabled: config.enabled,
 		compactWhenReady: config.compactWhenReady,
-		reserveTokens: config.reserveTokens,
-		keepRecentTokens: config.keepRecentTokens,
-		compactAtRatio: config.compactAtRatio,
 		minCeilingTokens: config.minCeilingTokens,
 		maxFailures: config.maxFailures,
+		keepRecentTokens: config.keepRecentTokens,
+		ceiling: (contextWindow) => ceiling(contextWindow, config),
+		gate: (contextWindow) => gate(contextWindow, config),
 		tail: (contextWindow) => tailLimit(contextWindow, config),
 	};
 }

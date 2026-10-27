@@ -2,7 +2,7 @@
 
 Version 1.2, freeze candidate. On approval this becomes the implementation contract. After that, anything marked FROZEN needs a version bump and an update to the tests that name it.
 
-Changes in 1.2, found in review of the 1.1 draft: §4.2 returns undefined when the branch ends with a compaction entry, as `prepareCompaction` does; §9 states the force guard §4.4 already requires; §10.1 gains that fixture.
+Changes in 1.2, found in review of the 1.1 draft: §4.2 returns undefined when the branch ends with a compaction entry, as `prepareCompaction` does; §6 `Limits` exposes `ceiling(window)` and `gate(window)` instead of their ingredients; §9 states the force guard §4.4 already requires; §10.1 gains that fixture.
 
 Changes in 1.1, found while implementing: `Limits` carries `enabled` and `compactWhenReady`; boundary planning skips compaction entries and zero-message entries; `/precompute` reports through `ui.notify` because command handlers return void; the state stays `ready` while `ctx.compact()` runs, and only an extension-issued compaction flips it to `compacting`.
 
@@ -259,11 +259,11 @@ export function advance(state: SessionState, snapshot: Snapshot, limits: Limits)
 export interface Limits {
   readonly enabled: boolean;
   readonly compactWhenReady: boolean;
-  readonly reserveTokens: number;
-  readonly keepRecentTokens: number;
-  readonly compactAtRatio: number;
   readonly minCeilingTokens: number;
   readonly maxFailures: number;
+  readonly keepRecentTokens: number;
+  readonly ceiling: (contextWindow: number) => number;
+  readonly gate: (contextWindow: number) => number;
   readonly tail: (contextWindow: number) => number;
 }
 ```
