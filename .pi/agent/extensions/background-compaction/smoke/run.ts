@@ -46,21 +46,37 @@ function modelFor(contextWindow: number) {
 }
 
 export interface RestartResult {
-	first: Result & { turns: number; tokens: number | null };
-	second: Result & { turns: number; tokens: number | null };
+	first: Result & { turns: number; tokens: number | null; tokenSamples: number[] };
+	second: Result & { turns: number; tokens: number | null; tokenSamples: number[] };
 	sessionFile: string;
 }
 
-export async function runTwice(scenario: Scenario): Promise<RestartResult> {
-	const cwd = mkdtempSync(join(tmpdir(), "bgc-project-"));
-	const agentDir = mkdtempSync(join(tmpdir(), "bgc-agent-"));
+function prepareAgentDir(agentDir: string, scenario: Scenario): void {
+	mkdirSync(join(agentDir, "extensions"), { recursive: true });
+	copyFileSync(PROBE, join(agentDir, "extensions", "mock-provider.ts"));
+	if (scenario.extension !== "background-compaction") return;
 	const extensionDir = join(agentDir, "extensions", "background-compaction");
 	mkdirSync(extensionDir, { recursive: true });
 	for (const file of ["index.ts", "boundary.ts", "state.ts", "package.json"]) {
 		copyFileSync(join(SOURCE, file), join(extensionDir, file));
 	}
-	writeFileSync(join(extensionDir, "config.ts"), readFileSync(join(SOURCE, "config.ts"), "utf8"));
-	copyFileSync(PROBE, join(agentDir, "extensions", "mock-provider.ts"));
+	let config = readFileSync(join(SOURCE, "config.ts"), "utf8");
+	if (scenario.compactWhenReady) {
+		config = config.replace(/(compactWhenReady: )(true|false)/, `$1${scenario.compactWhenReady}`);
+	}
+	if (scenario.keepRecentTokens) {
+		config = config.replace(/(keepRecentTokens: )\d[\d_]*/, `$1${scenario.keepRecentTokens}`);
+	}
+	if (scenario.tailMin) {
+		config = config.replace(/(tailMin: )\d[\d_]*/, `$1${scenario.tailMin}`);
+	}
+	writeFileSync(join(extensionDir, "config.ts"), config);
+}
+
+export async function runTwice(scenario: Scenario): Promise<RestartResult> {
+	const cwd = mkdtempSync(join(tmpdir(), "bgc-project-"));
+	const agentDir = mkdtempSync(join(tmpdir(), "bgc-agent-"));
+	prepareAgentDir(agentDir, scenario);
 
 	const modelRuntime = await ModelRuntime.create({
 		authPath: join(agentDir, "auth.json"),
@@ -86,12 +102,12 @@ export async function runTwice(scenario: Scenario): Promise<RestartResult> {
 
 	await loadMockProvider(PROBE);
 	const sessionFile = join(cwd, "session.jsonl");
-	const first = await driveOne(scenario, { cwd, agentDir, modelRuntime, sessionFile, create: true });
+	const first = await driveOne(scenario, { cwd, agentDir, modelRuntime, sessionFile, create: true, forcedTurns: 0 });
 	const reopened = first.sessionFile;
-	const second = await driveOne(scenario, { cwd, agentDir, modelRuntime, sessionFile: reopened, create: false });
+	const second = await driveOne(scenario, { cwd, agentDir, modelRuntime, sessionFile: reopened, create: false, forcedTurns: 2 });
 	return {
-		first: { ...first.result, turns: first.turns, tokens: first.tokens },
-		second: { ...second.result, turns: second.turns, tokens: second.tokens },
+		first: { ...first.result, turns: first.turns, tokens: first.tokens, tokenSamples: first.tokenSamples },
+		second: { ...second.result, turns: second.turns, tokens: second.tokens, tokenSamples: second.tokenSamples },
 		sessionFile: reopened,
 	};
 }
@@ -102,12 +118,13 @@ interface DriveOptions {
 	modelRuntime: ModelRuntime;
 	sessionFile: string;
 	create: boolean;
+	forcedTurns: number;
 }
 
 async function driveOne(
 	scenario: Scenario,
 	options: DriveOptions,
-): Promise<{ result: Result; sessionFile: string; turns: number; tokens: number | null }> {
+): Promise<{ result: Result; sessionFile: string; turns: number; tokens: number | null; tokenSamples: number[] }> {
 	const sessionManager = options.create
 		? SessionManager.create(options.cwd, options.cwd)
 		: SessionManager.open(options.sessionFile, options.cwd, options.cwd);
@@ -131,12 +148,16 @@ async function driveOne(
 	});
 
 	const recorder = () => (globalThis as Record<string, unknown>)[VERIFY_LOG_KEY] as Probe;
+	const tokenSamples: number[] = [];
 	let turns = 0;
-	for (let index = 1; index <= 4; index++) {
-		if (compactions(session.sessionManager).length > 0) break;
+	const limit = Math.max(4, options.forcedTurns);
+	for (let index = 1; index <= limit; index++) {
+		if (turns >= options.forcedTurns && compactions(session.sessionManager).length > 0) break;
 		await session.prompt(`bloat turn ${index}`);
 		await session.waitForIdle();
 		await new Promise((resolve) => setTimeout(resolve, 1_200));
+		const used = session.getContextUsage()?.tokens ?? null;
+		if (used !== null) tokenSamples.push(used);
 		turns += 1;
 	}
 	const probe = recorder();
@@ -145,7 +166,8 @@ async function driveOne(
 	return {
 		sessionFile: file ?? "missing",
 		turns,
-		tokens: session.getContextUsage()?.tokens ?? null,
+		tokens: tokenSamples.at(-1) ?? null,
+		tokenSamples,
 		result: {
 			summaryRequests: requests.filter((request) => request.summary).length,
 			compactions: compactions(session.sessionManager).map((entry) => ({
@@ -162,27 +184,7 @@ async function driveOne(
 export async function run(scenario: Scenario): Promise<Result> {
 	const cwd = mkdtempSync(join(tmpdir(), "bgc-project-"));
 	const agentDir = mkdtempSync(join(tmpdir(), "bgc-agent-"));
-	const extensionDir = join(agentDir, "extensions", "background-compaction");
-	mkdirSync(extensionDir, { recursive: true });
-
-	if (scenario.extension === "background-compaction") {
-		for (const file of ["index.ts", "boundary.ts", "state.ts", "package.json"]) {
-			copyFileSync(join(SOURCE, file), join(extensionDir, file));
-		}
-		let config = readFileSync(join(SOURCE, "config.ts"), "utf8");
-		if (scenario.compactWhenReady) {
-			config = config.replace(/(compactWhenReady: )(true|false)/, `$1${scenario.compactWhenReady}`);
-		}
-		if (scenario.keepRecentTokens) {
-			config = config.replace(/(keepRecentTokens: )\d[\d_]*/, `$1${scenario.keepRecentTokens}`);
-		}
-		if (scenario.tailMin) {
-			config = config.replace(/(tailMin: )\d[\d_]*/, `$1${scenario.tailMin}`);
-		}
-			writeFileSync(join(extensionDir, "config.ts"), config);
-	}
-
-	copyFileSync(PROBE, join(agentDir, "extensions", "mock-provider.ts"));
+	prepareAgentDir(agentDir, scenario);
 
 	const modelRuntime = await ModelRuntime.create({
 		authPath: join(agentDir, "auth.json"),
