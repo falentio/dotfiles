@@ -445,6 +445,22 @@ describe("event wiring", () => {
 		expect(result.compaction?.summary).toBe("manual summary");
 	});
 
+	it("leaves the state ready for a compaction the extension did not issue", async () => {
+		const calls: SummaryCall[] = [];
+		const h = makeHarness({ compactWhenReady: false }, calls);
+		await settle(h);
+		calls[0]!.resolve({ text: "foreign summary", usage });
+		await flush();
+		const result = (await emit(
+			h,
+			"session_before_compact",
+			beforeCompact(h, { reason: "manual" }),
+		)) as { compaction?: { summary: string } };
+		expect(result.compaction?.summary).toBe("foreign summary");
+		expect(lastStatus(h)).toBe("precompute: summary ready");
+		expect(h.compactCalls.length).toBe(0);
+	});
+
 	it("skips the hook when instructions are present", async () => {
 		const calls: SummaryCall[] = [];
 		const h = makeHarness({}, calls);
