@@ -106,7 +106,7 @@ function install(
 			tokens: usage?.tokens ?? null,
 			contextWindow: usage?.contextWindow ?? ctx.model?.contextWindow ?? 0,
 			branch,
-			modelRef: modelRefOf(ctx.model),
+			modelRef: ctx.model ? modelRefOf(ctx.model) : undefined,
 			userMessageSinceCompaction: userMessageAfterCompaction(branch),
 		};
 	}
@@ -234,13 +234,14 @@ function install(
 
 	pi.on("session_before_compact", (event, ctx) => {
 		if (!config.enabled || state.precompute.status !== "ready") return;
-		const contextWindow = ctx.model?.contextWindow ?? ctx.getContextUsage()?.contextWindow ?? 0;
+		const model = ctx.model;
+		const contextWindow = model?.contextWindow ?? ctx.getContextUsage()?.contextWindow ?? 0;
 		const baseTail = policy.tail(contextWindow);
 		const tailLimit = event.willRetry ? Math.min(baseTail, policy.keepRecentTokens) : baseTail;
 		const verdict = judge({
 			precompute: state.precompute,
 			branch: event.branchEntries,
-			modelRef: modelRefOf(ctx.model),
+			modelRef: model ? modelRefOf(model) : undefined,
 			customInstructions: event.customInstructions,
 			previousSummary: event.preparation.previousSummary,
 			tailLimit,
@@ -288,11 +289,8 @@ function install(
 				(state.precompute.status === "idle" || state.precompute.status === "failed");
 
 			if (canForce && ctx.model) {
-				const plan = planPrecompute(
-					branch,
-					policy.keepRecentTokens,
-					modelRefOf(ctx.model) ?? "",
-				);
+				const model = ctx.model;
+				const plan = planPrecompute(branch, policy.keepRecentTokens, modelRefOf(model));
 				if (plan) void startSummary(ctx, plan);
 			}
 
@@ -320,8 +318,8 @@ function statusFor(status: SessionState["precompute"]["status"]): string | undef
 	}
 }
 
-function modelRefOf(model: Model | undefined): string | undefined {
-	return model ? `${model.provider}/${model.id}` : undefined;
+function modelRefOf(model: Model): string {
+	return `${model.provider}/${model.id}`;
 }
 
 function userMessageAfterCompaction(branch: readonly SessionEntry[]): boolean {
