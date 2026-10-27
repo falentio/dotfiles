@@ -227,8 +227,10 @@ describe("one real session", () => {
 				() => open.log.requests.find((item) => !item.summary && item.lastUserText.includes("after compaction simple")),
 				2_000,
 			);
-			expect(next.texts.some((text) => text.includes(SUMMARY_MARKER))).toBe(true);
-			expect(next.texts.some((text) => text.includes(`done ${keptPrompt}`))).toBe(true);
+			const summaryAt = next.texts.findIndex((text) => text.includes(SUMMARY_MARKER));
+			const keptAt = next.texts.findIndex((text) => text.includes(`done ${keptPrompt}`));
+			expect(summaryAt).toBeGreaterThanOrEqual(0);
+			expect(keptAt).toBeGreaterThan(summaryAt);
 		},
 		20_000,
 	);
