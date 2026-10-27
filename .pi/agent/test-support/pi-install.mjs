@@ -90,6 +90,7 @@ export function linkPiInstall(target) {
 		[join(modules, "@earendil-works", "pi-ai"), join(root, "node_modules", "@earendil-works", "pi-ai")],
 		[join(modules, "@earendil-works", "pi-agent-core"), join(root, "node_modules", "@earendil-works", "pi-agent-core")],
 		[join(modules, "@earendil-works", "pi-tui"), join(root, "node_modules", "@earendil-works", "pi-tui")],
+		[join(modules, "jiti"), join(root, "node_modules", "jiti")],
 		[join(modules, "typebox"), join(root, "node_modules", "typebox")],
 	];
 

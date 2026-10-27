@@ -1,6 +1,6 @@
 # Extension test support
 
-`pi-install.mjs` finds the running pi install and links it into the `node_modules` of the extensions whose tests run in-process. It exists because a pi install lives under a hash directory that changes on every update:
+`pi-install.mjs` finds the running pi install and links it, with its `jiti`, into the `node_modules` of the extensions whose tests run in-process, plus `typebox` and bun-types for the typecheck. It exists because a pi install lives under a hash directory that changes on every update:
 
 ```text
 ~/.vite-plus/packages/@earendil-works/pi-coding-agent/<hash>/lib/node_modules/@earendil-works/pi-coding-agent
