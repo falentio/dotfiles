@@ -1,7 +1,7 @@
 {
   "lastChangelogVersion": "1.4.0",
-  "defaultProvider": "radius",
-  "defaultModel": "balanced",
+  "defaultProvider": "9Router",
+  "defaultModel": "deepseek",
   "defaultTools": [
     "+codemode"
   ],
@@ -14,5 +14,6 @@
       "maxRetries": 3,
       "maxRetryDelayMs": 120000
     }
-  }
+  },
+  "theme": "dark"
 }

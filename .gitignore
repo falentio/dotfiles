@@ -4,6 +4,9 @@
 # pi runtime state: shallow library-source clones, machine-local, large
 .pi/source/
 
+# pi runtime state: repo_scout cached sessions and clones, machine-local, large
+.pi/scout/
+
 # credentials / secrets: never commit these
 .pi/agent/auth.json
 .pi/agent/mcp-auth.json
