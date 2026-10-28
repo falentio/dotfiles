@@ -1,0 +1,22 @@
+{
+	"default": {
+		"text": "Mock assistant reply. No tokens were billed."
+	},
+	"rules": [
+		{
+			"match": "summar",
+			"text": "## Summary\n\n- Goal: develop a pi compaction extension against a fake model.\n- State: mock server answered the summarization request.\n- Next: inspect requests.jsonl for the exact prompt pi sent."
+		},
+		{
+			"match": "lighthouse|storm|story",
+			"text": "The lighthouse keeper climbed the spiral stairs each evening, counting the steps out of habit. Sixty-two. The lamp turned, and the beam swept the water like a slow hand across a table. When the storm came in from the north, the sea threw itself against the rocks below, and the keeper stayed awake, feeding the lamp oil and talking to the gulls that sheltered under the eaves. By morning the wind had tired itself out, and the water lay flat and grey as a coin. He wrote the night down in the log: wind north-west, gale, no ships lost."
+		},
+		{
+			"match": "\\b(ls|list files|what files)\\b",
+			"toolCall": {
+				"name": "bash",
+				"arguments": { "command": "ls -1 prototypes/pi-mock-llm" }
+			}
+		}
+	]
+}
