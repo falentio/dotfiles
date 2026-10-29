@@ -3,6 +3,7 @@ import {
 	PROJECT_URL_HEADER,
 	projectUrlOfRemote,
 	projectUrlOfRemotes,
+	remotesOf,
 } from "../project-url.ts";
 
 const remotes: Array<[string, string | null]> = [
@@ -24,6 +25,37 @@ describe("projectUrlOfRemote", () => {
 			expect(projectUrlOfRemote(remote)).toBe(expected);
 		});
 	}
+});
+
+describe("remotesOf", () => {
+	it("reads a url per remote and skips other remote keys", () => {
+		expect(
+			remotesOf(
+				"remote.origin.fetch +refs/heads/*:refs/remotes/origin/*\n" +
+					"remote.origin.url git@github.com:o/r.git\n" +
+					"remote.up.url https://github.com/u/r.git\n",
+			),
+		).toEqual([
+			{ name: "origin", url: "git@github.com:o/r.git" },
+			{ name: "up", url: "https://github.com/u/r.git" },
+		]);
+	});
+
+	it("keeps a url that contains a space", () => {
+		expect(remotesOf("remote.origin.url https://host/o/r x\n")).toEqual([
+			{ name: "origin", url: "https://host/o/r x" },
+		]);
+	});
+
+	it("reads crlf output", () => {
+		expect(remotesOf("remote.origin.url git@github.com:o/r.git\r\n")).toEqual([
+			{ name: "origin", url: "git@github.com:o/r.git" },
+		]);
+	});
+
+	it("ignores a push-only remote", () => {
+		expect(remotesOf("remote.origin.pushurl https://host/push.git\n")).toEqual([]);
+	});
 });
 
 describe("projectUrlOfRemotes", () => {

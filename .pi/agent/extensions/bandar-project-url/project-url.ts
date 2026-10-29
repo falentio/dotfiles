@@ -48,6 +48,18 @@ export function projectUrlOfRemote(remote: string): string | null {
 	return `${protocol}//${address.host}${path}`;
 }
 
+export function remotesOf(config: string): Remote[] {
+	const remotes: Remote[] = [];
+	for (const rawLine of config.split("\n")) {
+		const match = /^remote\.(.+?)\.url (.*)$/.exec(rawLine.replace(/\r$/, ""));
+		if (match === null) continue;
+		const [, name, url] = match;
+		if (name === undefined || url === undefined) continue;
+		remotes.push({ name, url });
+	}
+	return remotes;
+}
+
 export function projectUrlOfRemotes(remotes: ReadonlyArray<Remote>): string | null {
 	const ordered = [
 		...remotes.filter((remote) => remote.name === "origin"),

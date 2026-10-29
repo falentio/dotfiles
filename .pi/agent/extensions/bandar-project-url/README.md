@@ -33,9 +33,10 @@ used. A local path, a `file://` remote, and a remote with no path do not parse.
 ## How it runs
 
 pi fires `before_provider_headers` after it assembles the request headers and
-before the provider call. The handler runs `git -C <cwd> remote -v` once per
-working directory, caches the result for the session, and assigns the header in
-place. The extension registers no command, tool, or status line.
+before the provider call. It runs `git -C <cwd> config --local --get-regexp
+'^remote\.'` once per working directory, caches the result for the session, and
+assigns the header in place. The extension registers no command, tool, or
+status line.
 
 ## No remote, no header
 
@@ -50,7 +51,7 @@ with no install. For `bun test` and `tsc`, the shared linker symlinks the
 current pi install into `node_modules`. Both scripts run it first:
 
 ```sh
-bun run test        # links pi, then 18 tests
+bun run test        # links pi, then the suite
 bun run typecheck
 ```
 
