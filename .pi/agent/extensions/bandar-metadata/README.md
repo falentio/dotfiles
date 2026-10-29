@@ -46,11 +46,11 @@ with forward slashes.
 
 The `x-bandar-session-id` value is the id pi reports for the session. One
 conversation reuses one session, so every request in it carries the same value.
-The id is always present, and pi validates it at its CLI boundary, so the handler
-sends it as it comes. bandar keeps a value of 1 to 128 printable ASCII characters
-and drops any other value as unattributed. The ids pi generates are
-36-character UUIDs, so they fit. No cache is needed, because pi already holds the
-id.
+The id is always present. pi rejects an id outside `[A-Za-z0-9._-]` at its CLI
+boundary, so the handler sends the value as it comes. bandar keeps a value of 1
+to 128 characters from `!` to `~`, which leaves out spaces, and drops any other
+value as unattributed. The ids pi generates are 36-character UUIDs, so they fit.
+No cache is needed, because pi already holds the id.
 
 ## How it runs
 
