@@ -142,6 +142,17 @@ describe("x-bandar-project-url on the wire", () => {
 	);
 
 	it(
+		"sends no header outside a git repository",
+		async () => {
+			const dir = mkdtempSync(join(tmpdir(), "bandar-project-url-plain-"));
+			tempDirs.push(dir);
+			await runPi(dir);
+			expect(sentHeader()).toBeUndefined();
+		},
+		60_000,
+	);
+
+	it(
 		"keeps an https remote and drops the .git suffix",
 		async () => {
 			await runPi(makeRepo("https://github.com/example/r.git"));
