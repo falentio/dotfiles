@@ -22,7 +22,11 @@ function addressOf(remote: string): RemoteAddress | null {
 	if (scp !== null) {
 		const [, host = "", path = ""] = scp;
 		if (host === "" || path === "") return null;
-		return { protocol: "ssh:", host, path: path.startsWith("/") ? path : `/${path}` };
+		return {
+			protocol: "ssh:",
+			host: host.toLowerCase(),
+			path: path.startsWith("/") ? path : `/${path}`,
+		};
 	}
 
 	let url: URL;
