@@ -22,11 +22,14 @@ URL bandar accepts:
 | `ssh://git@github.com/o/r.git` | `https://github.com/o/r` |
 | `git://host/o/r.git` | `https://host/o/r` |
 | `ssh://git@host:2222/o/r.git` | `https://host/o/r` |
+| `https://host:8443/o/r.git` | `https://host:8443/o/r` |
+| `http://host:8080/o/r` | `http://host:8080/o/r` |
 
-The rewrite drops user info and the port, keeps `http` as `http`, moves every
-other scheme to `https`, and removes a trailing `.git` and trailing slashes.
-An ssh remote needs that rewrite because bandar accepts only `http` and
-`https` values.
+The rewrite drops user info and keeps the port only when the remote is
+already `http` or `https`. It keeps `http` as `http`, moves every other scheme
+to `https`, and removes a trailing `.git` and trailing slashes. An ssh remote
+needs that rewrite because bandar accepts only `http` and `https` values, and
+an ssh port belongs to ssh, not to the origin bandar keeps.
 
 `origin` wins. Without a parseable `origin`, the first remote that parses is
 used. A local path, a `file://` remote, and a remote with no path do not parse.

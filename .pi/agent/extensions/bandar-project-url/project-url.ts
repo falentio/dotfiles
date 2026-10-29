@@ -8,6 +8,7 @@ export interface Remote {
 interface RemoteAddress {
 	protocol: string;
 	host: string;
+	port: string;
 	path: string;
 }
 
@@ -25,6 +26,7 @@ function addressOf(remote: string): RemoteAddress | null {
 		return {
 			protocol: "ssh:",
 			host: host.toLowerCase(),
+			port: "",
 			path: path.startsWith("/") ? path : `/${path}`,
 		};
 	}
@@ -37,7 +39,7 @@ function addressOf(remote: string): RemoteAddress | null {
 	}
 
 	if (!REMOTE_PROTOCOLS.has(url.protocol) || url.hostname === "") return null;
-	return { protocol: url.protocol, host: url.hostname, path: url.pathname };
+	return { protocol: url.protocol, host: url.hostname, port: url.port, path: url.pathname };
 }
 
 export function projectUrlOfRemote(remote: string): string | null {
@@ -49,7 +51,9 @@ export function projectUrlOfRemote(remote: string): string | null {
 
 	// bandar drops a header it cannot parse as an absolute http(s) url, so an ssh or git remote keeps its host and moves to https.
 	const protocol = address.protocol === "http:" ? "http:" : "https:";
-	return `${protocol}//${address.host}${path}`;
+	const port =
+		address.protocol === "http:" || address.protocol === "https:" ? address.port : "";
+	return `${protocol}//${address.host}${port === "" ? "" : `:${port}`}${path}`;
 }
 
 export function remotesOf(config: string): Remote[] {
