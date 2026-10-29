@@ -1,0 +1,18 @@
+{
+	"name": "@falentio/bandar-project-url-pi1",
+	"type": "module",
+	"private": true,
+	"pi": {
+		"extensions": ["./index.ts"]
+	},
+	"scripts": {
+		"test": "bun ../../test-support/link-pi.mjs && bun --no-install test",
+		"typecheck": "bun ../../test-support/link-pi.mjs && tsc --noEmit"
+	},
+	"peerDependencies": {
+		"@earendil-works/pi-coding-agent": "*"
+	},
+	"peerDependenciesMeta": {
+		"@earendil-works/pi-coding-agent": { "optional": true }
+	}
+}
