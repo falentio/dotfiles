@@ -19,7 +19,7 @@ The linker refuses to delete a real directory where a link belongs: it stops and
 | `nested-agents` unit | `node --test logic.test.ts handler.test.ts compaction.test.ts` | 122 pass |
 | `nested-agents` smoke | `node --test smoke.test.ts` | 8 pass |
 | `background-compaction` | `bun run test` | 148 pass |
-| `bandar-project-url` | `bun run test` | 31 pass |
+| `bandar-project-url` | `bun run test` | 33 pass |
 | `repo-scout` | `bun run test` | 126 pass |
 | `todos` | `bun run test` | 113 pass |
 

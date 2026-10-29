@@ -1,17 +1,18 @@
 # bandar-project-url
 
-Sets two headers on every request to the `bandar` provider:
-`x-bandar-project-url` names the project the request came from, and
-`x-bandar-session-id` names the pi session that sent it. A request to any other
-provider carries neither header.
+Sets two headers on every request to the `bandar` provider that reaches the
+provider header hook: `x-bandar-project-url` names the project the request came
+from, and `x-bandar-session-id` names the pi session that sent it. A request to
+any other provider carries neither header.
 
 bandar is a gateway that sits in front of the model providers. It charges a
 request to the project in `x-bandar-project-url`, keeps the origin and path of
 that value, and drops any value that is not an absolute `http` or `https` URL. A
 request without the header lands in bandar's unattributed usage. The session id
 names the pi session, so the gateway can group every request one conversation
-sends under one id. bandar reads only the project url today; the session id
-reaches the gateway and is not recorded yet.
+sends under one id. bandar already groups usage by `x-bandar-session-id`: its
+gateway reads the header and stores the value with each request it records. This
+extension is the sender half.
 
 ## The project url
 
@@ -46,7 +47,10 @@ with forward slashes.
 The `x-bandar-session-id` value is the id pi reports for the session. One
 conversation reuses one session, so every request in it carries the same value.
 The id is always present, and pi validates it at its CLI boundary, so the handler
-sends it as it comes. No cache is needed, because pi already holds the id.
+sends it as it comes. bandar keeps a value of 1 to 128 printable ASCII characters
+and drops any other value as unattributed. The ids pi generates are
+36-character UUIDs, so they fit. No cache is needed, because pi already holds the
+id.
 
 ## How it runs
 

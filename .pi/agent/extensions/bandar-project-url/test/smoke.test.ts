@@ -72,7 +72,10 @@ function makeRepo(remote?: string): string {
 	return dir;
 }
 
-function runPi(cwd: string, provider = "bandar"): Promise<void> {
+function runPi(
+	cwd: string,
+	{ provider = "bandar", sessionId = SESSION_ID }: { provider?: string; sessionId?: string | null } = {},
+): Promise<void> {
 	return new Promise((resolve, reject) => {
 		const child = spawn(
 			PI[0] as string,
@@ -84,7 +87,7 @@ function runPi(cwd: string, provider = "bandar"): Promise<void> {
 				"--no-skills",
 				"--no-context-files",
 				"--no-session",
-				"--session-id", SESSION_ID,
+				...(sessionId === null ? [] : ["--session-id", sessionId]),
 				"-e", join(EXT_DIR, "index.ts"),
 				"-e", join(import.meta.dir, "http-provider.ts"),
 				"--provider", provider,
@@ -139,6 +142,18 @@ describe("bandar attribution headers on the wire", () => {
 	);
 
 	it(
+		"sends the id pi generates when no session id is given",
+		async () => {
+			await runPi(makeRepo("git@github.com:example/project.git"), { sessionId: null });
+			const headers = wireHeaders();
+			expect(headers[SESSION_ID_HEADER]).toMatch(
+				/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+			);
+		},
+		60_000,
+	);
+
+	it(
 		"sends the session id when the repository has no remote",
 		async () => {
 			await runPi(makeRepo());
@@ -176,7 +191,7 @@ describe("bandar attribution headers on the wire", () => {
 	it(
 		"sends neither header to a provider other than bandar",
 		async () => {
-			await runPi(makeRepo("git@github.com:example/project.git"), "other");
+			await runPi(makeRepo("git@github.com:example/project.git"), { provider: "other" });
 			const headers = wireHeaders();
 			expect(headers[SESSION_ID_HEADER]).toBeUndefined();
 			expect(headers[PROJECT_URL_HEADER]).toBeUndefined();
