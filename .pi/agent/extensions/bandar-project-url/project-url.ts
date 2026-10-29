@@ -16,7 +16,7 @@ const SCP_REMOTE = /^(?:[^@/]+@)?([^:/]+):(.+)$/;
 const REMOTE_PROTOCOLS = new Set(["http:", "https:", "ssh:", "git:"]);
 
 function addressOf(remote: string): RemoteAddress | null {
-	const raw = remote.trim();
+	const raw = remote.trim().replace(/^git\+/, "");
 	if (raw === "" || raw.includes("\\")) return null;
 
 	const scp = raw.includes("://") ? null : SCP_REMOTE.exec(raw);

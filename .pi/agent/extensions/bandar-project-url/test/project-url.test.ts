@@ -13,6 +13,8 @@ const remotes: Array<[string, string | null]> = [
 	["git@GitHub.com:o/r.git", "https://github.com/o/r"],
 	["ssh://git@github.com/o/r.git", "https://github.com/o/r"],
 	["git://host/o/r.git", "https://host/o/r"],
+	["git+ssh://git@host/o/r.git", "https://host/o/r"],
+	["git+https://github.com/o/r.git", "https://github.com/o/r"],
 	["ssh://git@host:2222/o/r.git", "https://host/o/r"],
 	["https://user:pass@github.com/o/r.git", "https://github.com/o/r"],
 	["https://git.example.com:8443/team/repo.git", "https://git.example.com:8443/team/repo"],
