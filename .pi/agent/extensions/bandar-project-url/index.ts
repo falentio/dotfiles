@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { PROJECT_URL_PROVIDERS } from "./config.ts";
 import {
 	PROJECT_URL_HEADER,
 	projectUrlOfRemotes,
@@ -27,6 +28,8 @@ export default function bandarProjectUrl(pi: ExtensionAPI): void {
 	}
 
 	pi.on("before_provider_headers", async (event, ctx) => {
+		const provider = ctx.model?.provider;
+		if (provider === undefined || !PROJECT_URL_PROVIDERS.includes(provider)) return;
 		const url = await projectUrlFor(ctx.cwd);
 		if (url !== null) event.headers[PROJECT_URL_HEADER] = url;
 	});

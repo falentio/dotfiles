@@ -1,7 +1,8 @@
 # bandar-project-url
 
-Sets `x-bandar-project-url` on every model request, so bandar can charge the
-request to the project it came from.
+Sets `x-bandar-project-url` on requests to the `bandar` provider, so bandar can
+charge the request to the project it came from. A request to any other provider
+carries no header.
 
 bandar is a gateway that sits in front of the model providers. It reads that
 header, keeps the origin and path of the value, and drops any value that is not
@@ -33,10 +34,11 @@ used. A local path, a `file://` remote, and a remote with no path do not parse.
 ## How it runs
 
 pi fires `before_provider_headers` after it assembles the request headers and
-before the provider call. It runs `git -C <cwd> config --local --get-regexp
-'^remote\.'` once per working directory, caches the result for the session, and
-assigns the header in place. The extension registers no command, tool, or
-status line.
+before the provider call. The handler adds the header only when the request
+goes to a provider in `PROJECT_URL_PROVIDERS` (`config.ts`), which lists
+`bandar`. It runs `git -C <cwd> config --local --get-regexp '^remote\.'` once
+per working directory, caches the result for the session, and assigns the
+header in place. The extension registers no command, tool, or status line.
 
 ## No remote, no header
 

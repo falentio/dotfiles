@@ -13,22 +13,22 @@ const tempDirs: string[] = [];
 let server: ReturnType<typeof Bun.serve>;
 let agentDir: string;
 
-function chunk(delta: unknown, finishReason: string | null, usage?: unknown): string {
+function chunk(model: string, delta: unknown, finishReason: string | null, usage?: unknown): string {
 	const payload = {
-		id: "chatcmpl-wire",
+		id: "chatcmpl-test",
 		object: "chat.completion.chunk",
 		created: 0,
-		model: "wire-1",
+		model,
 		choices: [{ index: 0, delta, finish_reason: finishReason }],
 		...(usage === undefined ? {} : { usage }),
 	};
 	return `data: ${JSON.stringify(payload)}\n\n`;
 }
 
-function body(): string {
+function body(model: string): string {
 	return (
-		chunk({ role: "assistant", content: "hi" }, null) +
-		chunk({}, "stop", { prompt_tokens: 3, completion_tokens: 1, total_tokens: 4 }) +
+		chunk(model, { role: "assistant", content: "hi" }, null) +
+		chunk(model, {}, "stop", { prompt_tokens: 3, completion_tokens: 1, total_tokens: 4 }) +
 		"data: [DONE]\n\n"
 	);
 }
@@ -39,13 +39,14 @@ beforeAll(() => {
 	server = Bun.serve({
 		hostname: "127.0.0.1",
 		port: 0,
-		fetch(request) {
+		async fetch(request) {
 			const headers: Record<string, string> = {};
 			request.headers.forEach((value, key) => {
 				headers[key] = value;
 			});
 			requests.push(headers);
-			return new Response(body(), {
+			const payload = (await request.json()) as { model?: string };
+			return new Response(body(payload.model ?? "test-1"), {
 				headers: { "content-type": "text/event-stream" },
 			});
 		},
@@ -69,7 +70,7 @@ function makeRepo(remote?: string): string {
 	return dir;
 }
 
-function runPi(cwd: string): Promise<void> {
+function runPi(cwd: string, provider = "bandar"): Promise<void> {
 	return new Promise((resolve, reject) => {
 		const child = spawn(
 			PI[0] as string,
@@ -83,8 +84,8 @@ function runPi(cwd: string): Promise<void> {
 				"--no-session",
 				"-e", join(EXT_DIR, "index.ts"),
 				"-e", join(import.meta.dir, "http-provider.ts"),
-				"--provider", "wire",
-				"--model", "wire-1",
+				"--provider", provider,
+				"--model", `${provider}-1`,
 				"--api-key", "test",
 				"hi",
 			],
@@ -93,7 +94,7 @@ function runPi(cwd: string): Promise<void> {
 				stdio: ["ignore", "pipe", "pipe"],
 				env: {
 					...process.env,
-					WIRE_BASE_URL: `http://127.0.0.1:${server.port}/v1`,
+					PROVIDER_BASE_URL: `http://127.0.0.1:${server.port}/v1`,
 					PI_CODING_AGENT_DIR: agentDir,
 					PI_OFFLINE: "1",
 				},
@@ -145,6 +146,15 @@ describe("x-bandar-project-url on the wire", () => {
 		async () => {
 			await runPi(makeRepo("https://github.com/example/r.git"));
 			expect(sentHeader()).toBe("https://github.com/example/r");
+		},
+		60_000,
+	);
+
+	it(
+		"sends no header to a provider other than bandar",
+		async () => {
+			await runPi(makeRepo("git@github.com:example/project.git"), "other");
+			expect(sentHeader()).toBeUndefined();
 		},
 		60_000,
 	);
