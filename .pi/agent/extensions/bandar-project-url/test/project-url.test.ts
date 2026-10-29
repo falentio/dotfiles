@@ -21,6 +21,7 @@ const remotes: Array<[string, string | null]> = [
 	["http://git.internal:8080/team/repo", "http://git.internal:8080/team/repo"],
 	["/home/x/r", null],
 	["C:\\repos\\r", null],
+	["C:/repos/r", null],
 	["file:///home/x/r", null],
 	["", null],
 ];

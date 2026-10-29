@@ -14,10 +14,11 @@ interface RemoteAddress {
 
 const SCP_REMOTE = /^(?:[^@/]+@)?([^:/]+):(.+)$/;
 const REMOTE_PROTOCOLS = new Set(["http:", "https:", "ssh:", "git:"]);
+const WINDOWS_PATH = /^[A-Za-z]:[\\/]/;
 
 function addressOf(remote: string): RemoteAddress | null {
 	const raw = remote.trim().replace(/^git\+/, "");
-	if (raw === "" || raw.includes("\\")) return null;
+	if (raw === "" || raw.includes("\\") || WINDOWS_PATH.test(raw)) return null;
 
 	const scp = raw.includes("://") ? null : SCP_REMOTE.exec(raw);
 	if (scp !== null) {
