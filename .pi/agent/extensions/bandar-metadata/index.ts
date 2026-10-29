@@ -5,7 +5,7 @@ import { projectUrlOfRemotes, remotesOf } from "./project-url.ts";
 
 const GIT_TIMEOUT_MS = 5_000;
 
-export default function bandarProjectUrl(pi: ExtensionAPI): void {
+export default function bandarMetadata(pi: ExtensionAPI): void {
 	const urls = new Map<string, Promise<string | null>>();
 
 	function projectUrlFor(cwd: string): Promise<string | null> {

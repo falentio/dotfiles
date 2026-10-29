@@ -10,7 +10,7 @@ The helper takes the newest install, or `PI_INSTALL` when set. `piAliases` retur
 
 The linker refuses to delete a real directory where a link belongs: it stops and names the path, so a `node_modules` from a real install survives.
 
-`link-pi.mjs` runs the linker for `background-compaction`, `bandar-project-url`, `repo-scout`, `todos`, and `test-support` itself, and every suite that imports pi in-process calls it from its `test` and `typecheck` scripts. The `nested-agents` suites need no link: they drive the real `pi` CLI in its own process. Run `bun test` directly only after one link; Bun resolves a test file's imports before any preload, so a `bunfig.toml` preload is too late on a clean checkout.
+`link-pi.mjs` runs the linker for `background-compaction`, `bandar-metadata`, `repo-scout`, `todos`, and `test-support` itself, and every suite that imports pi in-process calls it from its `test` and `typecheck` scripts. The `nested-agents` suites need no link: they drive the real `pi` CLI in its own process. Run `bun test` directly only after one link; Bun resolves a test file's imports before any preload, so a `bunfig.toml` preload is too late on a clean checkout.
 
 ## Suites on the faux model
 
@@ -19,7 +19,7 @@ The linker refuses to delete a real directory where a link belongs: it stops and
 | `nested-agents` unit | `node --test logic.test.ts handler.test.ts compaction.test.ts` | 122 pass |
 | `nested-agents` smoke | `node --test smoke.test.ts` | 8 pass |
 | `background-compaction` | `bun run test` | 148 pass |
-| `bandar-project-url` | `bun run test` | 33 pass |
+| `bandar-metadata` | `bun run test` | 33 pass |
 | `repo-scout` | `bun run test` | 126 pass |
 | `todos` | `bun run test` | 113 pass |
 

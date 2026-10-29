@@ -36,7 +36,7 @@ function body(model: string): string {
 }
 
 beforeAll(() => {
-	agentDir = mkdtempSync(join(tmpdir(), "bandar-project-url-agent-"));
+	agentDir = mkdtempSync(join(tmpdir(), "bandar-metadata-agent-"));
 	tempDirs.push(agentDir);
 	server = Bun.serve({
 		hostname: "127.0.0.1",
@@ -65,7 +65,7 @@ beforeEach(() => {
 });
 
 function makeRepo(remote?: string): string {
-	const dir = mkdtempSync(join(tmpdir(), "bandar-project-url-repo-"));
+	const dir = mkdtempSync(join(tmpdir(), "bandar-metadata-repo-"));
 	tempDirs.push(dir);
 	execFileSync("git", ["init", "--quiet"], { cwd: dir });
 	if (remote !== undefined) execFileSync("git", ["remote", "add", "origin", remote], { cwd: dir });
@@ -167,7 +167,7 @@ describe("bandar attribution headers on the wire", () => {
 	it(
 		"sends the session id outside a git repository",
 		async () => {
-			const dir = mkdtempSync(join(tmpdir(), "bandar-project-url-plain-"));
+			const dir = mkdtempSync(join(tmpdir(), "bandar-metadata-plain-"));
 			tempDirs.push(dir);
 			await runPi(dir);
 			const headers = wireHeaders();

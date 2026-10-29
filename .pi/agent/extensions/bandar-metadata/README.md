@@ -1,4 +1,4 @@
-# bandar-project-url
+# bandar-metadata
 
 Sets two headers on every request to the `bandar` provider that reaches the
 provider header hook: `x-bandar-project-url` names the project the request came
