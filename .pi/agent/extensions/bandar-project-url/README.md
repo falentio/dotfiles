@@ -33,6 +33,8 @@ an ssh port belongs to ssh, not to the origin bandar keeps.
 
 `origin` wins. Without a parseable `origin`, the first remote that parses is
 used. A local path, a `file://` remote, and a remote with no path do not parse.
+A Windows path never reaches the `host:path` form, because it contains a
+backslash.
 
 ## How it runs
 

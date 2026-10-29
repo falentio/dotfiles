@@ -17,7 +17,7 @@ const REMOTE_PROTOCOLS = new Set(["http:", "https:", "ssh:", "git:"]);
 
 function addressOf(remote: string): RemoteAddress | null {
 	const raw = remote.trim();
-	if (raw === "") return null;
+	if (raw === "" || raw.includes("\\")) return null;
 
 	const scp = raw.includes("://") ? null : SCP_REMOTE.exec(raw);
 	if (scp !== null) {
