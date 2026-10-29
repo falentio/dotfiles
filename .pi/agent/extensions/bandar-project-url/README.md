@@ -46,6 +46,11 @@ goes to a provider in `PROJECT_URL_PROVIDERS` (`config.ts`), which lists
 per working directory, caches the result for the session, and assigns the
 header in place. The extension registers no command, tool, or status line.
 
+A compaction summary carries no header. pi builds the summarization request
+with its own auth headers and never fires `before_provider_headers`, so bandar
+records those tokens as unattributed. An extension cannot close that gap on pi
+1.4.0.
+
 ## No remote, no header
 
 When git is missing, the directory is not a repository, or no remote parses,
