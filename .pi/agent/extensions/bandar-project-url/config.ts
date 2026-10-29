@@ -5,5 +5,4 @@
  * read.
  */
 
-/** Providers that receive x-bandar-project-url. */
-export const PROJECT_URL_PROVIDERS: readonly string[] = ["bandar"];
+export const ATTRIBUTION_PROVIDERS: readonly string[] = ["bandar"];

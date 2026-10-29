@@ -1,5 +1,3 @@
-export const PROJECT_URL_HEADER = "x-bandar-project-url";
-
 export interface Remote {
 	name: string;
 	url: string;

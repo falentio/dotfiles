@@ -4,9 +4,11 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { piCommand } from "../../../test-support/pi-install.mjs";
+import { PROJECT_URL_HEADER, SESSION_ID_HEADER } from "../headers.ts";
 
 const EXT_DIR = join(import.meta.dir, "..");
 const PI = piCommand();
+const SESSION_ID = "0199aaaa-bbbb-7ccc-8ddd-eeeeffff0000";
 
 const requests: Array<Record<string, string>> = [];
 const tempDirs: string[] = [];
@@ -82,6 +84,7 @@ function runPi(cwd: string, provider = "bandar"): Promise<void> {
 				"--no-skills",
 				"--no-context-files",
 				"--no-session",
+				"--session-id", SESSION_ID,
 				"-e", join(EXT_DIR, "index.ts"),
 				"-e", join(import.meta.dir, "http-provider.ts"),
 				"--provider", provider,
@@ -117,37 +120,44 @@ function runPi(cwd: string, provider = "bandar"): Promise<void> {
 	});
 }
 
-function sentHeader(): string | undefined {
-	expect(requests.length).toBeGreaterThan(0);
-	return requests.at(-1)?.["x-bandar-project-url"];
+function wireHeaders(): Record<string, string> {
+	const last = requests.at(-1);
+	if (last === undefined) throw new Error("pi sent no request");
+	return last;
 }
 
-describe("x-bandar-project-url on the wire", () => {
+describe("bandar attribution headers on the wire", () => {
 	it(
 		"sends the origin remote as an https project url",
 		async () => {
 			await runPi(makeRepo("git@github.com:example/project.git"));
-			expect(sentHeader()).toBe("https://github.com/example/project");
+			const headers = wireHeaders();
+			expect(headers[PROJECT_URL_HEADER]).toBe("https://github.com/example/project");
+			expect(headers[SESSION_ID_HEADER]).toBe(SESSION_ID);
 		},
 		60_000,
 	);
 
 	it(
-		"sends no header when the repository has no remote",
+		"sends the session id when the repository has no remote",
 		async () => {
 			await runPi(makeRepo());
-			expect(sentHeader()).toBeUndefined();
+			const headers = wireHeaders();
+			expect(headers[SESSION_ID_HEADER]).toBe(SESSION_ID);
+			expect(headers[PROJECT_URL_HEADER]).toBeUndefined();
 		},
 		60_000,
 	);
 
 	it(
-		"sends no header outside a git repository",
+		"sends the session id outside a git repository",
 		async () => {
 			const dir = mkdtempSync(join(tmpdir(), "bandar-project-url-plain-"));
 			tempDirs.push(dir);
 			await runPi(dir);
-			expect(sentHeader()).toBeUndefined();
+			const headers = wireHeaders();
+			expect(headers[SESSION_ID_HEADER]).toBe(SESSION_ID);
+			expect(headers[PROJECT_URL_HEADER]).toBeUndefined();
 		},
 		60_000,
 	);
@@ -156,16 +166,20 @@ describe("x-bandar-project-url on the wire", () => {
 		"keeps an https remote and drops the .git suffix",
 		async () => {
 			await runPi(makeRepo("https://github.com/example/r.git"));
-			expect(sentHeader()).toBe("https://github.com/example/r");
+			const headers = wireHeaders();
+			expect(headers[PROJECT_URL_HEADER]).toBe("https://github.com/example/r");
+			expect(headers[SESSION_ID_HEADER]).toBe(SESSION_ID);
 		},
 		60_000,
 	);
 
 	it(
-		"sends no header to a provider other than bandar",
+		"sends neither header to a provider other than bandar",
 		async () => {
 			await runPi(makeRepo("git@github.com:example/project.git"), "other");
-			expect(sentHeader()).toBeUndefined();
+			const headers = wireHeaders();
+			expect(headers[SESSION_ID_HEADER]).toBeUndefined();
+			expect(headers[PROJECT_URL_HEADER]).toBeUndefined();
 		},
 		60_000,
 	);

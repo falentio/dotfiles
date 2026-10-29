@@ -1,18 +1,22 @@
 # bandar-project-url
 
-Sets `x-bandar-project-url` on requests to the `bandar` provider, so bandar can
-charge the request to the project it came from. A request to any other provider
-carries no header.
+Sets two headers on every request to the `bandar` provider:
+`x-bandar-project-url` names the project the request came from, and
+`x-bandar-session-id` names the pi session that sent it. A request to any other
+provider carries neither header.
 
-bandar is a gateway that sits in front of the model providers. It reads that
-header, keeps the origin and path of the value, and drops any value that is not
-an absolute `http` or `https` URL. A request without the header lands in
-bandar's unattributed usage.
+bandar is a gateway that sits in front of the model providers. It charges a
+request to the project in `x-bandar-project-url`, keeps the origin and path of
+that value, and drops any value that is not an absolute `http` or `https` URL. A
+request without the header lands in bandar's unattributed usage. The session id
+names the pi session, so the gateway can group every request one conversation
+sends under one id. bandar reads only the project url today; the session id
+reaches the gateway and is not recorded yet.
 
-## What is sent
+## The project url
 
-The header value is the git remote of the working directory, rewritten into a
-URL bandar accepts:
+The `x-bandar-project-url` value is the git remote of the working directory,
+rewritten into a URL bandar accepts:
 
 | Remote | Header |
 | --- | --- |
@@ -37,25 +41,38 @@ used. A local path, a `file://` remote, and a remote with no path do not parse.
 A Windows path does not parse, whether it uses backslashes or a drive letter
 with forward slashes.
 
+## The session id
+
+The `x-bandar-session-id` value is the id pi reports for the session. One
+conversation reuses one session, so every request in it carries the same value.
+The id is always present, and pi validates it at its CLI boundary, so the handler
+sends it as it comes. No cache is needed, because pi already holds the id.
+
 ## How it runs
 
 pi fires `before_provider_headers` after it assembles the request headers and
-before the provider call. The handler adds the header only when the request
-goes to a provider in `PROJECT_URL_PROVIDERS` (`config.ts`), which lists
-`bandar`. It runs `git -C <cwd> config --local --get-regexp '^remote\.'` once
-per working directory, caches the result for the session, and assigns the
-header in place. The extension registers no command, tool, or status line.
+before the provider call. The handler returns early unless the request goes to a
+provider in `ATTRIBUTION_PROVIDERS` (`config.ts`), which lists `bandar`.
 
-A compaction summary carries no header. pi builds the summarization request
-with its own auth headers and never fires `before_provider_headers`, so bandar
-records those tokens as unattributed. An extension cannot close that gap on pi
-1.4.0.
+For a bandar request, the handler sets `x-bandar-session-id` from
+`ctx.sessionManager.getSessionId()`. It then sets `x-bandar-project-url` from the
+git remote of `ctx.cwd`: it runs `git -C <cwd> config --local --get-regexp
+'^remote\.'` once per working directory and caches the result for the session.
+The wire names live in `headers.ts`. The extension registers no command, tool, or
+status line.
 
-## No remote, no header
+## A compaction summary carries no header
 
-When git is missing, the directory is not a repository, or no remote parses,
-the handler leaves the request alone. bandar then records the usage without a
-project.
+pi builds the summarization request with its own auth headers and never fires
+`before_provider_headers`, so a compaction summary carries neither header.
+bandar records those tokens as unattributed and sees no session id for that
+request. An extension cannot add a header to that request on pi 1.4.0.
+
+## No remote, no project url
+
+When git is missing, the directory is not a repository, or no remote parses, the
+request carries no project url. It still carries the session id, which does not
+depend on the repository.
 
 ## Develop
 
@@ -69,4 +86,4 @@ bun run typecheck
 ```
 
 The smoke test drives the real `pi` CLI against a local OpenAI-compatible
-server and asserts the header on the wire.
+server and asserts both headers on the wire.
