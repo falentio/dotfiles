@@ -18,32 +18,6 @@ TypeScript, lint, and format errors wait until implementation is done. While imp
 
 Every rule fix is its own commit: an imperative subject that reads on its own, with the rule id in a `Rule:` trailer for `git log --grep`. The `fix-checks` skill holds the child's steps.
 
-## After a PR
-
-Opening a PR starts a review gate, and the gate is mandatory: a second agent reviews the PR, a third fixes every finding, and a fourth babysits it green. The author does not review its own PR.
-
-Each prompt may be worded freely; it must carry the instructions below, so the child does the same job every time.
-
-1. **Review.** Spawn one `tools.mcp__t3_code__delegate_task` to review the PR. Its prompt must name the PR number, name `/skill:code-review` and `/skill:poteto-mode` as skills to read, and ask for the findings, each with evidence, written to a markdown file under `/tmp`. A working prompt:
-
-   ```text
-   review pr #<n> using /skill:code-review /skill:poteto-mode write down evidence to /tmp with format markdown
-   ```
-
-2. **Fix.** When the review's terminal notification arrives, spawn a second `tools.mcp__t3_code__delegate_task` to fix every finding, handing it the review's `/tmp` file as the worklist. Its prompt must name that file, name `/skill:poteto-mode`, and ask for every finding fixed. A working prompt:
-
-   ```text
-   fix all findings in <path> using /skill:poteto-mode
-   ```
-
-3. **Babysit.** When the fix's terminal notification arrives, spawn a third `tools.mcp__t3_code__delegate_task` to babysit the PR until it is green. Its prompt must name the PR number and `/skill:poteto-mode`, whose **Babysit** playbook (`playbooks/babysit.md`) drives the PR to merge-ready in `drive` mode. A working prompt:
-
-   ```text
-   babysit pr #<n> until green using /skill:poteto-mode
-   ```
-
-Naming `/skill:poteto-mode` in each prompt is what loads the persona: it travels as a skill the child reads, never as the `role` line.
-
 ## Long-running processes
 
 A dev server, watcher, worker, or tunnel — anything outliving the command that starts it — runs as a tmux **DEV session** via `devproc`, one per worktree; its name, `DEV <repo> <branch> <port>`, is the registry.
