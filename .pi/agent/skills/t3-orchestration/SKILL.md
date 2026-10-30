@@ -30,7 +30,7 @@ const { content } = await tools.mcp__t3_code__delegate_task({
 const { taskId, childThreadId } = JSON.parse(content[0].text);
 ```
 
-Every tool returns JSON in `content[0].text`. A **failure is content too** (`code`, `message`); only transport or schema errors throw.
+Every tool returns its JSON in `content[0].text`, mirrored as `structuredContent`. A **failure is content too** (`code`, `message`); only transport or schema errors throw.
 
 Omitted `target` inherits this thread's provider, model, and options — the right default unless the user named a model or the task needs another provider. `role` is one-line framing (`implementation`, `research`, `review`, `design`, `test`, `general`); a persona travels as a skill the child reads.
 
@@ -46,7 +46,7 @@ A notification lands **between** turns, never inside one, so in-flight work fini
 | Need | Move |
 |---|---|
 | A resumed run to finish first | `t3_thread_wait` with `childThreadId`, re-called while `timedOut: true` |
-| The child asked a question | `hasPendingQuestion` → `t3_pending_request_list` / `_read` / `_respond` |
+| The child asked a question | `hasPendingQuestion` → `t3_pending_request` with `action` `list` → `read` → `respond` |
 | The child is stuck on an approval | `pendingApproval` names it; only its own approval holder can grant it. Report it. |
 | The work is wrong and still running | `t3_thread_send` with `mode: "steer"` |
 | The work should stop | `task_cancel` (whole task) or `t3_thread_interrupt` (one run) |
@@ -78,7 +78,7 @@ Cancellation is idempotent: `task_cancel` returns `cancel_requested`, a re-cance
 | Field | Takes | Behaviour |
 |---|---|---|
 | `task` | 1–120,000 chars, trimmed | The child's whole prompt; the parent conversation is not copied. |
-| `title` | ≤ 512 chars | Display title, in the notification: `Delegated task <taskId> (<title>): <summary>`. |
+| `title` | ≤ 512 chars | Display title. The notification reads `Delegated task <taskId> (<title>) [<status>]: <summary>`. |
 | `role` | see above | One-line framing; cannot load a persona. |
 | `target` | `{providerInstanceId?, driverKind?, model?, options?}` | Omitted, the child inherits this thread's provider, model, and options. |
 | `isolation` | `"shared"` (default) \| `"worktree"` | See Isolation. |
@@ -118,7 +118,7 @@ const r = JSON.parse((await tools.mcp__t3_code__t3_thread_send({
 | `auto` | idle | `started` | New run, `status: "starting"`. |
 | `auto` | run in flight | `queued` | Waited behind the running turn. |
 | `queue` | idle | `started` | **Ran immediately** — nothing to queue behind. |
-| `queue` | run in flight | `queued` | Appeared in `t3_queue_list`. |
+| `queue` | run in flight | `queued` | Appeared in the `t3_queue` `list`, under the returned `runId`. |
 | `steer` | run in flight | `steered` | Injected into that turn; `runId` was the **running** run, and the child answered the steer, abandoning the original instruction. |
 | `restart` | run in flight | `restarted` | Interrupts, then starts a new run. |
 
@@ -137,18 +137,22 @@ Without `runId` it waits on the **latest run at call time**, so a resume startin
 
 ### queue
 
-Queued messages are runs, addressed by `queuedRunId`.
+Queued messages are runs, addressed by `queuedRunId` — which is exactly the `runId` a `mode: "queue"` send returned.
 
-| Tool | Extra args | Notes |
+```js
+t3_queue({ threadId, action: "list" })   // { items: [{queuedRunId, text, truncated}], nextCursor }
+```
+
+| `action` | Extra args | Does |
 |---|---|---|
-| `t3_queue_list` | `cursor?`, `limit?` | `{items: [{queuedRunId, text, truncated}], nextCursor}`. |
-| `t3_queue_read` | `queuedRunId` | Up to 16,000 chars. |
-| `t3_queue_edit` | `queuedRunId`, `text` | Keeps attachments; rejects runs no longer queued. |
-| `t3_queue_cancel` | `queuedRunId` | Drops that message. |
-| `t3_queue_reorder` | `queuedRunId`, `beforeRunId` | `null` moves it to the end. |
-| `t3_queue_promote_to_steer` | `queuedRunId`, `targetRunId` | Delivers it as steering into the named active run. |
+| `list` | `cursor?`, `limit?` | Send order, paged. |
+| `read` | `queuedRunId` | Up to 16,000 chars. |
+| `edit` | `queuedRunId`, `text` | Replaces the text, attachments stay. |
+| `cancel` | `queuedRunId` | Drops that message. |
+| `reorder` | `queuedRunId`, `beforeRunId` | Moves it before that **currently queued** run. `null` is rejected: `"This action needs beforeRunId."` |
+| `promote_to_steer` | `queuedRunId`, `targetRunId` | Delivers it as steering into the named active run, and the queued run ends `cancelled`. |
 
-Each takes an optional `threadId` (omitted: this thread) and returns `{sequence}`, not the queue, so re-read `t3_queue_list`. **Interrupt does not drop the queue**: an interrupt left a queued run that later completed; `t3_queue_cancel` is how queued work is dropped.
+Each takes an optional `threadId` (omitted: this thread) and returns `{sequence}`, not the queue, so re-read `list`. A message no longer queued fails `invalid_request`: `"The queued message was not found."` **Interrupt does not drop the queue**: an interrupt left a queued run that later completed; `cancel` is how queued work is dropped.
 
 ### interrupt
 
@@ -157,7 +161,7 @@ await tools.mcp__t3_code__t3_thread_interrupt({ threadId, runId?, reason? });
 // { threadId, runId, status: "interrupt_requested" | "no_active_run" | <terminal> }
 ```
 
-Without `runId` it targets the newest interruptible run, which settles as `interrupted` a moment later — read the run list rather than assuming. `no_active_run` on an idle thread is not an error.
+Without `runId` it targets the newest interruptible run, which settles as `interrupted` a moment later — read the run list rather than assuming. `no_active_run` on an idle thread is not an error, and a run that already ended returns its terminal status (`completed`).
 
 ### read
 
@@ -178,22 +182,19 @@ Recover a lost `childThreadId` from `t3_thread_list`: the entry whose `parentThr
 
 | Tool | Does |
 |---|---|
-| `t3_thread_configure` | Set provider, model, options. Permission modes unchanged. |
-| `t3_thread_configuration` | Read a thread's selection and modes. |
-| `t3_thread_organize` | `pin`, `unpin`, `snooze` (needs `snoozedUntil`), `unsnooze`, `settle`, `unsettle`, `archive`, `unarchive`, `mark_unread`. Settling *this* thread applies at turn end; a failed turn or a queued message leaves it active. |
-| `t3_thread_fork` | From `{type:"latest_stable"}`, `{type:"run", runId}`, or `{type:"checkpoint", checkpointId}`; omit `threadId` to fork this thread. |
-| `t3_thread_merge_back` | Merge context into a related thread in the same project. |
-| `t3_thread_transfers` | Read context-transfer status. |
+| `t3_thread_configure` | Reads without `modelSelection`: `{modelSelection: {instanceId, model}, runtimeMode, interactionMode}`. With it, sets provider, model, options; permission modes stay. |
+| `t3_thread_organize` | `action`: `pin`, `unpin`, `snooze` (needs `snoozedUntil`), `unsnooze`, `settle`, `unsettle`, `archive`, `unarchive`, `mark_unread`. Settling *this* thread applies at turn end; a failed turn or a queued message leaves it active. |
+| `t3_thread_transfer` | `action`: `fork` from `sourcePoint` (`{type:"latest_stable"}`, `{type:"run", runId}`, `{type:"checkpoint", checkpointId}`), `merge_back` into `targetThreadId`, or `status`. Omit `threadId` for this thread. |
 
 ### Questions and approvals
 
 ```js
-t3_pending_request_list({ threadId })            // { requestIds }
-t3_pending_request_read({ threadId, requestId }) // { requestId, questions: [...] }
-t3_pending_request_respond({ threadId, requestId, answers })
+t3_pending_request({ threadId, action: "list" })               // { requestIds: [] }
+t3_pending_request({ threadId, action: "read", requestId })    // { requestId, questions: [...] }
+t3_pending_request({ threadId, action: "respond", requestId, answers })
 ```
 
-Answers are questions only; `_respond` cannot approve a permission request, which stays with the child's approval holder. Re-read before responding, since the record can outlive its provider callback.
+Answers are questions only; `respond` cannot approve a permission request, which stays with the child's approval holder. Re-read before responding, since the record can outlive its provider callback. A child blocked on `request_secret`, or on an approval, keeps `hasPendingQuestion: false` and an empty `requestIds`: those wait for the human in the UI, not for you.
 
 ## Failure modes
 
@@ -215,4 +216,4 @@ One stable `clientRequestId` per intended action, reused across retries of that 
 
 ## Tell the human
 
-Link a thread as `[title](t3-thread://v1/<threadId>)` with the exact `threadId`, unencoded.
+Results already carry `link`, so paste it verbatim. Without one: `[title](t3-thread://v1/<threadId>)`, the exact `threadId`, unencoded.

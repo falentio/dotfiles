@@ -73,3 +73,55 @@ E17 orchestrator_capabilities features: {appOwnedSubagents:true, asyncPolling:tr
 E18 codemode store() in one invocation, load() in the next -> undefined.
     PROVED: keep taskIds in the conversation or a file, never in store().
 ```
+
+## Probe round 2 — every example re-run (2026-10-30)
+
+Server `0.1.4-nightly.20261027.3770`. Parent: provider `pi`, model `9Router/deepseek`, `runtimeMode: full-access`. Method: each code block in SKILL.md run live, return shapes copied.
+
+```text
+R1  delegate_task {mode:"wait", timeoutMs:180000, role:"general"} -> 3.6s, parsed keys:
+    taskId, childThreadId, link, childRunId, childNodeId, status, workState, hasPendingChildRuns,
+    latestTerminalRunId/Status/Summary/ResultContextTransferId, providerInstanceId, model, options,
+    summary, resultContextTransferId, hasPendingQuestion, pendingApproval, waitTimedOut.
+    content[0].text and structuredContent hold the same object.
+    PROVED: the JSON.parse(content[0].text) example is right; results carry link.
+R2  task_status {taskId} -> completed, workState result_available, summary PROBE-OK,
+    latestTerminalSummary null, waitTimedOut false. Same key set as R1.
+    PROVED: the task_status example parses correctly; latestTerminal* is null when equal to summary.
+R3  t3_thread_send to the finished child, mode auto -> delivery "started", status "starting",
+    taskId node:delegated-task:<scope>:thread-send:<clientRequestId>, runId ...ordinal:2.
+    Its completion notified separately. PROVED: send keeps context; delivery is the fact.
+R4  t3_thread_wait {threadId, runId, timeoutMs} -> {threadId, runId, status:"completed", timedOut:false}.
+    PROVED: the wait example's shape is exact.
+R5  t3_thread_read {view:"messages", limit, maxCharsPerItem} -> {thread, recentRuns, items,
+    nextPosition, hasMore}; thread carries status, parentThreadId, relationshipToParent "subagent",
+    link, branch, worktreePath; items carry position, itemId, text, textTruncated, nextTextOffset.
+    PROVED: the read example's shape is exact.
+R6  delegate_task mode wait timeoutMs 4000 on a sleep-90 child -> status running, workState working,
+    summary null, waitTimedOut true; a later task_status reports waitTimedOut false.
+    PROVED: a timeout bounds one call and cancels nothing.
+R7  Repeated delegate_task, SAME clientRequestId, different brief/title/role -> the original
+    taskId, status completed, summary PROBE-OK. PROVED: idempotency key, not a resume.
+R8  t3_queue exists only as one action tool: list, read, edit, cancel, reorder, promote_to_steer.
+    list -> {items:[{queuedRunId, text, truncated}], nextCursor}. Mutations -> {sequence}.
+    A mode:"queue" send's runId IS the queuedRunId.
+    read on a run no longer queued -> invalid_request "The queued message was not found."
+    reorder with beforeRunId null -> invalid_request "This action needs `beforeRunId`."
+    reorder {queuedRunId: B, beforeRunId: A} -> {sequence}, list order became B, A.
+    promote_to_steer {queuedRunId, targetRunId} -> {sequence}; the steered text reached the target
+    run, which answered it, and the queued run ended cancelled.
+    PROVED: six separately named queue tools do not exist; reorder needs a live beforeRunId.
+R9  t3_pending_request exists only as one action tool: list, read, respond.
+    Child blocked inside mcp__t3-code__request_secret (activity item "secret_request/waiting",
+    tool call still running): task_status hasPendingQuestion false, pendingApproval null,
+    t3_pending_request list -> {requestIds: []}.
+    PROVED: a secret request or an approval is not a pending question; it waits on the human.
+R10 t3_thread_configure with no modelSelection -> {threadId, modelSelection:{instanceId, model},
+    runtimeMode, interactionMode}. t3_thread_transfer action "status" -> {transfers:[...]}.
+    t3_thread_organize action "pin" -> {sequence}.
+    PROVED: no t3_thread_configuration, t3_thread_fork, t3_thread_merge_back, or t3_thread_transfers.
+R11 t3_thread_interrupt {runId} on an already-ended run -> status "completed", not an error.
+    No runId on a running turn -> "interrupt_requested", and the queued run behind it ran to completion.
+    PROVED: interrupt leaves the queue alone.
+R12 task_cancel -> {status:"cancel_requested"}. PROVED: cancel is idempotent.
+```
