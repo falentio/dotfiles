@@ -6,7 +6,7 @@ import { registerFauxProvider } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { message, textOf, toolCall } from "../../../test-support/faux-message.ts";
+import { message, textOf } from "../../../test-support/faux-message.ts";
 
 const READS = 3;
 const SUMMARY_PROMPT = "context summarization assistant";
@@ -23,6 +23,7 @@ interface RequestContext {
 
 let sequence = 0;
 let reads = 0;
+let nextCallId = 0;
 
 const respond = (context: RequestContext) => {
 	const n = ++sequence;
@@ -35,7 +36,10 @@ const respond = (context: RequestContext) => {
 	if (summary) return message([{ type: "text", text: "[faux summary] earlier work happened." }]);
 
 	reads++;
-	if (reads <= READS) return message([toolCall("read", { path: "big.txt" })], "toolUse");
+	if (reads <= READS) {
+		const id = `faux-${nextCallId++}`;
+		return message([{ type: "toolCall", id, name: "read", arguments: { path: "big.txt" } }], "toolUse");
+	}
 	return message([{ type: "text", text: "DONE" }]);
 };
 
