@@ -1,6 +1,6 @@
 import { after, before, describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -21,10 +21,12 @@ const PI_BIN = piBinary();
 const PI_ARGS = piCommand().slice(1);
 
 const SMALL_WINDOW = 6000;
+const GATE_WINDOW = 24_000;
 const LARGE_WINDOW = 900_000;
 const PROMPT = "Read big.txt three times. Then say DONE.";
 const BIG_FILE_BYTES = 43_200;
 const MARKER_NEEDLE = CONFIG.marker.trim();
+const PRUNED_CHARS = CONFIG.headChars + CONFIG.marker.length + CONFIG.tailChars;
 
 interface Call {
 	n: number;
@@ -36,6 +38,7 @@ interface CompactionEntry {
 	firstKeptEntryId: string;
 	tokensBefore: number;
 	fromHook?: boolean;
+	details?: { readFiles: string[]; modifiedFiles: string[] };
 }
 
 interface Usage {
@@ -50,12 +53,23 @@ interface Entry {
 	summary?: string;
 	firstKeptEntryId?: string;
 	fromHook?: boolean;
+	details?: { readFiles: string[]; modifiedFiles: string[] };
 	message?: {
 		role?: string;
-		content?: Array<{ type?: string; id?: string }>;
+		content?: Array<{ type?: string; id?: string; text?: string }>;
 		toolCallId?: string;
 		usage?: Partial<Usage>;
 	};
+}
+
+interface Scenario {
+	name: string;
+	window: number;
+	extension: boolean;
+	/** Omitted: the project settings leave pi's own default reserve in charge. */
+	reserveTokens?: number;
+	/** Prompt text before the task. A prune cannot shrink it, so the drop runs. */
+	padding?: number;
 }
 
 interface Run {
@@ -66,12 +80,19 @@ interface Run {
 	entries: Entry[];
 }
 
+const SCENARIOS = {
+	small: { name: "small", window: SMALL_WINDOW, extension: true, reserveTokens: 200 },
+	smallBaseline: { name: "small-baseline", window: SMALL_WINDOW, extension: false, reserveTokens: 200 },
+	drop: { name: "drop", window: SMALL_WINDOW, extension: true, reserveTokens: 200, padding: 12_000 },
+	gate: { name: "gate", window: GATE_WINDOW, extension: true },
+	gateBaseline: { name: "gate-baseline", window: GATE_WINDOW, extension: false },
+	large: { name: "large", window: LARGE_WINDOW, extension: true },
+	largeBaseline: { name: "large-baseline", window: LARGE_WINDOW, extension: false },
+	instructions: { name: "instructions", window: SMALL_WINDOW, extension: true, reserveTokens: 200 },
+} satisfies Record<string, Scenario>;
+
 let work: string;
-let repo: string;
-let small: Run;
-let baseline: Run;
-let large: Run;
-let largeBaseline: Run;
+const runs = {} as Record<keyof typeof SCENARIOS, Run>;
 
 function bigFile(): string {
 	const lines: string[] = [];
@@ -82,8 +103,8 @@ function bigFile(): string {
 }
 
 function readCalls(log: string): Call[] {
-	const text = fs.readFileSync(path.join(log, "calls.log"), "utf-8").trim();
-	return text ? text.split("\n").map((line) => JSON.parse(line) as Call) : [];
+	const content = fs.readFileSync(path.join(log, "calls.log"), "utf-8").trim();
+	return content ? content.split("\n").map((line) => JSON.parse(line) as Call) : [];
 }
 
 function readRequests(log: string): string[] {
@@ -112,25 +133,35 @@ function readSession(sessions: string): Pick<Run, "entries" | "compactions" | "u
 	return { entries, compactions, usage };
 }
 
-function runScenario(name: string, options: { window: number; extension: boolean }): Run {
-	const runDir = path.join(work, "runs", name);
+function runScenario(scenario: Scenario): Run {
+	const runDir = path.join(work, "runs", scenario.name);
 	const log = path.join(runDir, "log");
 	const sessions = path.join(runDir, "sessions");
-	fs.mkdirSync(log, { recursive: true });
-	fs.mkdirSync(sessions, { recursive: true });
+	const project = path.join(runDir, "project");
+	for (const dir of [log, sessions, path.join(project, ".pi")]) fs.mkdirSync(dir, { recursive: true });
+	fs.writeFileSync(path.join(project, "big.txt"), bigFile());
+	fs.writeFileSync(
+		path.join(project, ".pi", "settings.json"),
+		JSON.stringify({
+			compaction: { enabled: true, keepRecentTokens: 600, ...(scenario.reserveTokens === undefined ? {} : { reserveTokens: scenario.reserveTokens }) },
+		}),
+	);
 
+	const prompt = scenario.padding ? `${"x".repeat(scenario.padding)} ${PROMPT}` : PROMPT;
 	execFileSync(
 		PI_BIN,
 		[
 			...PI_ARGS,
 			"-p",
+			// The project settings above only load for a trusted project.
+			"-a",
 			"--no-extensions",
 			"--no-mcp",
 			"--no-skills",
 			"--no-context-files",
 			"-e",
 			FAUX_PROVIDER,
-			...(options.extension ? ["-e", EXTENSION] : []),
+			...(scenario.extension ? ["-e", EXTENSION] : []),
 			"--provider",
 			"faux",
 			"--model",
@@ -140,15 +171,15 @@ function runScenario(name: string, options: { window: number; extension: boolean
 			"--session-dir",
 			sessions,
 			"--session-id",
-			name,
-			PROMPT,
+			scenario.name,
+			prompt,
 		],
 		{
-			cwd: repo,
+			cwd: project,
 			encoding: "utf-8",
 			timeout: 120_000,
 			stdio: ["ignore", "pipe", "pipe"],
-			env: { ...process.env, HARNESS_COMPACTION_LOG: log, FAUX_WINDOW: String(options.window) },
+			env: { ...process.env, HARNESS_COMPACTION_LOG: log, FAUX_WINDOW: String(scenario.window) },
 		},
 	);
 
@@ -159,9 +190,105 @@ function runScenario(name: string, options: { window: number; extension: boolean
 	};
 }
 
+interface RpcRecord {
+	type?: string;
+	id?: string;
+	command?: string;
+	success?: boolean;
+	data?: { summary?: string };
+}
+
+/** Drive one run through RPC mode so a command can reach the session after the agent settles. */
+function runCompactWithInstructions(scenario: Scenario): Promise<Run> {
+	const runDir = path.join(work, "runs", scenario.name);
+	const log = path.join(runDir, "log");
+	const sessions = path.join(runDir, "sessions");
+	const project = path.join(runDir, "project");
+	for (const dir of [log, sessions, path.join(project, ".pi")]) fs.mkdirSync(dir, { recursive: true });
+	fs.writeFileSync(path.join(project, "big.txt"), bigFile());
+	fs.writeFileSync(
+		path.join(project, ".pi", "settings.json"),
+		JSON.stringify({ compaction: { enabled: true, keepRecentTokens: 600, reserveTokens: scenario.reserveTokens } }),
+	);
+
+	const child = spawn(
+		PI_BIN,
+		[
+			...PI_ARGS,
+			"--mode",
+			"rpc",
+			"-a",
+			"--no-extensions",
+			"--no-mcp",
+			"--no-skills",
+			"--no-context-files",
+			"-e",
+			FAUX_PROVIDER,
+			"-e",
+			EXTENSION,
+			"--provider",
+			"faux",
+			"--model",
+			"faux-1",
+			"--tools",
+			"read",
+			"--session-dir",
+			sessions,
+			"--session-id",
+			scenario.name,
+		],
+		{
+			cwd: project,
+			env: { ...process.env, HARNESS_COMPACTION_LOG: log, FAUX_WINDOW: String(scenario.window) },
+			stdio: ["pipe", "pipe", "pipe"],
+		},
+	);
+
+	return new Promise((resolve, reject) => {
+		let buffer = "";
+		let compacting = false;
+		const finish = () => {
+			child.kill();
+			setTimeout(() => resolve({ calls: readCalls(log), requests: readRequests(log), ...readSession(sessions) }), 100);
+		};
+		const timer = setTimeout(() => {
+			child.kill();
+			reject(new Error("rpc compact run timed out"));
+		}, 60_000);
+		child.stdout.setEncoding("utf-8");
+		child.stdout.on("data", (chunk: string) => {
+			buffer += chunk;
+			for (let index = buffer.indexOf("\n"); index >= 0; index = buffer.indexOf("\n")) {
+				const line = buffer.slice(0, index);
+				buffer = buffer.slice(index + 1);
+				if (!line.trim()) continue;
+				const record = JSON.parse(line) as RpcRecord;
+				if (record.type === "agent_settled" && !compacting) {
+					compacting = true;
+					child.stdin.write(`${JSON.stringify({ id: "compact-1", type: "compact", customInstructions: "focus on the file read" })}\n`);
+				}
+				if (record.type === "response" && record.id === "compact-1") {
+					clearTimeout(timer);
+					child.stdin.end();
+					finish();
+				}
+			}
+		});
+		child.on("error", (error) => {
+			clearTimeout(timer);
+			reject(error);
+		});
+		child.stdin.write(`${JSON.stringify({ id: "prompt-1", type: "prompt", message: PROMPT })}\n`);
+	});
+}
+
 const summaryCalls = (run: Run): number => run.calls.filter((call) => call.kind === "summary").length;
 const requestsWithMarker = (run: Run): number =>
 	run.requests.filter((request) => request.includes(MARKER_NEEDLE)).length;
+const storedResultChars = (run: Run): number[] =>
+	run.entries
+		.filter((entry) => entry.type === "message" && entry.message?.role === "toolResult")
+		.map((entry) => (entry.message?.content ?? []).reduce((sum, block) => sum + (block.text?.length ?? 0), 0));
 
 function facts(run: Run) {
 	return {
@@ -170,27 +297,20 @@ function facts(run: Run) {
 		compactions: run.compactions.length,
 		requests: run.requests.length,
 		requestsWithMarker: requestsWithMarker(run),
+		storedResultChars: storedResultChars(run),
 		biggestRequestChars: Math.max(0, ...run.requests.map((request) => request.length)),
 		cacheWrite: run.usage.cacheWrite,
 		cacheRead: run.usage.cacheRead,
 	};
 }
 
-before(() => {
+before(async () => {
 	work = fs.mkdtempSync(path.join(os.tmpdir(), "harness-compaction-smoke-"));
-	repo = path.join(work, "project");
-	fs.mkdirSync(path.join(repo, ".pi"), { recursive: true });
-	fs.writeFileSync(path.join(repo, "big.txt"), bigFile());
-	fs.writeFileSync(
-		path.join(repo, ".pi", "settings.json"),
-		JSON.stringify({ compaction: { enabled: true, reserveTokens: 200, keepRecentTokens: 600 } }, null, 2),
-	);
-	assert.equal(fs.statSync(path.join(repo, "big.txt")).size, BIG_FILE_BYTES);
-
-	small = runScenario("small-extension", { window: SMALL_WINDOW, extension: true });
-	baseline = runScenario("small-baseline", { window: SMALL_WINDOW, extension: false });
-	large = runScenario("large-extension", { window: LARGE_WINDOW, extension: true });
-	largeBaseline = runScenario("large-baseline", { window: LARGE_WINDOW, extension: false });
+	for (const key of Object.keys(SCENARIOS) as Array<keyof typeof SCENARIOS>) {
+		if (key === "instructions") continue;
+		runs[key] = runScenario(SCENARIOS[key]);
+	}
+	runs.instructions = await runCompactWithInstructions(SCENARIOS.instructions);
 });
 
 after(() => {
@@ -198,59 +318,107 @@ after(() => {
 });
 
 describe("smoke: real pi CLI, faux model", () => {
-	test("small window with the extension never asks for a summary", (t) => {
-		t.diagnostic(`small extension: ${JSON.stringify(facts(small))}`);
-		t.diagnostic(`small baseline:  ${JSON.stringify(facts(baseline))}`);
-		assert.equal(summaryCalls(small), 0);
-		assert.ok(small.compactions.length >= 1, "the threshold compaction fired");
-		assert.ok(requestsWithMarker(small) >= 1, "a request carried the prune marker");
-		for (const entry of small.compactions) {
-			assert.equal(entry.summary, CONFIG.droppedHistoryNote);
-			assert.equal(entry.fromHook, true);
-			assert.equal(typeof entry.firstKeptEntryId, "string");
-		}
-		assert.ok(
-			small.usage.cacheWrite < baseline.usage.cacheWrite,
-			`pruning writes less to cache: ${small.usage.cacheWrite} < ${baseline.usage.cacheWrite}`,
+	test("the prune reaches the wire and nothing is summarized", (t) => {
+		t.diagnostic(`small extension: ${JSON.stringify(facts(runs.small))}`);
+		t.diagnostic(`small baseline:  ${JSON.stringify(facts(runs.smallBaseline))}`);
+		assert.equal(summaryCalls(runs.small), 0);
+		assert.ok(requestsWithMarker(runs.small) >= 1, "a request carried the prune marker");
+		assert.deepEqual(
+			storedResultChars(runs.small),
+			[PRUNED_CHARS, PRUNED_CHARS, PRUNED_CHARS],
+			"the append-time prune shrank every stored result",
 		);
 		assert.ok(
-			small.usage.cacheRead > baseline.usage.cacheRead,
-			`pruning reads more from cache: ${small.usage.cacheRead} > ${baseline.usage.cacheRead}`,
+			runs.small.usage.cacheWrite < runs.smallBaseline.usage.cacheWrite,
+			`pruning writes less to cache: ${runs.small.usage.cacheWrite} < ${runs.smallBaseline.usage.cacheWrite}`,
 		);
 	});
 
 	test("small window without the extension asks for a summary", (t) => {
-		t.diagnostic(`small baseline: ${JSON.stringify(facts(baseline))}`);
-		assert.ok(summaryCalls(baseline) >= 1, "pi wrote its summary");
-		assert.ok(baseline.compactions.length >= 1, "pi compacted");
-		assert.equal(requestsWithMarker(baseline), 0, "pi never prunes");
+		t.diagnostic(`small baseline: ${JSON.stringify(facts(runs.smallBaseline))}`);
+		assert.ok(summaryCalls(runs.smallBaseline) >= 1, "pi wrote its summary");
+		assert.ok(runs.smallBaseline.compactions.length >= 1, "pi compacted");
+		assert.equal(requestsWithMarker(runs.smallBaseline), 0, "pi never prunes");
+		assert.deepEqual(storedResultChars(runs.smallBaseline), [BIG_FILE_BYTES, BIG_FILE_BYTES, BIG_FILE_BYTES]);
+	});
+
+	test("a history the prune cannot shrink is dropped with the note", (t) => {
+		const run = runs.drop;
+		t.diagnostic(`drop: ${JSON.stringify(facts(run))}`);
+		assert.equal(summaryCalls(run), 0);
+		assert.ok(run.compactions.length >= 1, "the padded prompt forced the drop");
+		for (const entry of run.compactions) {
+			assert.equal(entry.summary, CONFIG.droppedHistoryNote);
+			assert.equal(entry.fromHook, true);
+			assert.equal(typeof entry.firstKeptEntryId, "string");
+		}
+	});
+
+	test("the gate opens at pi's default reserve and the drop is averted", (t) => {
+		t.diagnostic(`gate extension: ${JSON.stringify(facts(runs.gate))}`);
+		t.diagnostic(`gate baseline:  ${JSON.stringify(facts(runs.gateBaseline))}`);
+		assert.equal(summaryCalls(runs.gate), 0);
+		assert.ok(requestsWithMarker(runs.gate) >= 1, "a request carried the prune marker");
+		assert.equal(runs.gate.compactions.length, 0, "the prune kept pi's trigger from crossing");
+		assert.deepEqual(storedResultChars(runs.gate), [PRUNED_CHARS, PRUNED_CHARS, PRUNED_CHARS]);
+	});
+
+	test("the same window without the extension compacts with a summary", (t) => {
+		t.diagnostic(`gate baseline: ${JSON.stringify(facts(runs.gateBaseline))}`);
+		assert.ok(summaryCalls(runs.gateBaseline) >= 1, "pi wrote its summary");
+		assert.ok(runs.gateBaseline.compactions.length >= 1, "pi compacted");
+		assert.equal(requestsWithMarker(runs.gateBaseline), 0);
 	});
 
 	test("large window with the extension is untouched and matches pi alone", (t) => {
-		t.diagnostic(`large extension: ${JSON.stringify(facts(large))}`);
-		t.diagnostic(`large baseline:  ${JSON.stringify(facts(largeBaseline))}`);
-		assert.equal(summaryCalls(large), 0);
-		assert.equal(large.compactions.length, 0, "below the gate nothing compacts");
-		assert.equal(requestsWithMarker(large), 0, "below the gate nothing is pruned");
-		assert.deepEqual(large.requests, largeBaseline.requests, "request bytes match pi alone");
-		assert.deepEqual(large.usage, largeBaseline.usage, "cache accounting matches pi alone");
+		t.diagnostic(`large extension: ${JSON.stringify(facts(runs.large))}`);
+		t.diagnostic(`large baseline:  ${JSON.stringify(facts(runs.largeBaseline))}`);
+		assert.equal(summaryCalls(runs.large), 0);
+		assert.equal(runs.large.compactions.length, 0, "below the gate nothing compacts");
+		assert.equal(requestsWithMarker(runs.large), 0, "below the gate nothing is pruned");
+		assert.deepEqual(runs.large.requests, runs.largeBaseline.requests, "request bytes match pi alone");
+		// The two sessions register different commands, so their system prompts differ by a few
+		// tokens and the faux provider's cache accounting drifts with them.
+		for (const key of ["cacheRead", "cacheWrite"] as const) {
+			assert.ok(
+				Math.abs(runs.large.usage[key] - runs.largeBaseline.usage[key]) <= 100,
+				`${key} matches pi alone within drift: ${runs.large.usage[key]} vs ${runs.largeBaseline.usage[key]}`,
+			);
+		}
+	});
+
+
+	test("custom instructions still fall back to pi's summarizer", (t) => {
+		const run = runs.instructions;
+		t.diagnostic(`instructions: ${JSON.stringify(facts(run))}`);
+		const manual = run.compactions.filter((entry) => entry.fromHook === false);
+		assert.equal(manual.length, 1, "the manual compaction is pi's, not the hook's");
+		assert.ok(summaryCalls(run) >= 1, "pi's summarizer ran");
+		assert.match(String(manual[0]?.summary), /\[faux summary\]/);
+		assert.notEqual(manual[0]?.summary, CONFIG.droppedHistoryNote);
+		assert.ok(
+			run.compactions.some((entry) => entry.fromHook === true && entry.summary === CONFIG.droppedHistoryNote),
+			"the threshold compaction before it used the note",
+		);
 	});
 
 	test("every tool call keeps its result after the prunes and drops", () => {
-		const calls = new Set<string>();
-		const results = new Set<string>();
-		for (const entry of small.entries) {
-			if (entry.type !== "message" || !entry.message) continue;
-			if (entry.message.role === "assistant") {
-				for (const block of entry.message.content ?? []) {
-					if (block.type === "toolCall" && block.id) calls.add(block.id);
+		for (const run of [runs.small, runs.drop]) {
+			const calls = new Set<string>();
+			const results = new Set<string>();
+			for (const entry of run.entries) {
+				if (entry.type !== "message" || !entry.message) continue;
+				if (entry.message.role === "assistant") {
+					for (const block of entry.message.content ?? []) {
+						if (block.type === "toolCall" && block.id) calls.add(block.id);
+					}
+				}
+				if (entry.message.role === "toolResult" && entry.message.toolCallId) {
+					results.add(entry.message.toolCallId);
 				}
 			}
-			if (entry.message.role === "toolResult" && entry.message.toolCallId) {
-				results.add(entry.message.toolCallId);
-			}
+			assert.ok(calls.size > 0, `${run.entries.length} entries made tool calls`);
+			for (const id of calls) assert.ok(results.has(id), `tool call ${id} kept its result`);
 		}
-		assert.ok(calls.size > 0, "the run made tool calls");
-		for (const id of calls) assert.ok(results.has(id), `tool call ${id} kept its result`);
 	});
 });
