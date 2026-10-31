@@ -1,9 +1,15 @@
 {
 	"type": "module",
 	"private": true,
+	"pi": {
+		"extensions": [
+			"./index.ts"
+		]
+	},
 	"scripts": {
 		"test": "node link.mjs && node --test test/*.test.ts",
-		"test:smoke": "node link.mjs && node --test smoke.test.ts"
+		"test:smoke": "node link.mjs && node --test smoke.test.ts",
+		"typecheck": "node link.mjs && tsc --noEmit"
 	},
 	"peerDependencies": {
 		"@earendil-works/pi-coding-agent": "*"

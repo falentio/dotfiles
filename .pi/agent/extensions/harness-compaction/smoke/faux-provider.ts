@@ -2,7 +2,7 @@
  * Faux provider for the smoke suite: three reads of big.txt, then DONE. Every request is written to
  * HARNESS_COMPACTION_LOG so the suite can inspect what pi actually sent, including the prune marker.
  */
-import { registerFauxProvider } from "@earendil-works/pi-ai";
+import { registerFauxProvider } from "@earendil-works/pi-ai/compat";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import * as fs from "node:fs";
 import * as path from "node:path";
