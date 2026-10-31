@@ -64,11 +64,16 @@ export default function harnessCompaction(pi: ExtensionAPI, config: HarnessCompa
 
 	pi.on("session_before_compact", (event) => {
 		if (!config.enabled || event.customInstructions) return;
+		const { fileOps } = event.preparation;
 		return {
 			compaction: {
 				summary: config.droppedHistoryNote,
 				firstKeptEntryId: event.preparation.firstKeptEntryId,
 				tokensBefore: event.preparation.tokensBefore,
+				details: {
+					readFiles: [...fileOps.read],
+					modifiedFiles: [...fileOps.written, ...fileOps.edited],
+				},
 			},
 		};
 	});

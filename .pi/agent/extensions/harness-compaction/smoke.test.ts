@@ -342,7 +342,7 @@ describe("smoke: real pi CLI, faux model", () => {
 		assert.deepEqual(storedResultChars(runs.smallBaseline), [BIG_FILE_BYTES, BIG_FILE_BYTES, BIG_FILE_BYTES]);
 	});
 
-	test("a history the prune cannot shrink is dropped with the note", (t) => {
+	test("a history the prune cannot shrink is dropped with pi's file lists", (t) => {
 		const run = runs.drop;
 		t.diagnostic(`drop: ${JSON.stringify(facts(run))}`);
 		assert.equal(summaryCalls(run), 0);
@@ -351,7 +351,16 @@ describe("smoke: real pi CLI, faux model", () => {
 			assert.equal(entry.summary, CONFIG.droppedHistoryNote);
 			assert.equal(entry.fromHook, true);
 			assert.equal(typeof entry.firstKeptEntryId, "string");
+			assert.ok(entry.details, "the entry carries pi's file lists");
 		}
+		assert.ok(
+			run.compactions.some((entry) => entry.details?.readFiles.includes("big.txt")),
+			"a drop names the file the tool read",
+		);
+		assert.ok(
+			run.compactions.every((entry) => Array.isArray(entry.details?.modifiedFiles)),
+			"every drop carries both lists",
+		);
 	});
 
 	test("the gate opens at pi's default reserve and the drop is averted", (t) => {

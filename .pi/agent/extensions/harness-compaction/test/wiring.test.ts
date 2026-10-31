@@ -269,7 +269,7 @@ describe("tool_result hook", () => {
 });
 
 describe("session_before_compact hook", () => {
-	test("keeps pi's cut and supplies no usage", () => {
+	test("keeps pi's cut, pi's file lists, and supplies no usage", () => {
 		const { pi, handlers } = fakePi();
 		harnessCompaction(pi);
 		const { ctx } = context(undefined);
@@ -281,6 +281,10 @@ describe("session_before_compact hook", () => {
 				summary: CONFIG.droppedHistoryNote,
 				firstKeptEntryId: "entry-7",
 				tokensBefore: 1234,
+				details: {
+					readFiles: ["src/a.ts", "README.md"],
+					modifiedFiles: ["src/b.ts", "src/c.ts"],
+				},
 			},
 		});
 		assert.equal("usage" in result.compaction, false);
