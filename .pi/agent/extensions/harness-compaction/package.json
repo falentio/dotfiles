@@ -2,7 +2,15 @@
 	"type": "module",
 	"private": true,
 	"scripts": {
-		"test": "node --test test/*.test.ts",
-		"test:smoke": "node --test smoke.test.ts"
+		"test": "node link.mjs && node --test test/*.test.ts",
+		"test:smoke": "node link.mjs && node --test smoke.test.ts"
+	},
+	"peerDependencies": {
+		"@earendil-works/pi-coding-agent": "*"
+	},
+	"peerDependenciesMeta": {
+		"@earendil-works/pi-coding-agent": {
+			"optional": true
+		}
 	}
 }

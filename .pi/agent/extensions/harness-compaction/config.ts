@@ -1,13 +1,16 @@
 /**
- * Harness-compaction settings. This file is the only settings source: no environment variable or
- * other file is read. The defaults copy the DeepSeek Harness (DSH) compaction pruner.
+ * Harness-compaction settings. This file is the only extension settings source: no environment
+ * variable or other file is read. The gate reads pi's own compaction reserve through
+ * `reserveTokensFor` so it never sits above the trigger pi checks first. The defaults copy the
+ * DeepSeek Harness (DSH) compaction pruner.
  */
+import { DEFAULT_COMPACTION_SETTINGS } from "@earendil-works/pi-coding-agent";
 import { codePointLength, type PruneBudget } from "./prune.ts";
 
 export interface HarnessCompactionConfig {
-	/** Off: both hooks return nothing and pi behaves as shipped. */
+	/** Off: every hook returns nothing and pi behaves as shipped. */
 	readonly enabled: boolean;
-	/** Fraction of the model's context window at which the projection is pruned. DSH thresholdRatio. */
+	/** Fraction of the model's context window at which the prune starts. DSH thresholdRatio. */
 	readonly pruneAtRatio: number;
 	/** A tool result with more text code points than this is pruned. DSH thresholdChars. */
 	readonly thresholdChars: number;
@@ -35,6 +38,24 @@ export const CONFIG: HarnessCompactionConfig = {
 		"No summary was written: the earlier history was dropped and the retained messages continue verbatim.",
 };
 
+/** The part of pi's settings the gate needs: its compaction headroom. */
+export interface ReserveSettings {
+	readonly reserveTokens?: number;
+	readonly modelOverrides?: Readonly<Record<string, { readonly reserveTokens?: number } | undefined>>;
+}
+
+/**
+ * pi's reserve for the active model, in pi's own precedence: the model override, then
+ * `compaction.reserveTokens`, then its built-in default.
+ */
+export function reserveTokensFor(
+	compaction: ReserveSettings | undefined,
+	model?: { readonly provider: string; readonly id: string },
+): number {
+	const override = model ? compaction?.modelOverrides?.[`${model.provider}/${model.id}`]?.reserveTokens : undefined;
+	return override ?? compaction?.reserveTokens ?? DEFAULT_COMPACTION_SETTINGS.reserveTokens;
+}
+
 export function pruneBudget(config: HarnessCompactionConfig): PruneBudget {
 	return {
 		thresholdChars: config.thresholdChars,
@@ -44,15 +65,21 @@ export function pruneBudget(config: HarnessCompactionConfig): PruneBudget {
 	};
 }
 
-export function pruneGate(config: HarnessCompactionConfig, contextWindow: number): number {
-	return config.pruneAtRatio * contextWindow;
+/**
+ * Where the prune starts: DSH's `min(thresholdRatio x window, window - reserve)`. The headroom
+ * half is pi's own compaction trigger, and a gate above it never opens, because pi checks its
+ * trigger first and reports no token count until an assistant response follows the compaction.
+ */
+export function pruneGate(config: HarnessCompactionConfig, contextWindow: number, reserveTokens: number): number {
+	return Math.max(0, Math.min(config.pruneAtRatio * contextWindow, contextWindow - reserveTokens));
 }
 
 export function shouldPrune(
 	config: HarnessCompactionConfig,
 	usage: { readonly tokens: number | null; readonly contextWindow: number },
+	reserveTokens: number,
 ): boolean {
-	return config.enabled && usage.tokens !== null && usage.tokens >= pruneGate(config, usage.contextWindow);
+	return config.enabled && usage.tokens !== null && usage.tokens >= pruneGate(config, usage.contextWindow, reserveTokens);
 }
 
 /**
