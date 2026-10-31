@@ -43,6 +43,15 @@ function emit(handlers: Map<string, Handler>, name: string, event: unknown, ctx:
 	return handler(event, ctx);
 }
 
+interface FakeMessage {
+	role: string;
+	content: Array<{ type: string; text: string }>;
+	toolCallId?: string;
+	toolName?: string;
+	isError?: boolean;
+	timestamp: number;
+}
+
 const textBlock = (text: string) => ({ type: "text", text });
 const toolResult = (text: string, toolCallId = "call-1") => ({
 	role: "toolResult",
@@ -101,7 +110,7 @@ describe("context hook", () => {
 		harnessCompaction(pi);
 		const resultContent = [textBlock(big())];
 		const smallContent = [textBlock("small")];
-		const messages = [
+		const messages: FakeMessage[] = [
 			user(big(10_000)),
 			{ role: "toolResult", toolCallId: "call-1", toolName: "read", content: resultContent, isError: false, timestamp: 1 },
 			{ role: "toolResult", toolCallId: "call-2", toolName: "read", content: smallContent, isError: true, timestamp: 2 },

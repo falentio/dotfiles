@@ -11,7 +11,14 @@ import { CONFIG } from "./config.ts";
 const EXTENSION_DIR = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION = path.join(EXTENSION_DIR, "index.ts");
 const FAUX_PROVIDER = path.join(EXTENSION_DIR, "smoke", "faux-provider.ts");
-const PI = piCommand();
+function piBinary(): string {
+	const [command] = piCommand();
+	if (!command) throw new Error("piCommand returned no command");
+	return command;
+}
+
+const PI_BIN = piBinary();
+const PI_ARGS = piCommand().slice(1);
 
 const SMALL_WINDOW = 6000;
 const LARGE_WINDOW = 900_000;
@@ -113,9 +120,9 @@ function runScenario(name: string, options: { window: number; extension: boolean
 	fs.mkdirSync(sessions, { recursive: true });
 
 	execFileSync(
-		PI[0],
+		PI_BIN,
 		[
-			...PI.slice(1),
+			...PI_ARGS,
 			"-p",
 			"--no-extensions",
 			"--no-mcp",

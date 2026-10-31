@@ -46,9 +46,11 @@ const respond = (context: RequestContext) => {
 const MODEL = {
 	id: "faux-1",
 	name: "Faux 1",
+	reasoning: false,
 	contextWindow: Number(process.env.FAUX_WINDOW ?? 6000),
 	maxTokens: 512,
 	input: ["text"] as ("text" | "image")[],
+	cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 };
 
 export default function fauxModel(pi: ExtensionAPI) {
