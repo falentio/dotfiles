@@ -101,9 +101,12 @@ Measured on pi 1.4.0 with the defaults above. Token counts are the faux provider
 No summary call, and the retained prefix is read from cache instead of written again. The last two
 rows match in request bytes and cache totals, so the extension does nothing below the gate.
 
-The cache totals differ from section 4 of the build brief because that table was measured with the
-prototype's 3000/2000/600 slice. This extension ships the DSH defaults, so its pruned request is
-larger: 5,454 bytes against 2,894. Compaction counts and the biggest request per run match.
+The cache totals differ from section 4 of the build brief for two measured reasons. That table used
+the prototype's 3000/2000/600 slice, so its pruned request is 2,894 bytes against 5,454 here, which
+accounts for the extension row. Its runs also loaded the globally installed extensions, whose system
+prompt the faux provider counts; this suite passes `--no-extensions` and compares like with like.
+Rerunning the large scenario with discovery on gives the brief's 33,159 and 34,591 exactly. Compaction
+counts and the biggest request per run match either way.
 
 ## Known limits
 
