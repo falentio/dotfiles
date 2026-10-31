@@ -30,6 +30,7 @@ export default function harnessCompaction(pi: ExtensionAPI, config: HarnessCompa
 			message.content = content;
 			pruned++;
 		}
+		// Mutating the projection in place is the supported form; the empty result carries no replacement list.
 		if (pruned > 0) return {};
 	});
 
