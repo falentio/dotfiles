@@ -186,7 +186,7 @@ describe("context hook", () => {
 		assert.ok(codePointLength(textOf((atGate[0]?.content as Array<{ text: string }>))) < 9000);
 	});
 
-	test("the invite below the gate disappears at pi's own ceiling", () => {
+	test("prunes at pi's own ceiling, not at the ratio", () => {
 		const { pi, handlers } = fakePi({ reserveTokens: 16384 });
 		harnessCompaction(pi);
 		const justBelow = [toolResult(big())];
