@@ -1,6 +1,6 @@
 # Extension test support
 
-`pi-install.mjs` finds the running pi install and links it, with its `jiti`, into the `node_modules` of the extensions whose tests run in-process, plus `typebox` and bun-types for the typecheck. It exists because a pi install lives under a hash directory that changes on every update:
+`pi-install.mjs` finds the running pi install and links it, with its `jiti`, into the `node_modules` of the extensions whose tests run in-process, plus bun-types for the typecheck. It exists because a pi install lives under a hash directory that changes on every update:
 
 ```text
 ~/.vite-plus/packages/@earendil-works/pi-coding-agent/<hash>/lib/node_modules/@earendil-works/pi-coding-agent
@@ -23,4 +23,12 @@ The linker refuses to delete a real directory where a link belongs: it stops and
 | `repo-scout` | `bun run test` | 126 pass |
 | `todos` | `bun run test` | 113 pass |
 
-Measured against pi 1.4.0. The `nested-agents` smoke drives the real `pi` CLI with a faux provider; every other suite runs in-process. No suite reaches a real provider, a network, or credentials. Times vary per machine, so the counts are the record.
+Measured against pi 1.5.0. The `nested-agents` smoke drives the real `pi` CLI
+with a faux provider; every other suite runs in-process. No suite reaches a real
+provider, a network, or credentials. Times vary per machine, so the counts are
+the record.
+
+The extensions build tool schemas with `@earendil-works/pi-schema`, which pi
+validates with but does not supply to extensions. Each one lists it in
+`dependencies`, so run `bun install` in that extension's directory once per
+checkout. A test then resolves the schema library the same way a pi run does.
