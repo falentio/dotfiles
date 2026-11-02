@@ -1,4 +1,4 @@
-import { getApiProvider, registerApiProvider, registerFauxProvider, Type } from "@earendil-works/pi-ai/compat";
+import { getApiProvider, registerApiProvider, registerFauxProvider } from "@earendil-works/pi-ai/compat";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { message, textOf, toolCall } from "../../test-support/faux-message.ts";
 
@@ -12,7 +12,7 @@ export const BLOAT_CHARS = 240_000;
 export const SUMMARY_DELAY_MS = 300;
 export const SLOW_DELAY_MS = 400;
 
-const bloatParameters = Type.Object({ chars: Type.Optional(Type.Number()) });
+const bloatParameters = { type: "object", properties: { chars: { type: "number" } }, additionalProperties: false };
 
 export interface VerifyRequest {
 	seq: number;
@@ -135,7 +135,7 @@ export default function fauxProvider(pi: ExtensionAPI): void {
 		label: "Bloat",
 		description: "Return a large deterministic payload.",
 		parameters: bloatParameters,
-		execute: async (_toolCallId, params) => {
+		execute: async (_toolCallId, params: { chars?: number }) => {
 			const chars = params.chars ?? BLOAT_CHARS;
 			return { content: [{ type: "text", text: "b".repeat(chars) }], details: { chars } };
 		},
