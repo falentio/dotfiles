@@ -14,60 +14,61 @@
  */
 
 import type { ExtensionAPI, ExtensionToolContext } from '@earendil-works/pi-coding-agent';
-import { Type } from 'typebox';
+import { lit, obj, opt, str, union, type Annotations, type Schema } from '@earendil-works/pi-schema';
 import { PACKAGE_SOURCES, type PackageSource } from './registry.ts';
 import { buildRegistry, runPackageRepo, runRepoScout, type BuiltRegistry, type RepoScoutInput } from './tools.ts';
 
 const line = (message: string) => console.error('[repo-scout] ' + message);
 const log = { info: line, warn: line, error: line };
 
-const repoScoutParameters = Type.Object({
-	repo: Type.String({
-		description:
-			"Git repo: a URL (https://github.com/owner/name, git@github.com:owner/name.git), host/owner/name, owner/name (GitHub), or a local checkout path.",
-	}),
-	question: Type.String({ description: "The question about this repo. Answered by reading the checkout." }),
-	ref: Type.Optional(
-		Type.String({
-			description:
-				"A tag, branch, or commit to read instead of the default branch. Each ref gets its own checkout and its own conversation, so it does not disturb the session on the default branch.",
-		}),
-	),
-	model: Type.Optional(Type.String({ description: "Override the model as provider/model. Default: the caller's model." })),
-	thinkingLevel: Type.Optional(
-		Type.Union(
-			[
-				Type.Literal("off"),
-				Type.Literal("minimal"),
-				Type.Literal("low"),
-				Type.Literal("medium"),
-				Type.Literal("high"),
-				Type.Literal("xhigh"),
-				Type.Literal("max"),
-			],
-			{ description: "Thinking level for the scout. Default: medium." },
-		),
-	),
+const stringLit = <const V extends string>(value: V, options?: Annotations<V>): Schema<V> => ({
+	type: 'string',
+	...lit(value, options),
 });
 
-const packageRepoParameters = Type.Object({
-	package: Type.String({
-		description:
-			"Package name: zod, @scope/name, serde, requests, owner/image (Docker Hub), a Go module path (github.com/o/n), a Hex name (phoenix), group:artifact (Maven), a NuGet id (Newtonsoft.Json), or a zpm name (accord or author/name).",
-	}),
-	source: Type.Optional(
-		Type.Union(
-			PACKAGE_SOURCES.map((source) => Type.Literal(source)),
-			{ description: "Package registry. Default: npm. Supported: " + PACKAGE_SOURCES.join(", ") + "." },
-		),
-	),
-	version: Type.Optional(
-		Type.String({
+const repoScoutParameters = obj(
+	{
+		repo: str({
 			description:
-				"A published version; the registry latest when absent. The tool also returns the git tag that serves it, when one exists.",
+				"Git repo: a URL (https://github.com/owner/name, git@github.com:owner/name.git), host/owner/name, owner/name (GitHub), or a local checkout path.",
 		}),
-	),
-});
+		question: str({ description: "The question about this repo. Answered by reading the checkout." }),
+		ref: opt(
+			str({
+				description:
+					"A tag, branch, or commit to read instead of the default branch. Each ref gets its own checkout and its own conversation, so it does not disturb the session on the default branch.",
+			}),
+		),
+		model: opt(str({ description: "Override the model as provider/model. Default: the caller's model." })),
+		thinkingLevel: opt(
+			union(['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'].map((level) => stringLit(level)), {
+				description: "Thinking level for the scout. Default: medium.",
+			}),
+		),
+	},
+	{ open: true },
+);
+
+const packageRepoParameters = obj(
+	{
+		package: str({
+			description:
+				"Package name: zod, @scope/name, serde, requests, owner/image (Docker Hub), a Go module path (github.com/o/n), a Hex name (phoenix), group:artifact (Maven), a NuGet id (Newtonsoft.Json), or a zpm name (accord or author/name).",
+		}),
+		source: opt(
+			union(PACKAGE_SOURCES.map((source) => stringLit(source)), {
+				description: "Package registry. Default: npm. Supported: " + PACKAGE_SOURCES.join(", ") + ".",
+			}),
+		),
+		version: opt(
+			str({
+				description:
+					"A published version; the registry latest when absent. The tool also returns the git tag that serves it, when one exists.",
+			}),
+		),
+	},
+	{ open: true },
+);
 
 type RepoScoutParams = RepoScoutInput;
 
