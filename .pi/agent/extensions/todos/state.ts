@@ -5,7 +5,7 @@
  * (state helpers section).
  */
 
-import { Value } from "typebox/value";
+import { compile } from "@earendil-works/pi-schema";
 import {
 	todoSchema,
 	type TodoCompletionTransition,
@@ -14,6 +14,8 @@ import {
 	type TodoParams,
 	type TodoPhase,
 } from "./types.ts";
+
+const todoValidator = compile(todoSchema);
 
 function findTaskByContent(
 	phases: TodoPhase[],
@@ -430,16 +432,16 @@ export function resolveTodoParams(
 	raw: unknown,
 	hasExistingPhases: boolean,
 ): TodoParams | string {
-	if (Value.Check(todoSchema, raw)) return raw as TodoParams;
+	if (todoValidator.check(raw)) return raw;
 	if (isRecord(raw) && raw.op === undefined) {
 		const inferred = inferTodoOp(raw, hasExistingPhases);
 		if (inferred) {
 			const repaired = { ...raw, op: inferred };
-			if (Value.Check(todoSchema, repaired)) return repaired as TodoParams;
+			if (todoValidator.check(repaired)) return repaired;
 		}
 	}
-	const summary = Value.Errors(todoSchema, raw)
-		.map((error) => `${error.instancePath || "(root)"}: ${error.message}`)
+	const summary = todoValidator.errors(raw)
+		.map((error) => `${error.path || "(root)"}: ${error.message}`)
 		.join("; ");
 	return `Invalid todo arguments: ${summary}`;
 }

@@ -63,15 +63,18 @@ No JSON file, environment variable, or CLI flag is read.
 
 ## Develop
 
-pi provides `typebox`, `typebox/value`, and the `@earendil-works` packages at
-runtime, so the extension runs with no install. For `bun test` and `tsc`, the
-shared linker symlinks the current pi install into `node_modules`. Both scripts
-run it first:
+pi supplies the `@earendil-works` host packages, but not
+`@earendil-works/pi-schema`, so the tool schema's library is a normal dependency.
+Install it once per checkout:
 
 ```sh
+bun install         # pi-schema
 bun run test        # links pi, then 113 tests
 bun run typecheck
 ```
 
-The linker is `test-support/pi-install.mjs`. It finds the newest install under
+Both scripts run the shared linker first. It symlinks the current pi install,
+and its `jiti`, into `node_modules`, so a test and the extension it loads share
+one copy of pi's classes and registries. The linker is
+`test-support/pi-install.mjs`. It finds the newest install under
 `~/.vite-plus`, or uses `PI_INSTALL`, so it survives a pi update.

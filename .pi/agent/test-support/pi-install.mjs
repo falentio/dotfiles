@@ -59,7 +59,6 @@ export function piAliases(root = findPiInstall()) {
 		"@earendil-works/pi-ai/providers/faux": join(ai, "providers", "faux.js"),
 		"@earendil-works/pi-agent-core": join(root, "node_modules", "@earendil-works", "pi-agent-core", "dist", "index.js"),
 		"@earendil-works/pi-tui": join(root, "node_modules", "@earendil-works", "pi-tui", "dist", "index.js"),
-		typebox: join(root, "node_modules", "typebox", "build", "index.mjs"),
 	};
 }
 
@@ -91,7 +90,6 @@ export function linkPiInstall(target) {
 		[join(modules, "@earendil-works", "pi-agent-core"), join(root, "node_modules", "@earendil-works", "pi-agent-core")],
 		[join(modules, "@earendil-works", "pi-tui"), join(root, "node_modules", "@earendil-works", "pi-tui")],
 		[join(modules, "jiti"), join(root, "node_modules", "jiti")],
-		[join(modules, "typebox"), join(root, "node_modules", "typebox")],
 	];
 
 	for (const [link, source] of links) {

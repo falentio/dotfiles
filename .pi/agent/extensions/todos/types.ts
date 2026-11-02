@@ -1,9 +1,22 @@
 /**
- * Todo types and the TypeBox schema for the `todo` tool.
+ * Todo types and the pi-schema JSON Schema for the `todo` tool.
  */
 
-import { StringEnum } from "@earendil-works/pi-ai";
-import { Type, type Static } from "typebox";
+import {
+	arr,
+	obj,
+	oneOf,
+	opt,
+	str,
+	type Annotations,
+	type Schema,
+	type Static,
+} from "@earendil-works/pi-schema";
+
+const stringEnum = <const V extends readonly string[]>(
+	values: V,
+	options?: Annotations<V[number]>,
+): Schema<V[number]> => ({ type: "string", ...oneOf(values, options) });
 
 export type TodoStatus =
 	| "pending"
@@ -48,7 +61,7 @@ export interface TodoToolDetails {
 	completedTasks?: TodoCompletionTransition[];
 }
 
-const TodoOp = StringEnum(
+const TodoOp = stringEnum(
 	[
 		"init",
 		"start",
@@ -59,39 +72,40 @@ const TodoOp = StringEnum(
 		"unblock",
 		"append",
 		"view",
-	] as const,
+	],
 	{ description: "operation to apply" },
 );
 
-const InitListEntry = Type.Object({
-	phase: Type.String({ description: "phase name" }),
-	items: Type.Array(Type.String({ description: "task content" }), {
-		minItems: 1,
-		description: "tasks for this phase",
-	}),
-});
+const InitListEntry = obj(
+	{
+		phase: str({ description: "phase name" }),
+		items: arr(str({ description: "task content" }), {
+			minItems: 1,
+			description: "tasks for this phase",
+		}),
+	},
+	{ open: true },
+);
 
-export const todoSchema = Type.Object(
+export const todoSchema = obj(
 	{
 		op: TodoOp,
-		list: Type.Optional(
-			Type.Array(InitListEntry, { description: "phased task list (init)" }),
+		list: opt(
+			arr(InitListEntry, { description: "phased task list (init)" }),
 		),
-		task: Type.Optional(Type.String({ description: "task content" })),
-		phase: Type.Optional(Type.String({ description: "phase name" })),
+		task: opt(str({ description: "task content" })),
+		phase: opt(str({ description: "phase name" })),
 		// No `minItems` here: `items` is only meaningful for `init`/`append`,
 		// and both enforce non-empty with op-specific errors. A stray `items: []` on
 		// an op that ignores it (e.g. `view`) must not be a hard schema rejection.
-		items: Type.Optional(
-			Type.Array(Type.String({ description: "task content" }), {
+		items: opt(
+			arr(str({ description: "task content" }), {
 				description: "tasks to append",
 			}),
 		),
-		reason: Type.Optional(
-			Type.String({ description: "blocker note (block op)" }),
-		),
+		reason: opt(str({ description: "blocker note (block op)" })),
 	},
-	{ description: "apply a single todo operation" },
+	{ open: true, description: "apply a single todo operation" },
 );
 
 export type TodoParams = Static<typeof todoSchema>;

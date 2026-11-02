@@ -177,7 +177,8 @@ export default function todosExtension(pi: ExtensionAPI): void {
 
 	pi.on("before_agent_start", async (event, ctx) => {
 		tracker.resetCycle();
-		const prelude = tracker.createEagerTodoPrelude(event.prompt, ctx);
+		const prompt = event.messageType === "user" ? event.prompt : undefined;
+		const prelude = tracker.createEagerTodoPrelude(prompt, ctx);
 		return prelude ? { message: prelude } : undefined;
 	});
 
