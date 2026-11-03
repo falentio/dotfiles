@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { IDLE_COMPACT_CONFIG, limits, validateConfig, type IdleCompactConfig } from "./config.ts";
 import { decide, settledAtFrom, type Limits, type Phase, type Prompt } from "./state.ts";
 
@@ -34,7 +34,14 @@ function install(pi: ExtensionAPI, policy: Limits): void {
 
 		phase = { kind: "compacting", prompt: decision.prompt };
 		if (ctx.hasUI) ctx.ui.notify(NOTICE, "info");
-		ctx.compact({ onComplete: flush, onError: flush });
+		try {
+			ctx.compact({ onComplete: flush, onError: flush });
+		} catch {
+			// A replaced session leaves this ctx stale, and compact() throws before it starts.
+			// Pass the prompt through so pi sends it uncompacted rather than dropping it.
+			phase = { kind: "watching", settledAt: Date.now() };
+			return;
+		}
 		return { action: "handled" };
 	});
 
