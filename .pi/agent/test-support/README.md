@@ -20,7 +20,7 @@ The linker refuses to delete a real directory where a link belongs: it stops and
 | `nested-agents` smoke | `node --test smoke.test.ts` | 8 pass |
 | `background-compaction` | `bun run test` | 148 pass |
 | `bandar-metadata` | `bun run test` | 33 pass |
-| `idle-compact` | `bun run test` | 16 pass |
+| `idle-compact` | `bun run test` | 27 pass |
 | `repo-scout` | `bun run test` | 126 pass |
 | `todos` | `bun run test` | 113 pass |
 

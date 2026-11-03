@@ -46,7 +46,9 @@ expand. The re-sent prompt starts the turn pi would have started, one uncached
 summary request later.
 
 The prompt is never lost. A failed compaction, a "Nothing to compact (session
-too small)" error, and a cancelled compaction all reach the same re-send.
+too small)" error, and a cancelled compaction all reach the same re-send. A
+session replaced mid-handler leaves the context stale, so `compact()` throws
+before it starts; the prompt then goes out uncompacted instead.
 
 The phase is one value: either `watching`, with the time the run settled, or
 `compacting`, holding the prompt that was taken. A session restore seeds the
@@ -68,6 +70,10 @@ An hour matches the default prompt-cache lifetime. `minTokens` keeps a short
 conversation from paying for a summary it does not need.
 
 ## Limits
+
+In RPC mode the swallowed prompt answers with `disposition: "handled"`, because
+no run started for it. The run starts when the prompt is re-sent, so an RPC
+client should wait for events rather than for that response.
 
 A prompt sent while the compaction runs is queued by the TUI and rejected by pi
 in RPC and print mode with "Cannot submit a prompt while compaction is in
@@ -95,7 +101,8 @@ bun run test        # links pi, then the suite
 bun run typecheck
 ```
 
-The unit suite covers every guard in `decide()`. The smoke suite drives a real
+The unit suites cover every guard in `decide()` and the wiring that re-sends a
+swallowed prompt. The smoke suite drives a real
 `AgentSession` against a faux provider: it sends one prompt, waits for the
 session to settle past the rewritten `idleMs`, sends a second prompt, and
 asserts that one manual compaction ran, that a summary request went out, that
