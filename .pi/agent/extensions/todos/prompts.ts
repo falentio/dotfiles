@@ -70,7 +70,7 @@ function renderOperationTable(): string {
 /** The todo tool's description (what the model sees in the tools section). */
 export const TODO_TOOL_DESCRIPTION = `**Tasks: verbatim content strings, NEVER auto-generated IDs; no "task-1"/"task-N". Pass content in \`task\`.**
 
-Auto-promote only fires when NOTHING is in progress: an existing in-progress task keeps its place; completing any task with none in progress promotes the earliest still-open task (phase order) to \`in_progress\`. Out-of-order completion may move the pointer back to an earlier phase—expected; completed tasks NEVER revert.
+Auto-promote only fires when NOTHING is in progress: completing a task with none in progress promotes the earliest open task (phase order) to \`in_progress\`; an existing in-progress task keeps its place. Completed tasks NEVER revert; out-of-order work may point back to an earlier phase, which is expected.
 
 ## Operations
 
@@ -78,16 +78,14 @@ ${renderOperationTable()}
 
 ## Anatomy
 
-- Task content: 5–10 words; what, not how; unique identifier.
-- Phase name: short noun phrase (e.g. \`Foundation\`, \`Auth\`, \`Verification\`); unique identifier. NEVER prefix \`1.\`, \`A)\`, \`Phase 1:\`.
+- Task: 5-10 words, unique. Phase: short noun phrase, no numbering.
 
 ## Rules
 
 - Mark tasks done immediately after finishing; complete phases in order.
-- NEVER make a todo call the turn's only tool call. Batch with real work: \`init\` with first reads/edits; each \`done\`/\`start\` with next action. Solo todo turns waste a round trip.
-- Waiting on something you can't act on—a user decision, another agent, external service: \`block\` task (optional \`reason\`); remains tracked but avoids stop reminder. \`unblock\` when actionable. If blocker agent-actionable, \`append\` an unblocking task instead.
-- Keep introduced \`task\`/\`phase\` strings stable.
-- Lost exact task text: \`view\` echoes list; NEVER guess from memory.
+- Batch todo calls with real work (\`init\` with first reads, each \`done\`/\`start\` with the next action); a solo todo turn wastes a round trip.
+- Stuck on external input: \`block\` with \`reason\`, \`unblock\` when actionable; if the blocker is agent-actionable, \`append\` an unblocking task.
+- Keep introduced \`task\`/\`phase\` strings stable. \`view\` echoes the list; never guess task text from memory.
 
 ## Create a list
 
@@ -95,9 +93,4 @@ ${renderOperationTable()}
 - User explicitly requests one.
 - User provides a set of tasks.
 - New instructions arrive mid-task: capture before proceeding.
-
-<critical>
-User gives multi-step plan—phased todo, numbered/bulleted checklist, or "N bugs/items/tasks":
-- MUST \`init\` every item as its own task before working.
-- Enumerate all; NEVER summarize into fewer tasks, sample "the important ones", drop items, or track the rest from memory.
-</critical>`;
+- For an N-item plan, create one task per item.`;

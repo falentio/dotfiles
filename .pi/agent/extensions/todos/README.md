@@ -72,7 +72,7 @@ Install it once per checkout:
 
 ```sh
 bun install         # pi-schema
-bun run test        # links pi, then 127 tests
+bun run test        # links pi, then runs the suite
 bun run typecheck
 ```
 

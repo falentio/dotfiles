@@ -100,8 +100,6 @@ export default function todosExtension(pi: ExtensionAPI): void {
 		promptSnippet:
 			"Write a structured todo list to track progress within a session",
 		promptGuidelines: [
-			"Use the todo tool to track multi-step work as a phased list; update it as the work progresses.",
-			"When the user provides a multi-step plan or enumerates N items/bugs/tasks, initialize every item as its own todo task before working.",
 			"Mark tasks done immediately after finishing them; batch todo calls with real work instead of making solo todo turns.",
 		],
 		parameters: todoSchema,
