@@ -795,3 +795,46 @@ describe("summary modes", () => {
 		).not.toContain("Remaining items");
 	});
 });
+
+describe("collapsed full list", () => {
+	function closedPlan() {
+		const tool = makeTool();
+		tool.run({
+			op: "init",
+			list: [{ phase: "Work", items: ["kept", "finished", "removed", "next"] }],
+		});
+		tool.run({ op: "done", task: "finished" });
+		tool.run({ op: "drop", task: "removed" });
+		return tool;
+	}
+
+	it("prints open tasks and one closed-count line per phase", () => {
+		const summary = summaryText(closedPlan().run({ op: "view" }));
+		expect(summary).toContain("  Work:");
+		expect(summary).toContain("- kept");
+		expect(summary).toContain("- next");
+		expect(summary).toContain("    (1 done, 1 dropped)");
+	});
+
+	it("omits closed task text from the full list", () => {
+		const summary = summaryText(closedPlan().run({ op: "view" }));
+		expect(summary).not.toContain("finished");
+		expect(summary).not.toContain("removed");
+	});
+
+	it("omits the count line when nothing is closed", () => {
+		const tool = makeTool();
+		const summary = summaryText(tool.run({ op: "init", items: ["only"] }));
+		expect(summary).toContain("- only");
+		expect(summary).not.toMatch(/\(\d+ done/);
+	});
+
+	it("reports a single closed kind without a zero count", () => {
+		const tool = makeTool();
+		tool.run({ op: "init", items: ["a", "b"] });
+		tool.run({ op: "done", task: "b" });
+		const summary = summaryText(tool.run({ op: "view" }));
+		expect(summary).toContain("    (1 done)");
+		expect(summary).not.toContain("dropped");
+	});
+});

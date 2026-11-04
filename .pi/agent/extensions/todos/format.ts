@@ -53,6 +53,13 @@ function nextLine(phases: TodoPhase[]): string {
 	return "Next: none.";
 }
 
+function closedCounts(done: number, dropped: number): string {
+	const parts: string[] = [];
+	if (done > 0) parts.push(`${done} done`);
+	if (dropped > 0) parts.push(`${dropped} dropped`);
+	return `(${parts.join(", ")})`;
+}
+
 function phaseBlocks(phases: TodoPhase[]): string[] {
 	const lines: string[] = [];
 	for (const phase of phases) {
@@ -67,6 +74,13 @@ function phaseBlocks(phases: TodoPhase[]): string[] {
 							: " (blocked)"
 						: "";
 			lines.push(`    - ${task.content}${tag}`);
+		}
+		const done = phase.tasks.filter((task) => task.status === "completed").length;
+		const dropped = phase.tasks.filter(
+			(task) => task.status === "abandoned",
+		).length;
+		if (done > 0 || dropped > 0) {
+			lines.push(`    ${closedCounts(done, dropped)}`);
 		}
 	}
 	return lines;
