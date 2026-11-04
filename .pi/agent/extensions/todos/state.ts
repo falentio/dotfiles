@@ -310,13 +310,10 @@ function removeTasks(
 	if (entry.phase !== undefined) {
 		const phase = resolvePhaseOrError(phases, entry.phase, errors);
 		if (!phase) return phases;
-		phase.tasks = [];
+		phases.splice(phases.indexOf(phase), 1);
 		return phases;
 	}
-	for (const phase of phases) {
-		phase.tasks = [];
-	}
-	return phases;
+	return [];
 }
 
 function applyEntry(

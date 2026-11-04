@@ -276,7 +276,7 @@ describe("TodoTool operations", () => {
 		]);
 	});
 
-	it("removes all tasks when rm omits task and phase", () => {
+	it("clears the whole list when rm omits task and phase", () => {
 		const tool = makeTool();
 		tool.run({
 			op: "init",
@@ -284,7 +284,30 @@ describe("TodoTool operations", () => {
 		});
 
 		const result = tool.run({ op: "rm" });
-		expect(result.phases[0]?.tasks).toEqual([]);
+		expect(result.phases).toEqual([]);
+		expect(summaryText(result)).toContain("Todo list cleared.");
+	});
+
+	it("splices a removed phase out of the list", () => {
+		const tool = makeTool();
+		tool.run({
+			op: "init",
+			list: [
+				{ phase: "Work", items: ["First"] },
+				{ phase: "Later", items: ["Second"] },
+			],
+		});
+
+		const result = tool.run({ op: "rm", phase: "Work" });
+		expect(result.phases.map((phase) => phase.name)).toEqual(["Later"]);
+	});
+
+	it("clears the list when the only phase is removed", () => {
+		const tool = makeTool();
+		tool.run({ op: "init", list: [{ phase: "Work", items: ["First"] }] });
+
+		const result = tool.run({ op: "rm", phase: "Work" });
+		expect(result.phases).toEqual([]);
 		expect(summaryText(result)).toContain("Todo list cleared.");
 	});
 
