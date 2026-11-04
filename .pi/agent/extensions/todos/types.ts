@@ -53,10 +53,14 @@ export interface TodoCompletionTransition {
 	content: string;
 }
 
+/**
+ * Result details. The list itself lives only in the `todo_snapshot` entry: a
+ * second durable copy in the tool result can disagree with the snapshot after
+ * a rewind.
+ */
 export interface TodoToolDetails {
 	/** Operation that produced this snapshot; absent on legacy transcript entries. */
 	op?: TodoOperation;
-	phases: TodoPhase[];
 	storage: "session" | "memory";
 	completedTasks?: TodoCompletionTransition[];
 }

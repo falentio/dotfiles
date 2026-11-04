@@ -9,12 +9,19 @@ import type {
 export type AnyHandler = ExtensionHandler<ExtensionEvent, unknown>;
 type RegisterFlagOptions = Parameters<ExtensionAPI["registerFlag"]>[1];
 
+export interface RecordedEntry {
+	type: "custom";
+	customType: string;
+	data?: unknown;
+}
+
 export interface RecordingAPI {
 	api: ExtensionAPI;
 	handlers: Map<string, AnyHandler[]>;
 	tools: ToolDefinition[];
 	commands: string[];
 	flags: Array<{ name: string; options: RegisterFlagOptions }>;
+	entries: RecordedEntry[];
 }
 
 export function makeRecordingAPI(): RecordingAPI {
@@ -22,6 +29,7 @@ export function makeRecordingAPI(): RecordingAPI {
 	const tools: ToolDefinition[] = [];
 	const commands: string[] = [];
 	const flags: Array<{ name: string; options: RegisterFlagOptions }> = [];
+	const entries: RecordedEntry[] = [];
 
 	const api: ExtensionAPI = {
 		on: ((event: string, handler: AnyHandler) => {
@@ -45,7 +53,9 @@ export function makeRecordingAPI(): RecordingAPI {
 		registerEntryRenderer: () => {},
 		sendMessage: () => {},
 		sendUserMessage: () => {},
-		appendEntry: () => {},
+		appendEntry: (customType: string, data?: unknown) => {
+			entries.push({ type: "custom", customType, data });
+		},
 		setSessionName: () => {},
 		getSessionName: () => undefined,
 		setLabel: () => {},
@@ -66,7 +76,7 @@ export function makeRecordingAPI(): RecordingAPI {
 		},
 	} as unknown as ExtensionAPI;
 
-	return { api, handlers, tools, commands, flags };
+	return { api, handlers, tools, commands, flags, entries };
 }
 
 export function makeContext(

@@ -142,7 +142,6 @@ export default function todosExtension(pi: ExtensionAPI): void {
 			}
 			const details: TodoToolDetails = {
 				op: outcome.op,
-				phases: outcome.phases,
 				storage: outcome.storage,
 			};
 			if (outcome.completedTasks.length > 0)

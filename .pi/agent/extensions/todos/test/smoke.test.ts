@@ -1,6 +1,5 @@
 import { describe, expect, it } from "bun:test";
 import type {
-	ExtensionAPI,
 	ExtensionContext,
 	ExtensionToolContext,
 } from "@earendil-works/pi-coding-agent";
@@ -63,7 +62,7 @@ describe("todos extension factory", () => {
 	});
 
 	it("the todo tool executes against branch-synced state", async () => {
-		const { api, handlers, tools } = makeRecordingAPI();
+		const { api, handlers, tools, entries } = makeRecordingAPI();
 		todosExtension(api);
 
 		const phases = [
@@ -91,7 +90,7 @@ describe("todos extension factory", () => {
 
 		const result = await tool.execute!(
 			"call-1",
-			{ op: "view" },
+			{ op: "start", task: "from branch" },
 			undefined,
 			undefined,
 			ctx as ExtensionToolContext,
@@ -99,7 +98,21 @@ describe("todos extension factory", () => {
 		const text =
 			result.content.find((part) => part.type === "text")?.text ?? "";
 		expect(text).toContain("from branch");
-		expect((result.details as { phases: unknown }).phases).toEqual(phases);
+		expect((result.details as Record<string, unknown>).phases).toBeUndefined();
+		expect(entries).toEqual([
+			{
+				type: "custom",
+				customType: TODO_SNAPSHOT_CUSTOM_TYPE,
+				data: {
+					phases: [
+						{
+							name: "Work",
+							tasks: [{ content: "from branch", status: "in_progress" }],
+						},
+					],
+				},
+			},
+		]);
 	});
 
 	it("before_agent_start injects the configured eager prelude", async () => {
@@ -137,14 +150,6 @@ describe("todos extension factory", () => {
 		expect(message?.content).toContain("Consider calling `todo` first");
 		expect(message?.content).not.toContain("MUST");
 	});
-
-	async function makeEntryCapture(api: ExtensionAPI) {
-		const entries: Array<{ customType: string; data: unknown }> = [];
-		api.appendEntry = (customType: string, data?: unknown) => {
-			entries.push({ customType, data });
-		};
-		return entries;
-	}
 
 	async function settleAssistant(
 		handlers: Map<string, AnyHandler[]>,
@@ -365,8 +370,7 @@ describe("todos extension factory", () => {
 	});
 
 	it("writes a todo_snapshot custom entry on a successful mutation", async () => {
-		const { api, handlers, tools } = makeRecordingAPI();
-		const entries = await makeEntryCapture(api);
+		const { api, handlers, tools, entries } = makeRecordingAPI();
 		todosExtension(api);
 		const ctx = makeContext(
 			{ cwd: "/tmp/project" },
@@ -404,8 +408,7 @@ describe("todos extension factory", () => {
 	});
 
 	it("writes no snapshot without a session file", async () => {
-		const { api, handlers, tools } = makeRecordingAPI();
-		const entries = await makeEntryCapture(api);
+		const { api, handlers, tools, entries } = makeRecordingAPI();
 		todosExtension(api);
 		const ctx = makeContext(
 			{ cwd: "/tmp/project" },
@@ -430,8 +433,7 @@ describe("todos extension factory", () => {
 	});
 
 	it("writes nothing on a view or a failed mutation", async () => {
-		const { api, handlers, tools } = makeRecordingAPI();
-		const entries = await makeEntryCapture(api);
+		const { api, handlers, tools, entries } = makeRecordingAPI();
 		todosExtension(api);
 		const ctx = makeContext(
 			{ cwd: "/tmp/project" },

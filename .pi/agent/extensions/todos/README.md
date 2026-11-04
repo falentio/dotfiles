@@ -27,10 +27,11 @@ Tasks are referenced by their exact content, never by an id. A missing `op` is
 inferred when the arguments are unambiguous, so `{list: [...]}` becomes an
 `init`.
 
-State lives in the tool result and in a session snapshot. Every successful
-call returns `details.phases` and writes a `todo_snapshot` session entry; the
-extension rebuilds the list from the newest of either on the session branch.
-Branching and rewinding show the list correct for that point in history.
+State lives in a session snapshot. Every successful mutation writes a
+`todo_snapshot` entry; the extension rebuilds the list from the newest one on
+the session branch, and replays `details.phases` from an older tool result so
+a session recorded before snapshots still restores. Branching and rewinding
+show the list correct for that point in history.
 
 The tool is registered `model-only`, so the model calls it directly and a
 `codemode` script cannot. A wrapped call would record only the outer `codemode`
