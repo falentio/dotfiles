@@ -311,6 +311,29 @@ describe("TodoTool operations", () => {
 		expect(summaryText(result)).toContain("Todo list cleared.");
 	});
 
+	it("drops a phase once its last task is removed", () => {
+		const tool = makeTool();
+		tool.run({
+			op: "init",
+			list: [
+				{ phase: "Work", items: ["First"] },
+				{ phase: "Later", items: ["Second"] },
+			],
+		});
+
+		const result = tool.run({ op: "rm", task: "First" });
+		expect(result.phases.map((phase) => phase.name)).toEqual(["Later"]);
+	});
+
+	it("clears the list when the last remaining task is removed", () => {
+		const tool = makeTool();
+		tool.run({ op: "init", items: ["Only"] });
+
+		const result = tool.run({ op: "rm", task: "Only" });
+		expect(result.phases).toEqual([]);
+		expect(summaryText(result)).toContain("Todo list cleared.");
+	});
+
 	it("drops all tasks in a phase", () => {
 		const tool = makeTool();
 		tool.run({

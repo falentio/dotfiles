@@ -20,7 +20,7 @@ import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import type { TodoConfig } from "./config.ts";
 import { renderEagerTodoPrompt, renderMidRunNudgePrompt } from "./prompts.ts";
 import { getLatestTodoPhasesFromEntries } from "./persistence.ts";
-import { clonePhases } from "./state.ts";
+import { clonePhases, pruneEmptyPhases } from "./state.ts";
 import { TODO_TOOL_NAME, type TodoItem, type TodoPhase } from "./types.ts";
 
 const MID_RUN_NUDGE_MUTATION_THRESHOLD = 12;
@@ -161,7 +161,9 @@ export class TodoTracker {
 	/** Rehydrates todo phases from the current transcript branch. */
 	syncFromBranch(ctx: ExtensionContext): void {
 		this.setPhases(
-			getLatestTodoPhasesFromEntries(this.#host.getBranch(ctx)) ?? [],
+			pruneEmptyPhases(
+				getLatestTodoPhasesFromEntries(this.#host.getBranch(ctx)) ?? [],
+			),
 		);
 	}
 
@@ -343,7 +345,7 @@ function isTrackerContextMessage(
 }
 
 /**
- * Drop tracker-injected messages (eager preludes, mid-run nudges, completion reminders)
+ * Drop tracker-injected messages
  * from outgoing LLM context once any later real message exists.
  *
  * Each such message describes moment-in-time todo state ("You stopped with

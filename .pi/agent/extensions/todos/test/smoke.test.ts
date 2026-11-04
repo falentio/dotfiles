@@ -116,6 +116,42 @@ describe("todos extension factory", () => {
 		]);
 	});
 
+	it("drops a phase that a restored session left empty", async () => {
+		const { api, handlers, tools } = makeRecordingAPI();
+		todosExtension(api);
+		const ctx = makeContext(
+			{ cwd: "/tmp/project" },
+			{
+				getBranch: () =>
+					branchWithTodo([
+						{ name: "Husk", tasks: [] },
+						{ name: "Work", tasks: [{ content: "real", status: "pending" }] },
+					]) as never,
+				getCwd: () => "/tmp/project",
+				getSessionFile: () => "/tmp/project/session.jsonl",
+			},
+		);
+		await dispatch(
+			handlers,
+			"session_start",
+			{ type: "session_start", reason: "startup" },
+			ctx,
+		);
+		const tool = tools.find((t) => t.name === "todo");
+		if (!tool) throw new Error("todo tool missing");
+		const result = await tool.execute!(
+			"call-1",
+			{ op: "view" },
+			undefined,
+			undefined,
+			ctx as ExtensionToolContext,
+		);
+		const text =
+			result.content.find((part) => part.type === "text")?.text ?? "";
+		expect(text).not.toContain("Husk");
+		expect(text).toContain("real");
+	});
+
 	it("injects no eager prelude for a run started by a custom message", async () => {
 		const { api, handlers } = makeRecordingAPI();
 		todosExtension(api);

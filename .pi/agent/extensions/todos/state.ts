@@ -40,6 +40,11 @@ export function cloneTask(task: TodoItem): TodoItem {
 	return { ...task };
 }
 
+/** Drop phases with no tasks, so an emptied list holds no phases at all. */
+export function pruneEmptyPhases(phases: TodoPhase[]): TodoPhase[] {
+	return phases.filter((phase) => phase.tasks.length > 0);
+}
+
 export function clonePhases(phases: TodoPhase[]): TodoPhase[] {
 	return phases.map((phase) => ({
 		name: phase.name,
@@ -111,9 +116,7 @@ export function isTodoPhase(value: unknown): value is TodoPhase {
 		if (typeof task !== "object" || task === null) return false;
 		const candidate = task as Record<string, unknown>;
 		if (typeof candidate.content !== "string") return false;
-		if (typeof candidate.status !== "string") return false;
-		if (!(TODO_STATUSES as readonly string[]).includes(candidate.status))
-			return false;
+		if (!TODO_STATUSES.some((status) => status === candidate.status)) return false;
 		return (
 			candidate.blocker === undefined ||
 			typeof candidate.blocker === "string"
@@ -304,10 +307,13 @@ function removeTasks(
 	if (entry.phase !== undefined) {
 		const phase = resolvePhaseOrError(phases, entry.phase, errors);
 		if (!phase) return phases;
-		phases.splice(phases.indexOf(phase), 1);
+		phase.tasks = [];
 		return phases;
 	}
-	return [];
+	for (const phase of phases) {
+		phase.tasks = [];
+	}
+	return phases;
 }
 
 function applyEntry(
@@ -442,7 +448,7 @@ export function applyParams(
 	params: TodoParams,
 ): { phases: TodoPhase[]; errors: string[] } {
 	const errors: string[] = [];
-	const next = applyEntry(phases, params, errors);
+	const next = pruneEmptyPhases(applyEntry(phases, params, errors));
 	normalizeInProgressTask(next);
 	return { phases: next, errors };
 }
