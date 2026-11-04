@@ -2,7 +2,7 @@
  * Text summary returned to the model after every todo operation.
  *
  * Ported from Oh My Pi's `packages/coding-agent/src/tools/todo.ts`
- * (`formatSummary`), split into a full list and the delta a status op returns.
+ * (`formatSummary`).
  */
 
 import type { TodoItem, TodoPhase } from "./types.ts";
@@ -10,7 +10,7 @@ import type { TodoItem, TodoPhase } from "./types.ts";
 export interface SummaryContext {
 	mode: "full" | "delta";
 	readOnly?: boolean;
-	/** Lines describing what this call changed, e.g. Marked done: "X". */
+	/** Pre-rendered change lines, printed above the counts. */
 	changes?: string[];
 }
 

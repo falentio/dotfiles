@@ -72,8 +72,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export default function todosExtension(pi: ExtensionAPI): void {
 	let phases: TodoPhase[] = [];
 	let lastAssistant: AssistantMessage | undefined;
-	// A compaction drops the transcript the model reads the list from, so the
-	// next call re-renders the whole list even when it is a status op.
+	// Compaction drops the list from the model's transcript; re-send it whole.
 	let forceFullList = false;
 
 	function getPhases(): TodoPhase[] {
@@ -109,11 +108,6 @@ export default function todosExtension(pi: ExtensionAPI): void {
 		// durable record. The cost: a script cannot batch todo updates.
 		exposure: "model-only",
 
-		// Repairs a missing `op` and common argument shapes (models routinely
-		// send `{list:[...]}` with no op) before schema validation, mirroring
-		// omp's `lenientArgValidation` + `resolveTodoParams` behavior.
-		// Uninferable shapes return as-is and fail schema validation for a
-		// normal model retry.
 		prepareArguments(args: unknown): TodoParams {
 			const normalized = normalizeTodoArgs(args);
 			if (isRecord(normalized) && normalized.op === undefined) {

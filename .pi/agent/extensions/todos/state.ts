@@ -508,11 +508,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/**
- * Coerce the argument shapes models actually send into the schema's shape.
- * Only unambiguous repairs: a list of strings, a phase map, an entry keyed by
- * `name`, a single string of items, an empty entry, and an unknown op name.
- */
+/** Coerce the argument shapes models send into the schema's shape; only unambiguous repairs. */
 export function normalizeTodoArgs(raw: unknown): unknown {
 	if (!isRecord(raw)) return raw;
 	const args: Record<string, unknown> = { ...raw };

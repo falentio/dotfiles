@@ -42,13 +42,10 @@ export interface TodoExecuteOutcome {
 }
 
 export interface TodoExecuteOptions {
-	/** True when the session has a file (`"session"` storage). */
 	hasSessionFile: boolean;
-	/** Return the full list for a status op too (after a compaction). */
 	forceFullList?: boolean;
 }
 
-/** Ops whose result is a delta; every other op returns the full list. */
 const DELTA_OPS: ReadonlySet<TodoOperation> = new Set([
 	"done",
 	"start",
@@ -116,11 +113,8 @@ function renderStatusChanges(
 	return lines;
 }
 
-/**
- * `start` demotes the previous in-progress task, and every other status op
- * auto-promotes the next one. Neither is a change the call made, and the Next
- * line already reports the promoted task.
- */
+// Auto-promotion and start's demotion are engine moves, not this call's
+// change; the Next line already names the promoted task.
 function relevantChanges(
 	op: TodoOperation,
 	changes: TodoStatusChange[],
