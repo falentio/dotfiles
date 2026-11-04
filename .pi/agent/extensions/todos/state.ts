@@ -219,7 +219,7 @@ const DEFAULT_INIT_PHASE = "Tasks";
  * task identity that targeting ops match by. Normalizing at this boundary
  * keeps every consumer one-line-safe without touching identity.
  */
-function normalizeSingleLine(value: string): string {
+export function normalizeSingleLine(value: string): string {
 	return value.replace(/\s+/g, " ").trim();
 }
 
@@ -308,6 +308,73 @@ function appendItems(
 
 	for (const content of normalizedItems) {
 		phase.tasks.push({ content, status: "pending" });
+	}
+	return phases;
+}
+
+function updateTask(
+	phases: TodoPhase[],
+	entry: TodoParams,
+	errors: string[],
+): TodoPhase[] {
+	const hit = resolveTaskOrError(phases, entry.task, errors);
+	if (!hit) return phases;
+	if (
+		entry.content === undefined &&
+		entry.phase === undefined &&
+		entry.before === undefined
+	) {
+		errors.push("update requires content, phase, or before");
+		return phases;
+	}
+	const target = hit.task;
+	const content =
+		entry.content !== undefined
+			? normalizeSingleLine(entry.content)
+			: target.content;
+	if (!content) {
+		errors.push("Empty task content in update");
+		return phases;
+	}
+	if (content !== target.content && findTaskByContent(phases, content)) {
+		errors.push(`Task "${content}" already exists`);
+		return phases;
+	}
+	const phaseName =
+		entry.phase !== undefined ? normalizeSingleLine(entry.phase) : hit.phase.name;
+	if (!phaseName) {
+		errors.push("Missing phase name for update operation");
+		return phases;
+	}
+	let destination = findPhaseByName(phases, phaseName);
+	if (!destination) {
+		destination = { name: phaseName, tasks: [] };
+		phases.push(destination);
+	}
+	const beforeContent =
+		entry.before !== undefined ? normalizeSingleLine(entry.before) : undefined;
+	if (
+		beforeContent !== undefined &&
+		!destination.tasks.some(
+			(task) => task !== target && task.content === beforeContent,
+		)
+	) {
+		errors.push(`Task "${beforeContent}" not found in phase "${phaseName}"`);
+		return phases;
+	}
+	if (beforeContent === undefined && destination === hit.phase) {
+		target.content = content;
+		return phases;
+	}
+	hit.phase.tasks = hit.phase.tasks.filter((task) => task !== target);
+	target.content = content;
+	if (beforeContent === undefined) {
+		destination.tasks.push(target);
+	} else {
+		const index = destination.tasks.findIndex(
+			(task) => task.content === beforeContent,
+		);
+		destination.tasks.splice(index, 0, target);
 	}
 	return phases;
 }
@@ -407,6 +474,8 @@ function applyEntry(
 		}
 		case "rm":
 			return removeTasks(phases, entry, errors);
+		case "update":
+			return updateTask(phases, entry, errors);
 		case "append":
 			return appendItems(phases, entry, errors);
 		case "view":

@@ -838,3 +838,140 @@ describe("collapsed full list", () => {
 		expect(summary).not.toContain("dropped");
 	});
 });
+
+describe("update op", () => {
+	function plan() {
+		const tool = makeTool();
+		tool.run({
+			op: "init",
+			list: [
+				{ phase: "Build", items: ["parser", "fixtures", "report"] },
+				{ phase: "Ship", items: ["tag"] },
+			],
+		});
+		return tool;
+	}
+
+	it("renames a task and keeps its status", () => {
+		const tool = plan();
+		const result = tool.run({
+			op: "update",
+			task: "parser",
+			content: "lalr parser",
+		});
+		expect(result.failed).toBe(false);
+		const renamed = result.phases[0]?.tasks.find(
+			(task) => task.content === "lalr parser",
+		);
+		expect(renamed?.status).toBe("in_progress");
+		expect(summaryText(result)).toContain('Renamed "parser" to "lalr parser".');
+	});
+
+	it("keeps a renamed task's position in its phase", () => {
+		const tool = plan();
+		tool.run({ op: "update", task: "report", content: "release notes" });
+		expect(tool.phases[0]?.tasks.map((task) => task.content)).toEqual([
+			"parser",
+			"fixtures",
+			"release notes",
+		]);
+	});
+
+	it("rejects a rename onto an existing task", () => {
+		const tool = plan();
+		const result = tool.run({
+			op: "update",
+			task: "parser",
+			content: "fixtures",
+		});
+		expect(result.failed).toBe(true);
+		expect(summaryText(result)).toContain('Task "fixtures" already exists');
+	});
+
+	it("moves a task to an existing phase at the end", () => {
+		const tool = plan();
+		const result = tool.run({ op: "update", task: "report", phase: "Ship" });
+		expect(
+			result.phases.map((phase) => [
+				phase.name,
+				phase.tasks.map((task) => task.content),
+			]),
+		).toEqual([
+			["Build", ["parser", "fixtures"]],
+			["Ship", ["tag", "report"]],
+		]);
+		expect(summaryText(result)).toContain('Moved "report" to "Ship".');
+	});
+
+	it("moves a task before another in the destination phase", () => {
+		const tool = plan();
+		const result = tool.run({
+			op: "update",
+			task: "report",
+			phase: "Ship",
+			before: "tag",
+		});
+		expect(result.phases[1]?.tasks.map((task) => task.content)).toEqual([
+			"report",
+			"tag",
+		]);
+	});
+
+	it("creates the destination phase when it is missing", () => {
+		const tool = plan();
+		const result = tool.run({ op: "update", task: "tag", phase: "Release" });
+		expect(result.failed).toBe(false);
+		expect(result.phases.map((phase) => phase.name)).toEqual([
+			"Build",
+			"Release",
+		]);
+		expect(result.phases[1]?.tasks.map((task) => task.content)).toEqual(["tag"]);
+	});
+
+	it("reorders within a phase when given only before", () => {
+		const tool = plan();
+		const result = tool.run({ op: "update", task: "report", before: "parser" });
+		expect(result.failed).toBe(false);
+		expect(result.phases[0]?.tasks.map((task) => task.content)).toEqual([
+			"report",
+			"parser",
+			"fixtures",
+		]);
+		expect(summaryText(result)).toContain(
+			'Reordered "report" before "parser".',
+		);
+	});
+
+	it("requires content, phase, or before", () => {
+		const tool = plan();
+		const result = tool.run({ op: "update", task: "parser" });
+		expect(result.failed).toBe(true);
+		expect(summaryText(result)).toContain(
+			"update requires content, phase, or before",
+		);
+	});
+
+	it("rejects a before target outside the destination phase", () => {
+		const tool = plan();
+		const result = tool.run({
+			op: "update",
+			task: "tag",
+			phase: "Ship",
+			before: "parser",
+		});
+		expect(result.failed).toBe(true);
+		expect(summaryText(result)).toContain(
+			'Task "parser" not found in phase "Ship"',
+		);
+	});
+
+	it("targets the renamed content afterwards", () => {
+		const tool = plan();
+		tool.run({ op: "update", task: "parser", content: "lalr parser" });
+		const result = tool.run({ op: "done", task: "lalr parser" });
+		expect(result.failed).toBe(false);
+		expect(result.completedTasks).toEqual([
+			{ phase: "Build", content: "lalr parser" },
+		]);
+	});
+});

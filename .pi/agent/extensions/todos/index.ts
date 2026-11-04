@@ -3,7 +3,7 @@
  *
  * Replicates the OMP todo experience as a pi extension package:
  *
- * - **`todo` tool** (`init|start|done|rm|drop|block|unblock|append|view`)
+ * - **`todo` tool** (`init|start|done|update|rm|drop|block|unblock|append|view`)
  *   with phased lists, auto-promotion of the next task, completion
  *   transitions, and strict batch semantics. Every successful mutation writes
  *   a `todo_snapshot` session entry, and state is reconstructed from the

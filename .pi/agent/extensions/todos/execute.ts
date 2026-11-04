@@ -11,6 +11,7 @@ import {
 	clonePhases,
 	getCompletionTransitions,
 	getStatusChanges,
+	normalizeSingleLine,
 	resolveTodoParams,
 	type TodoStatusChange,
 } from "./state.ts";
@@ -131,6 +132,33 @@ function relevantChanges(
 	});
 }
 
+function renderUpdateChanges(
+	entry: TodoParams,
+	previousPhases: TodoPhase[],
+): string[] {
+	if (entry.task === undefined) return [];
+	const original = entry.task;
+	const originalPhase = previousPhases.find((phase) =>
+		phase.tasks.some((task) => task.content === original),
+	)?.name;
+	const content =
+		entry.content !== undefined ? normalizeSingleLine(entry.content) : original;
+	const lines: string[] = [];
+	if (content !== original) lines.push(`Renamed "${original}" to "${content}".`);
+	if (
+		entry.phase !== undefined &&
+		normalizeSingleLine(entry.phase) !== originalPhase
+	) {
+		lines.push(`Moved "${content}" to "${normalizeSingleLine(entry.phase)}".`);
+	}
+	if (entry.before !== undefined) {
+		lines.push(
+			`Reordered "${content}" before "${normalizeSingleLine(entry.before)}".`,
+		);
+	}
+	return lines;
+}
+
 /**
  * Apply a single todo op with full omp semantics:
  *
@@ -178,10 +206,12 @@ export function executeTodoOp(
 	const changes =
 		readOnly || failed
 			? []
-			: renderStatusChanges(
-					relevantChanges(op, getStatusChanges(previousPhases, updated)),
-					updated,
-				);
+			: op === "update"
+				? renderUpdateChanges(entry, previousPhases)
+				: renderStatusChanges(
+						relevantChanges(op, getStatusChanges(previousPhases, updated)),
+						updated,
+					);
 	const mode: SummaryContext["mode"] =
 		failed || forceFullList || !DELTA_OPS.has(op) ? "full" : "delta";
 	return {

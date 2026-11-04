@@ -48,6 +48,11 @@ export const TODO_OP_ROWS = [
 		effect: "Append tasks to phase; lazily creates phase",
 	},
 	{
+		op: "update",
+		fields: "`task`; optional `content`, `phase`, `before`",
+		effect: "Rename, move, or reorder; keeps status",
+	},
+	{
 		op: "view",
 		fields: "—",
 		effect: "Read-only; echo list",

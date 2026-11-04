@@ -19,6 +19,7 @@ The agent calls `todo` with one operation:
 | `drop` | `task` or `phase` | Mark abandoned; omit both to mark every task |
 | `block` | `task` or `phase`, optional `reason` | Mark blocked on external input |
 | `unblock` | `task` or `phase` | Return a blocked task to pending |
+| `update` | `task`, optional `content`, `phase`, `before` | Rename, move, or reorder; keeps status |
 | `rm` | optional `task` or `phase` | Remove a task or phase; omit both to clear the list |
 | `append` | `phase`, `items` | Add tasks; creates the phase if missing |
 | `view` | | Read the list |
