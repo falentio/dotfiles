@@ -30,8 +30,7 @@ function overallLine(phases: TodoPhase[]): string {
 	return `Overall: ${closed}/${tasks.length} done, ${open} open${blocked > 0 ? `, ${blocked} blocked` : ""}.`;
 }
 
-const WORKED_AHEAD_SUFFIX =
-	" — earliest phase with open tasks; the in-progress pointer auto-advances to the earliest open task on each completion, so it can sit behind out-of-order work (nothing was un-completed).";
+const WORKED_AHEAD_SUFFIX = " — earliest phase with open tasks.";
 
 function activePhaseLine(phases: TodoPhase[]): string {
 	let index = phases.findIndex((phase) => phase.tasks.some(isOpen));

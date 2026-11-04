@@ -79,7 +79,9 @@ export const todoSchema = obj(
 		phase: opt(str({ description: "phase name" })),
 		content: opt(str({ description: "new task content (update op)" })),
 		before: opt(
-			str({ description: "insert before this task in the destination phase (update op)" }),
+			str({
+				description: "insert before this task in the destination phase (update op)",
+			}),
 		),
 		// No `minItems` here: `items` is only meaningful for `init`/`append`,
 		// and both enforce non-empty with op-specific errors. A stray `items: []` on

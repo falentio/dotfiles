@@ -28,6 +28,12 @@ Tasks are referenced by their exact content, never by an id. A missing `op` is
 inferred when the arguments are unambiguous, so `{list: [...]}` becomes an
 `init`.
 
+A status op (`done`, `start`, `drop`, `block`, `unblock`) returns a delta:
+what changed, the next open task, and the counts. `init`, `append`, `rm`,
+`view`, a failed call, and the first call after a compaction return the open
+plan. Completed and abandoned tasks appear as a per-phase count, never as
+text.
+
 State lives in a session snapshot. Every successful mutation writes a
 `todo_snapshot` entry; the extension rebuilds the list from the newest one on
 the session branch, and replays `details.phases` from an older tool result so
