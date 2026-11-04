@@ -206,11 +206,12 @@ export default function todosExtension(pi: ExtensionAPI): void {
 		}
 	});
 
-	pi.on("agent_before_settle", async (_event, ctx) => {
+	pi.on("agent_before_settle", async (event, ctx) => {
 		const reminder = await tracker.checkCompletion(ctx, lastAssistant);
 		if (reminder === null) return undefined;
 		return {
 			entries: [
+				...event.entries,
 				{
 					type: "custom_message",
 					customType: TODO_REMINDER_CUSTOM_TYPE,

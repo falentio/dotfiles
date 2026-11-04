@@ -169,7 +169,7 @@ describe("todos extension factory", () => {
 		const [result] = await dispatch(
 			handlers,
 			"agent_before_settle",
-			{ type: "agent_before_settle" },
+			{ type: "agent_before_settle", entries: [] },
 			ctx,
 		);
 		return result;
@@ -260,6 +260,65 @@ describe("todos extension factory", () => {
 		expect(result?.entries?.[0]?.customType).toBe("todo-reminder");
 		expect(result?.entries?.[0]?.content).toContain("Wire workspace");
 		expect(result?.entries?.[0]?.display).toBe(false);
+	});
+
+	it("appends the reminder to entries proposed by earlier handlers", async () => {
+		const { api, handlers, tools } = makeRecordingAPI();
+		todosExtension(api);
+		const ctx = makeContext(
+			{ cwd: "/tmp/project" },
+			{
+				getBranch: () => [],
+				getCwd: () => "/tmp/project",
+				getSessionFile: () => "/tmp/project/session.jsonl",
+			},
+		);
+		await dispatch(
+			handlers,
+			"session_start",
+			{ type: "session_start", reason: "startup" },
+			ctx,
+		);
+		const tool = tools.find((t) => t.name === "todo");
+		if (!tool) throw new Error("todo tool missing");
+		await tool.execute!(
+			"init",
+			{ op: "init", items: ["Wire workspace"] },
+			undefined,
+			undefined,
+			ctx as ExtensionToolContext,
+		);
+		await dispatch(
+			handlers,
+			"agent_end",
+			{
+				type: "agent_end",
+				messages: [
+					{
+						role: "assistant",
+						content: [{ type: "text", text: "Stopping here." }],
+						stopReason: "stop",
+					},
+				],
+			},
+			ctx,
+		);
+		const earlier = {
+			type: "custom_message",
+			customType: "other-extension",
+			content: "an entry proposed earlier",
+			display: false,
+		};
+		const [result] = (await dispatch(
+			handlers,
+			"agent_before_settle",
+			{ type: "agent_before_settle", entries: [earlier] },
+			ctx,
+		)) as [ReminderResult];
+		expect(result?.entries?.map((entry) => entry.customType)).toEqual([
+			"other-extension",
+			"todo-reminder",
+		]);
 	});
 
 	it("does not remind after completion", async () => {
