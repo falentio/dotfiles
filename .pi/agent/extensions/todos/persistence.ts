@@ -14,7 +14,7 @@ import type {
 	SessionEntry,
 } from "@earendil-works/pi-coding-agent";
 import { clonePhases, isTodoPhase } from "./state.ts";
-import type { TodoPhase } from "./types.ts";
+import { TODO_TOOL_NAME, type TodoPhase } from "./types.ts";
 
 export const TODO_SNAPSHOT_CUSTOM_TYPE = "todo_snapshot";
 /** Bumped when a snapshot's shape changes incompatibly. */
@@ -80,7 +80,7 @@ export function getLatestTodoPhasesFromEntries(
 		};
 		if (
 			message.role !== "toolResult" ||
-			message.toolName !== "todo" ||
+			message.toolName !== TODO_TOOL_NAME ||
 			message.isError
 		)
 			continue;

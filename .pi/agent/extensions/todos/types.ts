@@ -14,6 +14,9 @@ import {
 } from "@earendil-works/pi-schema";
 import { TODO_OPERATIONS, type TodoOperation } from "./operations.ts";
 
+/** Wire name of the tool; the tracker and the persistence reader match on it. */
+export const TODO_TOOL_NAME = "todo";
+
 const stringEnum = <const V extends readonly string[]>(
 	values: V,
 	options?: Annotations<V[number]>,

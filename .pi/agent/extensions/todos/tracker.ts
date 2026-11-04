@@ -21,7 +21,7 @@ import type { TodoConfig } from "./config.ts";
 import { renderEagerTodoPrompt, renderMidRunNudgePrompt } from "./prompts.ts";
 import { getLatestTodoPhasesFromEntries } from "./persistence.ts";
 import { clonePhases } from "./state.ts";
-import type { TodoItem, TodoPhase } from "./types.ts";
+import { TODO_TOOL_NAME, type TodoItem, type TodoPhase } from "./types.ts";
 
 const MID_RUN_NUDGE_MUTATION_THRESHOLD = 12;
 const MID_RUN_NUDGE_MAX_PER_CYCLE = 2;
@@ -177,7 +177,7 @@ export class TodoTracker {
 
 	/** Records a completed tool result before asynchronous event processing begins. */
 	onToolResult(toolName: string, isError: boolean): void {
-		if (toolName === "todo") {
+		if (toolName === TODO_TOOL_NAME) {
 			this.#mutationsSinceLastTouch = 0;
 		} else if (!isError && MUTATING_TOOLS[toolName]) {
 			this.#mutationsSinceLastTouch++;
@@ -209,11 +209,12 @@ export class TodoTracker {
 			if (trimmedPromptText.endsWith("?") || trimmedPromptText.endsWith("!"))
 				return undefined;
 		}
-		if (!this.#host.getActiveToolNames(ctx).includes("todo")) return undefined;
+		if (!this.#host.getActiveToolNames(ctx).includes(TODO_TOOL_NAME))
+			return undefined;
 		return {
 			customType: EAGER_TODO_PRELUDE_CUSTOM_TYPE,
 			content: renderEagerTodoPrompt({
-				toolRef: "todo",
+				toolRef: TODO_TOOL_NAME,
 				forced: mode === "always",
 			}),
 			display: false,
@@ -227,7 +228,8 @@ export class TodoTracker {
 		if (this.#midRunNudgeCount >= MID_RUN_NUDGE_MAX_PER_CYCLE) return null;
 		const settings = this.#host.config();
 		if (!settings.enabled || !settings.reminders) return null;
-		if (!this.#host.getActiveToolNames(ctx).includes("todo")) return null;
+		if (!this.#host.getActiveToolNames(ctx).includes(TODO_TOOL_NAME))
+			return null;
 		const incomplete = this.#host
 			.getPhases()
 			.flatMap((phase) => phase.tasks)
@@ -240,7 +242,7 @@ export class TodoTracker {
 		return {
 			customType: MID_RUN_NUDGE_MESSAGE_TYPE,
 			content: renderMidRunNudgePrompt({
-				toolRef: "todo",
+				toolRef: TODO_TOOL_NAME,
 				incompleteCount: incomplete.length,
 			}),
 			display: false,
@@ -268,7 +270,8 @@ export class TodoTracker {
 		// mode, tools subset) — reminding the model to edit state it cannot
 		// touch is pure noise. Mirrors the guards on the eager prelude and
 		// mid-run nudge.
-		if (!this.#host.getActiveToolNames(ctx).includes("todo")) return null;
+		if (!this.#host.getActiveToolNames(ctx).includes(TODO_TOOL_NAME))
+			return null;
 		const phases = this.phases;
 		if (phases.length === 0) {
 			this.#reminderCount = 0;

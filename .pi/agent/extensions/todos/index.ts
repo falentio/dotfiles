@@ -58,6 +58,7 @@ import {
 import { clonePhases, inferTodoOp } from "./state.ts";
 import { TODO_TOOL_DESCRIPTION } from "./prompts.ts";
 import {
+	TODO_TOOL_NAME,
 	todoSchema,
 	type TodoParams,
 	type TodoPhase,
@@ -90,7 +91,7 @@ export default function todosExtension(pi: ExtensionAPI): void {
 	});
 
 	const todoTool = defineTool({
-		name: "todo",
+		name: TODO_TOOL_NAME,
 		label: "Todo",
 		description: TODO_TOOL_DESCRIPTION,
 		promptSnippet:
@@ -165,8 +166,10 @@ export default function todosExtension(pi: ExtensionAPI): void {
 	pi.on("session_start", async (_event, ctx) => {
 		if (!TODO_CONFIG.enabled) {
 			const active = pi.getActiveTools();
-			if (active.includes("todo")) {
-				pi.setActiveTools(active.filter((name) => name !== "todo"));
+			if (active.includes(TODO_TOOL_NAME)) {
+				pi.setActiveTools(
+					active.filter((name) => name !== TODO_TOOL_NAME),
+				);
 			}
 		}
 		tracker.syncFromBranch(ctx);
