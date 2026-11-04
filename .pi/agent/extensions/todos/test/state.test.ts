@@ -3,6 +3,7 @@ import {
 	getCompletionTransitions,
 	inferTodoOp,
 	normalizeInProgressTask,
+	normalizeTodoArgs,
 } from "../state.ts";
 import { executeTodoOp } from "../execute.ts";
 import type { TodoParams, TodoPhase } from "../types.ts";
@@ -973,5 +974,86 @@ describe("update op", () => {
 		expect(result.completedTasks).toEqual([
 			{ phase: "Build", content: "lalr parser" },
 		]);
+	});
+});
+
+describe("normalizeTodoArgs", () => {
+	it("moves a list of strings to items", () => {
+		expect(normalizeTodoArgs({ op: "init", list: ["a", "b"] })).toEqual({
+			op: "init",
+			items: ["a", "b"],
+		});
+	});
+
+	it("converts a phase map to a phased list", () => {
+		expect(normalizeTodoArgs({ list: { Build: ["a"], Ship: ["b"] } })).toEqual({
+			list: [
+				{ phase: "Build", items: ["a"] },
+				{ phase: "Ship", items: ["b"] },
+			],
+		});
+	});
+
+	it("takes a list entry's phase from its name", () => {
+		expect(
+			normalizeTodoArgs({ list: [{ name: "Build", items: ["a"] }] }),
+		).toEqual({ list: [{ name: "Build", phase: "Build", items: ["a"] }] });
+	});
+
+	it("wraps a string of items in an array", () => {
+		expect(
+			normalizeTodoArgs({ list: [{ phase: "Build", items: "a" }] }),
+		).toEqual({ list: [{ phase: "Build", items: ["a"] }] });
+	});
+
+	it("drops a list entry with no items", () => {
+		expect(
+			normalizeTodoArgs({
+				list: [
+					{ phase: "Build", items: [] },
+					{ phase: "Ship", items: ["b"] },
+				],
+			}),
+		).toEqual({ list: [{ phase: "Ship", items: ["b"] }] });
+	});
+
+	it("deletes an unknown op so inference runs", () => {
+		expect(normalizeTodoArgs({ op: "complete", task: "a" })).toEqual({
+			task: "a",
+		});
+		expect(normalizeTodoArgs({ op: "done", task: "a" })).toEqual({
+			op: "done",
+			task: "a",
+		});
+	});
+});
+
+describe("argument shape recovery at execute time", () => {
+	it("infers init from a bare list of strings", () => {
+		const tool = makeTool();
+		const result = tool.run({ list: ["First", "Second"] });
+		expect(result.failed).toBe(false);
+		expect(result.op).toBe("init");
+		expect(result.phases[0]?.tasks.map((task) => task.content)).toEqual([
+			"First",
+			"Second",
+		]);
+	});
+
+	it("infers init from a phase map", () => {
+		const tool = makeTool();
+		const result = tool.run({ list: { Work: ["First"] } });
+		expect(result.failed).toBe(false);
+		expect(result.phases.map((phase) => phase.name)).toEqual(["Work"]);
+	});
+
+	it("recovers from an unknown op name", () => {
+		const tool = makeTool();
+		const result = tool.run({
+			op: "complete",
+			list: [{ phase: "Work", items: ["First"] }],
+		});
+		expect(result.failed).toBe(false);
+		expect(result.op).toBe("init");
 	});
 });

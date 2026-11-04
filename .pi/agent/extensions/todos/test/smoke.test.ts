@@ -61,6 +61,23 @@ describe("todos extension factory", () => {
 		expect(tool.prepareArguments?.({ task: "x" })).toEqual({ task: "x" });
 	});
 
+	it("prepareArguments normalizes shapes before inferring the op", () => {
+		const { api, tools } = makeRecordingAPI();
+		todosExtension(api);
+		const tool = tools.find((t) => t.name === "todo");
+		if (!tool) throw new Error("todo tool missing");
+		expect(tool.prepareArguments?.({ list: ["a"] })).toEqual({
+			items: ["a"],
+			op: "init",
+		});
+		expect(
+			tool.prepareArguments?.({ op: "complete", list: { Build: ["a"] } }),
+		).toEqual({
+			list: [{ phase: "Build", items: ["a"] }],
+			op: "init",
+		});
+	});
+
 	it("the todo tool executes against branch-synced state", async () => {
 		const { api, handlers, tools, entries } = makeRecordingAPI();
 		todosExtension(api);

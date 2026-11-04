@@ -55,7 +55,7 @@ import {
 	TODO_SNAPSHOT_CUSTOM_TYPE,
 	TODO_SNAPSHOT_VERSION,
 } from "./persistence.ts";
-import { clonePhases, inferTodoOp } from "./state.ts";
+import { clonePhases, inferTodoOp, normalizeTodoArgs } from "./state.ts";
 import { TODO_TOOL_DESCRIPTION } from "./prompts.ts";
 import {
 	TODO_TOOL_NAME,
@@ -111,16 +111,18 @@ export default function todosExtension(pi: ExtensionAPI): void {
 		// durable record. The cost: a script cannot batch todo updates.
 		exposure: "model-only",
 
-		// Repairs a missing `op` (models routinely send `{list:[...]}` with no
-		// op) before schema validation, mirroring omp's `lenientArgValidation`
-		// + `resolveTodoParams` behavior. Uninferable shapes return as-is and
-		// fail schema validation for a normal model retry.
+		// Repairs a missing `op` and common argument shapes (models routinely
+		// send `{list:[...]}` with no op) before schema validation, mirroring
+		// omp's `lenientArgValidation` + `resolveTodoParams` behavior.
+		// Uninferable shapes return as-is and fail schema validation for a
+		// normal model retry.
 		prepareArguments(args: unknown): TodoParams {
-			if (isRecord(args) && args.op === undefined) {
-				const inferred = inferTodoOp(args, phases.length > 0);
-				if (inferred) return { ...args, op: inferred } as TodoParams;
+			const normalized = normalizeTodoArgs(args);
+			if (isRecord(normalized) && normalized.op === undefined) {
+				const inferred = inferTodoOp(normalized, phases.length > 0);
+				if (inferred) return { ...normalized, op: inferred } as TodoParams;
 			}
-			return args as TodoParams;
+			return normalized as TodoParams;
 		},
 
 		async execute(

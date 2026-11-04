@@ -6,7 +6,7 @@
  */
 
 import { compile } from "@earendil-works/pi-schema";
-import type { TodoOperation } from "./operations.ts";
+import { TODO_OPERATIONS, type TodoOperation } from "./operations.ts";
 import {
 	TODO_STATUSES,
 	todoSchema,
@@ -509,6 +509,48 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
+ * Coerce the argument shapes models actually send into the schema's shape.
+ * Only unambiguous repairs: a list of strings, a phase map, an entry keyed by
+ * `name`, a single string of items, an empty entry, and an unknown op name.
+ */
+export function normalizeTodoArgs(raw: unknown): unknown {
+	if (!isRecord(raw)) return raw;
+	const args: Record<string, unknown> = { ...raw };
+	if (
+		Array.isArray(args.list) &&
+		args.list.length > 0 &&
+		args.list.every((entry) => typeof entry === "string")
+	) {
+		args.items = args.list;
+		delete args.list;
+	} else if (isRecord(args.list)) {
+		const entries = Object.entries(args.list);
+		if (
+			entries.length > 0 &&
+			entries.every(([, items]) => Array.isArray(items))
+		) {
+			args.list = entries.map(([phase, items]) => ({ phase, items }));
+		}
+	}
+	if (Array.isArray(args.list)) {
+		args.list = args.list.flatMap((entry) => {
+			if (!isRecord(entry)) return [entry];
+			const next: Record<string, unknown> = { ...entry };
+			if (next.phase === undefined && typeof next.name === "string") {
+				next.phase = next.name;
+			}
+			if (typeof next.items === "string") next.items = [next.items];
+			if (Array.isArray(next.items) && next.items.length === 0) return [];
+			return [next];
+		});
+	}
+	if (args.op !== undefined && !TODO_OPERATIONS.some((op) => op === args.op)) {
+		delete args.op;
+	}
+	return args;
+}
+
+/**
  * Validate execute-time arguments, repairing an omitted `op`. The tool's
  * `prepareArguments` shim repairs a missing `op` alongside an unambiguous
  * payload (models routinely send `{list:[...]}` with no op) before schema
@@ -519,15 +561,16 @@ export function resolveTodoParams(
 	raw: unknown,
 	hasExistingPhases: boolean,
 ): TodoParams | string {
-	if (todoValidator.check(raw)) return raw;
-	if (isRecord(raw) && raw.op === undefined) {
-		const inferred = inferTodoOp(raw, hasExistingPhases);
+	const normalized = normalizeTodoArgs(raw);
+	if (todoValidator.check(normalized)) return normalized;
+	if (isRecord(normalized) && normalized.op === undefined) {
+		const inferred = inferTodoOp(normalized, hasExistingPhases);
 		if (inferred) {
-			const repaired = { ...raw, op: inferred };
+			const repaired = { ...normalized, op: inferred };
 			if (todoValidator.check(repaired)) return repaired;
 		}
 	}
-	const summary = todoValidator.errors(raw)
+	const summary = todoValidator.errors(normalized)
 		.map((error) => `${error.path || "(root)"}: ${error.message}`)
 		.join("; ");
 	return `Invalid todo arguments: ${summary}`;
