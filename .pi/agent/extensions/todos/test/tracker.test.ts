@@ -236,7 +236,7 @@ describe("checkCompletion", () => {
 		expect(reminder).toBeNull();
 	});
 
-	it("returns the reminder with the incomplete list and re-arms the budget", async () => {
+	it("returns the reminder with the incomplete list", async () => {
 		const { tracker } = makeTracker({
 			phases: [
 				{
@@ -258,11 +258,11 @@ describe("checkCompletion", () => {
 		expect(reminder).toContain("  - a");
 		expect(reminder).toContain("  - b");
 		expect(reminder).not.toContain("  - c");
-		expect(reminder).toContain("(Reminder 1/3)");
+		expect(reminder).toContain("(Reminder 1/2)");
 	});
 
-	it("stays silent after a reminder until progress is made", async () => {
-		const { tracker } = makeTracker({
+	it("stays silent after a reminder until the open set changes", async () => {
+		const { tracker, setHostPhases } = makeTracker({
 			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
 		});
 		expect(
@@ -278,6 +278,15 @@ describe("checkCompletion", () => {
 			),
 		).toBeNull();
 		tracker.onToolResult("edit", false);
+		expect(
+			await tracker.checkCompletion(
+				makeContext(),
+				assistantMessage("Stopped again."),
+			),
+		).toBeNull();
+		setHostPhases([
+			{ name: "Work", tasks: [{ content: "a", status: "in_progress" }] },
+		]);
 		expect(
 			await tracker.checkCompletion(
 				makeContext(),
@@ -306,17 +315,21 @@ describe("checkCompletion", () => {
 	});
 
 	it("respects remindersMax", async () => {
-		const { tracker } = makeTracker({
+		const { tracker, setHostPhases } = makeTracker({
 			config: { remindersMax: 2 },
 			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
 		});
+		const setStatus = (status: "pending" | "in_progress") =>
+			setHostPhases([{ name: "Work", tasks: [{ content: "a", status }] }]);
 		expect(
 			await tracker.checkCompletion(makeContext(), assistantMessage("Stop 1.")),
 		).not.toBeNull();
+		setStatus("in_progress");
 		tracker.onToolResult("edit", false);
 		expect(
 			await tracker.checkCompletion(makeContext(), assistantMessage("Stop 2.")),
 		).not.toBeNull();
+		setStatus("pending");
 		tracker.onToolResult("edit", false);
 		expect(
 			await tracker.checkCompletion(makeContext(), assistantMessage("Stop 3.")),
@@ -343,6 +356,79 @@ describe("checkCompletion", () => {
 			assistantMessage("Stopped."),
 		);
 		expect(reminder).toBeNull();
+	});
+
+	it("does not repeat a reminder for an unchanged open set", async () => {
+		const { tracker } = makeTracker({
+			config: { remindersMax: 5 },
+			phases: [
+				{
+					name: "Work",
+					tasks: [
+						{ content: "a", status: "pending" },
+						{ content: "b", status: "in_progress" },
+					],
+				},
+			],
+		});
+		expect(
+			await tracker.checkCompletion(makeContext(), assistantMessage("Stop.")),
+		).not.toBeNull();
+		tracker.resetCycle();
+		tracker.onToolResult("edit", false);
+		expect(
+			await tracker.checkCompletion(
+				makeContext(),
+				assistantMessage("Stop again."),
+			),
+		).toBeNull();
+	});
+
+	it("re-arms a reminder when a task status changes", async () => {
+		const { tracker, setHostPhases } = makeTracker({
+			config: { remindersMax: 5 },
+			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
+		});
+		expect(
+			await tracker.checkCompletion(makeContext(), assistantMessage("Stop.")),
+		).not.toBeNull();
+		setHostPhases([
+			{ name: "Work", tasks: [{ content: "a", status: "in_progress" }] },
+		]);
+		tracker.onToolResult("edit", false);
+		expect(
+			await tracker.checkCompletion(
+				makeContext(),
+				assistantMessage("Stop again."),
+			),
+		).not.toBeNull();
+	});
+
+	it("a cleared list clears the stored open set", async () => {
+		const { tracker, setHostPhases } = makeTracker({
+			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
+		});
+		expect(
+			await tracker.checkCompletion(makeContext(), assistantMessage("Stop.")),
+		).not.toBeNull();
+		setHostPhases([]);
+		tracker.onToolResult("edit", false);
+		expect(
+			await tracker.checkCompletion(
+				makeContext(),
+				assistantMessage("Stop again."),
+			),
+		).toBeNull();
+		setHostPhases([
+			{ name: "Work", tasks: [{ content: "a", status: "pending" }] },
+		]);
+		tracker.onToolResult("edit", false);
+		expect(
+			await tracker.checkCompletion(
+				makeContext(),
+				assistantMessage("Stop again."),
+			),
+		).not.toBeNull();
 	});
 
 	it("reads live host state, so reminders track external mutations", async () => {

@@ -143,6 +143,7 @@ export class TodoTracker {
 	#reminderAwaitingProgress = false;
 	#mutationsSinceLastTouch = 0;
 	#midRunNudgeCount = 0;
+	#lastReminderFingerprint: string | undefined;
 
 	constructor(host: TodoTrackerHost) {
 		this.#host = host;
@@ -276,6 +277,7 @@ export class TodoTracker {
 		if (phases.length === 0) {
 			this.#reminderCount = 0;
 			this.#reminderAwaitingProgress = false;
+			this.#lastReminderFingerprint = undefined;
 			return null;
 		}
 		const incompleteByPhase = phases
@@ -293,8 +295,20 @@ export class TodoTracker {
 		if (incomplete.length === 0) {
 			this.#reminderCount = 0;
 			this.#reminderAwaitingProgress = false;
+			this.#lastReminderFingerprint = undefined;
 			return null;
 		}
+		const fingerprint = incompleteByPhase
+			.map((phase) =>
+				phase.tasks
+					.map(
+						(task) =>
+							`${phase.name}\u0000${task.content}\u0000${task.status}`,
+					)
+					.join("\n"),
+			)
+			.join("\n");
+		if (fingerprint === this.#lastReminderFingerprint) return null;
 		// Never nag after an interrupted or failed run: the user pressed Esc
 		// (or the model errored), treating it as a signal to stop, not as an
 		// invitation for the extension to re-enter the loop on its own.
@@ -315,6 +329,7 @@ export class TodoTracker {
 			.join("\n");
 		this.#mutationsSinceLastTouch = 0;
 		this.#reminderAwaitingProgress = true;
+		this.#lastReminderFingerprint = fingerprint;
 		return (
 			`<system-reminder>\n` +
 			`You stopped with ${incomplete.length} incomplete todo item(s):\n${todoList}\n\n` +

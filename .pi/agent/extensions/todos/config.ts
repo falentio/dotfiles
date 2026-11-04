@@ -21,6 +21,6 @@ export interface TodoConfig {
 export const TODO_CONFIG: Readonly<TodoConfig> = {
 	enabled: true,
 	reminders: true,
-	remindersMax: 3,
+	remindersMax: 2,
 	eager: "preferred",
 };
