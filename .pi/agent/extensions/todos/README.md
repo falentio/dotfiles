@@ -41,7 +41,8 @@ result and the list would not survive a resume.
 
 The extension adds three nudges around the tool, each gated on config:
 
-- An eager prelude on the first turn asks for a phased `init` before work.
+- An eager prelude on the first user turn asks for a phased `init` before
+  work; it is pruned from context once that turn is over.
 - A mid-run nudge after 12 mutating tool results asks the agent to mark
   finished tasks done.
 - A completion reminder fires on `agent_before_settle` when the agent stops
@@ -70,7 +71,7 @@ Install it once per checkout:
 
 ```sh
 bun install         # pi-schema
-bun run test        # links pi, then 113 tests
+bun run test        # links pi, then 124 tests
 bun run typecheck
 ```
 

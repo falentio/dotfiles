@@ -116,6 +116,34 @@ describe("todos extension factory", () => {
 		]);
 	});
 
+	it("injects no eager prelude for a run started by a custom message", async () => {
+		const { api, handlers } = makeRecordingAPI();
+		todosExtension(api);
+		const ctx = makeContext({ cwd: "/tmp/project" });
+		await dispatch(
+			handlers,
+			"session_start",
+			{ type: "session_start", reason: "startup" },
+			ctx,
+		);
+		const [result] = await dispatch(
+			handlers,
+			"before_agent_start",
+			{
+				type: "before_agent_start",
+				messageType: "custom",
+				message: {
+					role: "custom",
+					customType: "other-extension",
+					content: "wake up",
+					display: false,
+				},
+			},
+			ctx,
+		);
+		expect(result).toBeUndefined();
+	});
+
 	it("before_agent_start injects the configured eager prelude", async () => {
 		const { api, handlers } = makeRecordingAPI();
 		todosExtension(api);
@@ -138,7 +166,7 @@ describe("todos extension factory", () => {
 		const results = await dispatch(
 			handlers,
 			"before_agent_start",
-			{ type: "before_agent_start", prompt: "Build the feature" },
+			{ type: "before_agent_start", messageType: "user", prompt: "Build the feature" },
 			ctx,
 		);
 		const message = (
@@ -363,7 +391,7 @@ describe("todos extension factory", () => {
 		await dispatch(
 			handlers,
 			"before_agent_start",
-			{ type: "before_agent_start", prompt: "Unrelated next prompt" },
+			{ type: "before_agent_start", messageType: "user", prompt: "Unrelated next prompt" },
 			ctx,
 		);
 		const result = await settleAssistant(handlers, ctx);

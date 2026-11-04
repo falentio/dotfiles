@@ -187,28 +187,26 @@ export class TodoTracker {
 
 	/** Builds the first-turn eager todo prelude message, or undefined. */
 	createEagerTodoPrelude(
-		promptText: string | undefined,
+		promptText: string,
 		ctx: ExtensionContext,
 	): TodoInjectedMessage | undefined {
 		const settings = this.#host.config();
 		const mode = settings.eager;
 		if (mode === "default" || !settings.enabled) return undefined;
 		if (this.#host.getPhases().length > 0) return undefined;
-		if (promptText !== undefined) {
-			if (
-				this.#host
-					.getBranch(ctx)
-					.some(
-						(entry) =>
-							entry.type === "message" && entry.message.role === "user",
-					)
-			) {
-				return undefined;
-			}
-			const trimmedPromptText = promptText.trimEnd();
-			if (trimmedPromptText.endsWith("?") || trimmedPromptText.endsWith("!"))
-				return undefined;
+		if (
+			this.#host
+				.getBranch(ctx)
+				.some(
+					(entry) =>
+						entry.type === "message" && entry.message.role === "user",
+				)
+		) {
+			return undefined;
 		}
+		const trimmedPromptText = promptText.trimEnd();
+		if (trimmedPromptText.endsWith("?") || trimmedPromptText.endsWith("!"))
+			return undefined;
 		if (!this.#host.getActiveToolNames(ctx).includes(TODO_TOOL_NAME))
 			return undefined;
 		return {
@@ -329,6 +327,7 @@ export class TodoTracker {
 const SUPERSEDED_TRACKER_MESSAGE_TYPES: ReadonlySet<string> = new Set([
 	TODO_REMINDER_CUSTOM_TYPE,
 	MID_RUN_NUDGE_MESSAGE_TYPE,
+	EAGER_TODO_PRELUDE_CUSTOM_TYPE,
 ]);
 
 function isTrackerContextMessage(
@@ -344,7 +343,7 @@ function isTrackerContextMessage(
 }
 
 /**
- * Drop tracker-injected messages (completion reminders, mid-run nudges)
+ * Drop tracker-injected messages (eager preludes, mid-run nudges, completion reminders)
  * from outgoing LLM context once any later real message exists.
  *
  * Each such message describes moment-in-time todo state ("You stopped with
