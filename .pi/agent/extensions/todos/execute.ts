@@ -12,9 +12,9 @@ import {
 	getCompletionTransitions,
 	resolveTodoParams,
 } from "./state.ts";
+import type { TodoOperation } from "./operations.ts";
 import type {
 	TodoCompletionTransition,
-	TodoOperation,
 	TodoParams,
 	TodoPhase,
 } from "./types.ts";

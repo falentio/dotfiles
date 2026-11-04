@@ -6,12 +6,12 @@
  */
 
 import { compile } from "@earendil-works/pi-schema";
+import type { TodoOperation } from "./operations.ts";
 import {
 	TODO_STATUSES,
 	todoSchema,
 	type TodoCompletionTransition,
 	type TodoItem,
-	type TodoOperation,
 	type TodoParams,
 	type TodoPhase,
 } from "./types.ts";

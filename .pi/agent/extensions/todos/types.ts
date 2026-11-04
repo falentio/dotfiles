@@ -12,6 +12,7 @@ import {
 	type Schema,
 	type Static,
 } from "@earendil-works/pi-schema";
+import { TODO_OPERATIONS, type TodoOperation } from "./operations.ts";
 
 const stringEnum = <const V extends readonly string[]>(
 	values: V,
@@ -26,18 +27,6 @@ export const TODO_STATUSES = [
 	"blocked",
 ] as const;
 export type TodoStatus = (typeof TODO_STATUSES)[number];
-/** Operation names accepted by the todo tool and echoed in successful result details. */
-export type TodoOperation =
-	| "init"
-	| "start"
-	| "done"
-	| "rm"
-	| "drop"
-	| "block"
-	| "unblock"
-	| "append"
-	| "view";
-
 export interface TodoItem {
 	content: string;
 	status: TodoStatus;
@@ -67,20 +56,9 @@ export interface TodoToolDetails {
 	completedTasks?: TodoCompletionTransition[];
 }
 
-const TodoOp = stringEnum(
-	[
-		"init",
-		"start",
-		"done",
-		"rm",
-		"drop",
-		"block",
-		"unblock",
-		"append",
-		"view",
-	],
-	{ description: "operation to apply" },
-);
+const TodoOp = stringEnum(TODO_OPERATIONS, {
+	description: "operation to apply",
+});
 
 const InitListEntry = obj(
 	{
