@@ -51,7 +51,10 @@ import {
 	TodoTracker,
 	pruneSupersededTrackerMessages,
 } from "./tracker.ts";
-import { TODO_SNAPSHOT_CUSTOM_TYPE } from "./persistence.ts";
+import {
+	TODO_SNAPSHOT_CUSTOM_TYPE,
+	TODO_SNAPSHOT_VERSION,
+} from "./persistence.ts";
 import { clonePhases, inferTodoOp } from "./state.ts";
 import { TODO_TOOL_DESCRIPTION } from "./prompts.ts";
 import {
@@ -137,7 +140,10 @@ export default function todosExtension(pi: ExtensionAPI): void {
 				// appendEntry still records in memory without a session file; only
 				// the snapshot is durable when a session file exists.
 				if (outcome.storage === "session") {
-					pi.appendEntry(TODO_SNAPSHOT_CUSTOM_TYPE, { phases: outcome.phases });
+					pi.appendEntry(TODO_SNAPSHOT_CUSTOM_TYPE, {
+						v: TODO_SNAPSHOT_VERSION,
+						phases: outcome.phases,
+					});
 				}
 			}
 			const details: TodoToolDetails = {

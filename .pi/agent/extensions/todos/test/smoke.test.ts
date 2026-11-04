@@ -104,6 +104,7 @@ describe("todos extension factory", () => {
 				type: "custom",
 				customType: TODO_SNAPSHOT_CUSTOM_TYPE,
 				data: {
+					v: 1,
 					phases: [
 						{
 							name: "Work",
@@ -398,6 +399,7 @@ describe("todos extension factory", () => {
 		expect(entries).toHaveLength(1);
 		expect(entries[0]?.customType).toBe(TODO_SNAPSHOT_CUSTOM_TYPE);
 		expect(entries[0]?.data).toEqual({
+			v: 1,
 			phases: [
 				{
 					name: "Tasks",

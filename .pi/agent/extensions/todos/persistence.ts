@@ -17,6 +17,8 @@ import { clonePhases, isTodoPhase } from "./state.ts";
 import type { TodoPhase } from "./types.ts";
 
 export const TODO_SNAPSHOT_CUSTOM_TYPE = "todo_snapshot";
+/** Bumped when a snapshot's shape changes incompatibly. */
+export const TODO_SNAPSHOT_VERSION = 1;
 /** Legacy type written by `@gamaraan/todos-tool`; the reader still replays it. */
 export const USER_TODO_EDIT_CUSTOM_TYPE = "user_todo_edit";
 
@@ -57,9 +59,14 @@ export function getLatestTodoPhasesFromEntries(
 			SNAPSHOT_CUSTOM_TYPES.has(entry.customType)
 		) {
 			const customEntry = entry as CustomEntry<
-				{ phases?: unknown } | undefined
+				{ v?: number; phases?: unknown } | undefined
 			>;
 			const data = customEntry.data;
+			// A newer writer owns this branch's list. Resurrecting an older
+			// snapshot silently shows the wrong list, while an empty one is visible.
+			if (data?.v !== undefined && data.v > TODO_SNAPSHOT_VERSION) {
+				return undefined;
+			}
 			const restored = data ? validPersistedPhases(data.phases) : undefined;
 			if (restored !== undefined) return restored;
 			continue;

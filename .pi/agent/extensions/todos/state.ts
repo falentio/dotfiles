@@ -7,6 +7,7 @@
 
 import { compile } from "@earendil-works/pi-schema";
 import {
+	TODO_STATUSES,
 	todoSchema,
 	type TodoCompletionTransition,
 	type TodoItem,
@@ -36,9 +37,7 @@ function findPhaseByName(
 }
 
 export function cloneTask(task: TodoItem): TodoItem {
-	return task.blocker !== undefined
-		? { content: task.content, status: task.status, blocker: task.blocker }
-		: { content: task.content, status: task.status };
+	return { ...task };
 }
 
 export function clonePhases(phases: TodoPhase[]): TodoPhase[] {
@@ -112,13 +111,8 @@ export function isTodoPhase(value: unknown): value is TodoPhase {
 		if (typeof task !== "object" || task === null) return false;
 		const candidate = task as Record<string, unknown>;
 		if (typeof candidate.content !== "string") return false;
-		if (
-			candidate.status !== "pending" &&
-			candidate.status !== "in_progress" &&
-			candidate.status !== "completed" &&
-			candidate.status !== "abandoned" &&
-			candidate.status !== "blocked"
-		)
+		if (typeof candidate.status !== "string") return false;
+		if (!(TODO_STATUSES as readonly string[]).includes(candidate.status))
 			return false;
 		return (
 			candidate.blocker === undefined ||
@@ -379,7 +373,7 @@ function applyEntry(
 			for (const task of getTaskTargets(phases, entry, errors)) {
 				if (task.status === "blocked") {
 					task.status = "pending";
-					task.blocker = undefined;
+					delete task.blocker;
 				}
 			}
 			return phases;

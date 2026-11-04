@@ -18,12 +18,14 @@ const stringEnum = <const V extends readonly string[]>(
 	options?: Annotations<V[number]>,
 ): Schema<V[number]> => ({ type: "string", ...oneOf(values, options) });
 
-export type TodoStatus =
-	| "pending"
-	| "in_progress"
-	| "completed"
-	| "abandoned"
-	| "blocked";
+export const TODO_STATUSES = [
+	"pending",
+	"in_progress",
+	"completed",
+	"abandoned",
+	"blocked",
+] as const;
+export type TodoStatus = (typeof TODO_STATUSES)[number];
 /** Operation names accepted by the todo tool and echoed in successful result details. */
 export type TodoOperation =
 	| "init"
