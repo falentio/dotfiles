@@ -72,6 +72,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export default function todosExtension(pi: ExtensionAPI): void {
 	let phases: TodoPhase[] = [];
 	let lastAssistant: AssistantMessage | undefined;
+	// A compaction drops the transcript the model reads the list from, so the
+	// next call re-renders the whole list even when it is a status op.
+	let forceFullList = false;
 
 	function getPhases(): TodoPhase[] {
 		return clonePhases(phases);
@@ -128,11 +131,11 @@ export default function todosExtension(pi: ExtensionAPI): void {
 			ctx: ExtensionToolContext,
 		): Promise<AgentToolResult<TodoToolDetails>> {
 			const previousPhases = getPhases();
-			const outcome = executeTodoOp(
-				previousPhases,
-				params,
-				Boolean(ctx.sessionManager.getSessionFile()),
-			);
+			const outcome = executeTodoOp(previousPhases, params, {
+				hasSessionFile: Boolean(ctx.sessionManager.getSessionFile()),
+				forceFullList,
+			});
+			forceFullList = false;
 			// pi signals tool errors by throwing; the model receives the message
 			// text (omp's formatSummary output, errors + full current list).
 			if (outcome.failed) throw new Error(outcome.summary);
@@ -181,6 +184,7 @@ export default function todosExtension(pi: ExtensionAPI): void {
 
 	pi.on("session_compact", async (_event, ctx) => {
 		tracker.syncFromBranch(ctx);
+		forceFullList = true;
 	});
 
 	pi.on("before_agent_start", async (event, ctx) => {

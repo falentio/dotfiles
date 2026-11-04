@@ -14,6 +14,7 @@ import {
 	type TodoItem,
 	type TodoParams,
 	type TodoPhase,
+	type TodoStatus,
 } from "./types.ts";
 
 const todoValidator = compile(todoSchema);
@@ -56,11 +57,18 @@ function todoTransitionKey(phase: string, content: string): string {
 	return `${phase}\u0000${content}`;
 }
 
-export function getCompletionTransitions(
+export interface TodoStatusChange {
+	phase: string;
+	content: string;
+	from: TodoStatus;
+	to: TodoStatus;
+}
+
+export function getStatusChanges(
 	previous: TodoPhase[],
 	updated: TodoPhase[],
-): TodoCompletionTransition[] {
-	const previousStatuses = new Map<string, TodoItem["status"]>();
+): TodoStatusChange[] {
+	const previousStatuses = new Map<string, TodoStatus>();
 	for (const phase of previous) {
 		for (const task of phase.tasks) {
 			previousStatuses.set(
@@ -70,19 +78,32 @@ export function getCompletionTransitions(
 		}
 	}
 
-	const transitions: TodoCompletionTransition[] = [];
+	const changes: TodoStatusChange[] = [];
 	for (const phase of updated) {
 		for (const task of phase.tasks) {
-			if (task.status !== "completed") continue;
-			const previousStatus = previousStatuses.get(
+			const from = previousStatuses.get(
 				todoTransitionKey(phase.name, task.content),
 			);
-			if (previousStatus && previousStatus !== "completed") {
-				transitions.push({ phase: phase.name, content: task.content });
+			if (from !== undefined && from !== task.status) {
+				changes.push({
+					phase: phase.name,
+					content: task.content,
+					from,
+					to: task.status,
+				});
 			}
 		}
 	}
-	return transitions;
+	return changes;
+}
+
+export function getCompletionTransitions(
+	previous: TodoPhase[],
+	updated: TodoPhase[],
+): TodoCompletionTransition[] {
+	return getStatusChanges(previous, updated)
+		.filter((change) => change.to === "completed" && change.from !== "completed")
+		.map(({ phase, content }) => ({ phase, content }));
 }
 
 export function normalizeInProgressTask(phases: TodoPhase[]): void {

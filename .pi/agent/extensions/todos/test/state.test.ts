@@ -11,7 +11,7 @@ function makeTool(initialPhases: TodoPhase[] = []) {
 	let phases = initialPhases;
 	return {
 		run(params: unknown) {
-			const outcome = executeTodoOp(phases, params, false);
+			const outcome = executeTodoOp(phases, params, { hasSessionFile: false });
 			if (!outcome.failed && !outcome.readOnly) phases = outcome.phases;
 			return outcome;
 		},
@@ -40,9 +40,9 @@ describe("executeTodoOp auto-start behavior", () => {
 			"in_progress",
 			"pending",
 		]);
-		expect(summaryText(result)).toContain("Remaining items (2):");
-		expect(summaryText(result)).toContain("status [in_progress] (Execution)");
-		expect(summaryText(result)).toContain("diagnostics [pending] (Execution)");
+		expect(summaryText(result)).toContain("  Execution:");
+		expect(summaryText(result)).toContain("- status (in progress)");
+		expect(summaryText(result)).toContain("- diagnostics");
 	});
 
 	it("auto-promotes the next pending task when current task is completed", () => {
@@ -62,13 +62,13 @@ describe("executeTodoOp auto-start behavior", () => {
 		expect(result.completedTasks).toEqual([
 			{ phase: "Execution", content: "status" },
 		]);
-		expect(summaryText(result)).toContain("Remaining items (1):");
+		expect(summaryText(result)).toContain('Marked done: "status"');
 		expect(summaryText(result)).toContain(
-			"diagnostics [in_progress] (Execution)",
+			'Next: "diagnostics" [in_progress] (Execution)',
 		);
 
 		const completedResult = tool.run({ op: "done", task: "diagnostics" });
-		expect(summaryText(completedResult)).toContain("Remaining items: none.");
+		expect(summaryText(completedResult)).toContain("Next: none.");
 	});
 });
 
@@ -138,7 +138,9 @@ describe("TodoTool operations", () => {
 		const bTask = blocked.phases[0]?.tasks.find((task) => task.content === "b");
 		expect(bTask?.status).toBe("blocked");
 		expect(bTask?.blocker).toBe("waiting on sign-off");
-		expect(summaryText(blocked)).toContain("Remaining items (1):");
+		expect(summaryText(blocked)).toContain(
+			'Blocked "b" (Work): waiting on sign-off.',
+		);
 		expect(summaryText(blocked)).toContain("1 blocked");
 
 		const unblocked = tool.run({ op: "unblock", task: "b" });
@@ -495,7 +497,7 @@ describe("empty target safety", () => {
 	it.each(["done", "rm", "drop", "block", "unblock"] as const)(
 		"empty task with op=%s fails without touching any task",
 		(op) => {
-			const outcome = executeTodoOp(initial, { op, task: "" }, false);
+			const outcome = executeTodoOp(initial, { op, task: "" }, { hasSessionFile: false });
 			expect(outcome.failed).toBe(true);
 			expect(outcome.summary).toContain("Missing task content");
 			expect(outcome.phases).toEqual(initial);
@@ -505,7 +507,7 @@ describe("empty target safety", () => {
 	it.each(["done", "rm", "drop", "block", "unblock"] as const)(
 		"empty phase with op=%s fails without touching any task",
 		(op) => {
-			const outcome = executeTodoOp(initial, { op, phase: "" }, false);
+			const outcome = executeTodoOp(initial, { op, phase: "" }, { hasSessionFile: false });
 			expect(outcome.failed).toBe(true);
 			expect(outcome.summary).toContain("Missing phase name");
 			expect(outcome.phases).toEqual(initial);
@@ -513,7 +515,7 @@ describe("empty target safety", () => {
 	);
 
 	it("omitted targets still mean all tasks (deliberate global op)", () => {
-		const outcome = executeTodoOp(initial, { op: "done" }, false);
+		const outcome = executeTodoOp(initial, { op: "done" }, { hasSessionFile: false });
 		expect(outcome.failed).toBe(false);
 		expect(outcome.phases[0]?.tasks.every((t) => t.status === "completed")).toBe(true);
 	});
@@ -678,5 +680,118 @@ describe("single-line normalization of task content and phase names", () => {
 		const blankItem = tool.run({ op: "append", phase: "A", items: ["\t"] });
 		expect(blankItem.failed).toBe(true);
 		expect(summaryText(blankItem)).toContain("Empty task content");
+	});
+});
+
+describe("summary modes", () => {
+	function plan() {
+		const tool = makeTool();
+		tool.run({
+			op: "init",
+			list: [
+				{ phase: "Build", items: ["Write the parser", "Add fixtures"] },
+				{ phase: "Ship", items: ["Tag release"] },
+			],
+		});
+		return tool;
+	}
+
+	it("done returns a delta: change, next, overall, active phase", () => {
+		const tool = plan();
+		const result = tool.run({ op: "done", task: "Write the parser" });
+		expect(summaryText(result)).toBe(
+			[
+				'Marked done: "Write the parser"',
+				'Next: "Add fixtures" [in_progress] (Build)',
+				"Overall: 1/3 done, 2 open.",
+				'Active phase 1/2 "Build" (1/2).',
+			].join("\n"),
+		);
+	});
+
+	it("start returns a delta", () => {
+		const tool = plan();
+		const result = tool.run({ op: "start", task: "Tag release" });
+		expect(summaryText(result)).toContain('Started: "Tag release"');
+		expect(summaryText(result)).toContain(
+			'Next: "Write the parser" [pending] (Build)',
+		);
+	});
+
+	it("drop returns a delta", () => {
+		const tool = plan();
+		const result = tool.run({ op: "drop", task: "Add fixtures" });
+		expect(summaryText(result)).toContain('Dropped: "Add fixtures"');
+		expect(summaryText(result)).toContain("Overall: 1/3 done, 2 open.");
+	});
+
+	it("block returns a delta with the phase and the reason", () => {
+		const tool = plan();
+		const result = tool.run({
+			op: "block",
+			task: "Tag release",
+			reason: "waiting on sign-off",
+		});
+		expect(summaryText(result)).toContain(
+			'Blocked "Tag release" (Ship): waiting on sign-off.',
+		);
+		expect(summaryText(result)).toContain("Overall: 0/3 done, 2 open, 1 blocked.");
+	});
+
+	it("unblock returns a delta", () => {
+		const tool = plan();
+		tool.run({ op: "block", task: "Tag release", reason: "x" });
+		const result = tool.run({ op: "unblock", task: "Tag release" });
+		expect(summaryText(result)).toContain('Unblocked: "Tag release"');
+	});
+
+	it("init, append, rm and view return the full list", () => {
+		const tool = plan();
+		expect(summaryText(tool.run({ op: "view" }))).toContain("  Build:");
+		expect(
+			summaryText(tool.run({ op: "append", phase: "Ship", items: ["Cut tag"] })),
+		).toContain("  Ship:");
+		expect(summaryText(tool.run({ op: "rm", task: "Cut tag" }))).toContain(
+			"  Ship:",
+		);
+		expect(
+			summaryText(tool.run({ op: "init", items: ["Only task"] })),
+		).toContain("  Tasks:");
+	});
+
+	it("a failed call returns the full list with the error first", () => {
+		const tool = plan();
+		const result = tool.run({ op: "done", task: "nope" });
+		expect(result.failed).toBe(true);
+		expect(summaryText(result)).toContain('Errors: Task "nope" not found');
+		expect(summaryText(result)).toContain("  Build:");
+		expect(summaryText(result)).toContain("Overall: 0/3 done, 3 open.");
+	});
+
+	it("caps change names at six", () => {
+		const tool = makeTool();
+		tool.run({
+			op: "init",
+			list: [
+				{
+					phase: "Bulk",
+					items: ["1", "2", "3", "4", "5", "6", "7", "8"],
+				},
+			],
+		});
+		const result = tool.run({ op: "drop" });
+		expect(summaryText(result)).toContain(
+			'Dropped: "1", "2", "3", "4", "5", "6" (+2 more)',
+		);
+	});
+
+	it("prints no Remaining items block in either mode", () => {
+		const tool = plan();
+		expect(summaryText(tool.run({ op: "view" }))).not.toContain(
+			"Remaining items",
+		);
+		expect(
+			summaryText(tool.run({ op: "done", task: "Write the parser" })),
+		).not.toContain("Remaining items");
 	});
 });

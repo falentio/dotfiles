@@ -616,4 +616,56 @@ describe("todos extension factory", () => {
 		expect(sent).toHaveLength(1);
 		expect(sent[0]?.customType).toBe("mid-run-todo-nudge");
 	});
+
+	it("a compaction makes the next status op return the full list", async () => {
+		const { api, handlers, tools } = makeRecordingAPI();
+		todosExtension(api);
+		const phases = [
+			{
+				name: "Work",
+				tasks: [
+					{ content: "a", status: "in_progress" },
+					{ content: "b", status: "pending" },
+					{ content: "c", status: "pending" },
+				],
+			},
+		];
+		const ctx = makeContext(
+			{ cwd: "/tmp/project" },
+			{
+				getBranch: () => branchWithTodo(phases) as never,
+				getCwd: () => "/tmp/project",
+				getSessionFile: () => "/tmp/project/session.jsonl",
+			},
+		);
+		await dispatch(
+			handlers,
+			"session_start",
+			{ type: "session_start", reason: "startup" },
+			ctx,
+		);
+		await dispatch(handlers, "session_compact", { type: "session_compact" }, ctx);
+
+		const tool = tools.find((t) => t.name === "todo");
+		if (!tool) throw new Error("todo tool missing");
+		const run = async (id: string, params: Parameters<typeof tool.execute>[1]) => {
+			const result = await tool.execute!(
+				id,
+				params,
+				undefined,
+				undefined,
+				ctx as ExtensionToolContext,
+			);
+			return result.content.find((part) => part.type === "text")?.text ?? "";
+		};
+
+		const afterCompact = await run("done", { op: "done", task: "a" });
+		expect(afterCompact).toContain('Marked done: "a"');
+		expect(afterCompact).toContain("  Work:");
+		expect(afterCompact).not.toContain("Next:");
+
+		const afterFullList = await run("start", { op: "start", task: "c" });
+		expect(afterFullList).toContain('Started: "c"');
+		expect(afterFullList).not.toContain("  Work:");
+	});
 });
