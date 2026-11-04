@@ -1,10 +1,4 @@
-/**
- * The `todo` tool's operation table.
- *
- * The tool description renders these rows, and both the schema enum and the
- * `TodoOperation` union derive from them, so an operation is declared once.
- * Both prose cells are markdown.
- */
+/** Source for the description table, the schema enum, and `TodoOperation`. */
 
 export const TODO_OP_ROWS = [
 	{

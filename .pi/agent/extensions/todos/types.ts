@@ -14,7 +14,6 @@ import {
 } from "@earendil-works/pi-schema";
 import { TODO_OPERATIONS, type TodoOperation } from "./operations.ts";
 
-/** Wire name of the tool; the tracker and the persistence reader match on it. */
 export const TODO_TOOL_NAME = "todo";
 
 const stringEnum = <const V extends readonly string[]>(
@@ -47,11 +46,7 @@ export interface TodoCompletionTransition {
 	content: string;
 }
 
-/**
- * Result details. The list itself lives only in the `todo_snapshot` entry: a
- * second durable copy in the tool result can disagree with the snapshot after
- * a rewind.
- */
+/** No `phases` copy: a second durable copy can disagree with the snapshot after a rewind. */
 export interface TodoToolDetails {
 	/** Operation that produced this snapshot; absent on legacy transcript entries. */
 	op?: TodoOperation;
