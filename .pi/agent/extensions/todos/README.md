@@ -44,7 +44,7 @@ The extension adds three nudges around the tool, each gated on config:
 
 - An eager prelude on the first user turn asks for a phased `init` before
   work; it is pruned from context once that turn is over.
-- A mid-run nudge after 12 mutating tool results asks the agent to mark
+- A mid-run nudge after 20 mutating tool results asks the agent to mark
   finished tasks done.
 - A completion reminder fires on `agent_before_settle` when the agent stops
   with open tasks and is not waiting on an answer. It appends a hidden message

@@ -23,8 +23,8 @@ import { getLatestTodoPhasesFromEntries } from "./persistence.ts";
 import { clonePhases, pruneEmptyPhases } from "./state.ts";
 import { TODO_TOOL_NAME, type TodoItem, type TodoPhase } from "./types.ts";
 
-const MID_RUN_NUDGE_MUTATION_THRESHOLD = 12;
-const MID_RUN_NUDGE_MAX_PER_CYCLE = 2;
+const MID_RUN_NUDGE_MUTATION_THRESHOLD = 20;
+const MID_RUN_NUDGE_MAX_PER_CYCLE = 1;
 // omp's `eval` is pi's `codemode`; the other names match pi's built-in tools.
 const MUTATING_TOOLS: Record<string, true> = {
 	bash: true,

@@ -145,51 +145,54 @@ describe("takeMidRunNudge", () => {
 		const { tracker } = makeTracker({
 			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
 		});
-		for (let i = 0; i < 11; i++) tracker.onToolResult("edit", false);
+		for (let i = 0; i < 19; i++) tracker.onToolResult("edit", false);
 		expect(tracker.takeMidRunNudge(makeContext())).toBeNull();
-	});
-
-	it("fires after 12 mutating tool results and counts toward the cycle budget", () => {
-		const { tracker } = makeTracker({
-			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
-		});
-		for (let i = 0; i < 12; i++) tracker.onToolResult("edit", false);
-		const nudge = tracker.takeMidRunNudge(makeContext());
-		expect(nudge?.customType).toBe(MID_RUN_NUDGE_MESSAGE_TYPE);
-		expect(nudge?.content).toContain("1 todo item still open");
-		expect(tracker.takeMidRunNudge(makeContext())).toBeNull();
-		for (let i = 0; i < 12; i++) tracker.onToolResult("write", false);
+		tracker.onToolResult("edit", false);
 		expect(tracker.takeMidRunNudge(makeContext())).not.toBeNull();
 	});
 
-	it("caps at 2 nudges per cycle", () => {
+	it("fires once after 20 mutating tool results", () => {
 		const { tracker } = makeTracker({
 			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
 		});
-		for (let i = 0; i < 36; i++) tracker.onToolResult("edit", false);
+		for (let i = 0; i < 20; i++) tracker.onToolResult("edit", false);
+		const nudge = tracker.takeMidRunNudge(makeContext());
+		expect(nudge?.customType).toBe(MID_RUN_NUDGE_MESSAGE_TYPE);
+		expect(nudge?.content).toContain("1 todo item still open");
+		for (let i = 0; i < 20; i++) tracker.onToolResult("write", false);
+		expect(tracker.takeMidRunNudge(makeContext())).toBeNull();
+	});
+
+	it("caps at one nudge per cycle", () => {
+		const { tracker } = makeTracker({
+			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
+		});
+		for (let i = 0; i < 60; i++) tracker.onToolResult("edit", false);
 		expect(tracker.takeMidRunNudge(makeContext())).not.toBeNull();
 		expect(tracker.takeMidRunNudge(makeContext())).toBeNull();
 		tracker.resetCycle();
 		expect(tracker.takeMidRunNudge(makeContext())).toBeNull();
+		for (let i = 0; i < 20; i++) tracker.onToolResult("edit", false);
+		expect(tracker.takeMidRunNudge(makeContext())).not.toBeNull();
 	});
 
 	it("does not fire without incomplete todos, when disabled, or without the tool", () => {
 		const none = makeTracker({});
-		for (let i = 0; i < 12; i++) none.tracker.onToolResult("edit", false);
+		for (let i = 0; i < 20; i++) none.tracker.onToolResult("edit", false);
 		expect(none.tracker.takeMidRunNudge(makeContext())).toBeNull();
 
 		const disabled = makeTracker({
 			config: { enabled: false },
 			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
 		});
-		for (let i = 0; i < 12; i++) disabled.tracker.onToolResult("edit", false);
+		for (let i = 0; i < 20; i++) disabled.tracker.onToolResult("edit", false);
 		expect(disabled.tracker.takeMidRunNudge(makeContext())).toBeNull();
 
 		const noTool = makeTracker({
 			activeTools: ["bash"],
 			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
 		});
-		for (let i = 0; i < 12; i++) noTool.tracker.onToolResult("edit", false);
+		for (let i = 0; i < 20; i++) noTool.tracker.onToolResult("edit", false);
 		expect(noTool.tracker.takeMidRunNudge(makeContext())).toBeNull();
 	});
 
@@ -197,7 +200,7 @@ describe("takeMidRunNudge", () => {
 		const { tracker } = makeTracker({
 			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
 		});
-		for (let i = 0; i < 12; i++) tracker.onToolResult("edit", false);
+		for (let i = 0; i < 20; i++) tracker.onToolResult("edit", false);
 		tracker.onToolResult("todo", false);
 		expect(tracker.takeMidRunNudge(makeContext())).toBeNull();
 	});
@@ -206,7 +209,7 @@ describe("takeMidRunNudge", () => {
 		const { tracker } = makeTracker({
 			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
 		});
-		for (let i = 0; i < 12; i++) tracker.onToolResult("edit", true);
+		for (let i = 0; i < 20; i++) tracker.onToolResult("edit", true);
 		expect(tracker.takeMidRunNudge(makeContext())).toBeNull();
 	});
 
@@ -214,7 +217,7 @@ describe("takeMidRunNudge", () => {
 		const { tracker } = makeTracker({
 			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
 		});
-		for (let i = 0; i < 12; i++) tracker.onToolResult("codemode", false);
+		for (let i = 0; i < 20; i++) tracker.onToolResult("codemode", false);
 		expect(tracker.takeMidRunNudge(makeContext())).not.toBeNull();
 	});
 });

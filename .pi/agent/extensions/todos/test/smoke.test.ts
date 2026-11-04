@@ -622,7 +622,7 @@ describe("todos extension factory", () => {
 			ctx,
 		);
 
-		for (let i = 0; i < 12; i++) {
+		for (let i = 0; i < 20; i++) {
 			await dispatch(
 				handlers,
 				"tool_result",

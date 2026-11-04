@@ -19,8 +19,8 @@
  *   `<agent dir>/skills/todo-discipline` that mandates phased `init` before
  *   work and per-task `done` marking as each task finishes (not retro-batched
  *   at the end).
- * - **Mid-run nudge**: after 12 mutating tool results, a hidden steer
- *   message asks the agent to mark finished tasks done (≤2 per prompt
+ * - **Mid-run nudge**: after 20 mutating tool results, a hidden steer
+ *   message asks the agent to mark finished tasks done (once per prompt
  *   cycle).
  * - **Completion reminder**: when the agent stops with incomplete todos and
  *   isn't waiting on the user, `agent_before_settle` appends a hidden message
