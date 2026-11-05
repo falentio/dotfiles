@@ -796,6 +796,38 @@ describe("todos extension factory", () => {
 		).toEqual([undefined]);
 	});
 
+	it("reports a marker whose op is not done", async () => {
+		const { api, handlers } = makeRecordingAPI();
+		todosExtension(api);
+		const ctx = makeContext({ cwd: "/tmp/project" });
+		await dispatch(
+			handlers,
+			"message_end",
+			{
+				type: "message_end",
+				message: {
+					role: "assistant",
+					content: [{ type: "text", text: '<!-- todo: rm "x" -->' }],
+				},
+			},
+			ctx,
+		);
+		const [patched] = (await dispatch(
+			handlers,
+			"tool_result",
+			{
+				type: "tool_result",
+				toolName: "bash",
+				isError: false,
+				content: [{ type: "text", text: "ok" }],
+			},
+			ctx,
+		)) as [{ content: { type: string; text: string }[] }];
+		expect(patched?.content.at(-1)?.text).toBe(
+			'Todo marker skipped: only "done" applies.',
+		);
+	});
+
 	it("reports an unmatched marker on the next tool result and clears it", async () => {
 		const { api, handlers, tools } = makeRecordingAPI();
 		todosExtension(api);

@@ -220,7 +220,12 @@ export default function todosExtension(pi: ExtensionAPI): void {
 				.map((part) => part.text)
 				.join("\n"),
 		);
-		if (extraction.marked.length === 0) return undefined;
+		if (extraction.marked.length === 0 && extraction.unknown.length === 0) {
+			return undefined;
+		}
+		if (extraction.unknown.length > 0) {
+			skippedMarkers.push('Todo marker skipped: only "done" applies.');
+		}
 		for (const content of extraction.marked) {
 			if (applyMutation({ op: "done", task: content }, ctx).failed) {
 				skippedMarkers.push(
@@ -228,9 +233,7 @@ export default function todosExtension(pi: ExtensionAPI): void {
 				);
 			}
 		}
-		if (extraction.unknown.length > 0) {
-			skippedMarkers.push('Todo marker skipped: only "done" applies.');
-		}
+		if (extraction.marked.length === 0) return undefined;
 		// One stripped block stands in for every text block: the markers were
 		// parsed across the concatenation, so per-block text cannot be recovered.
 		const content: AssistantMessage["content"] = [];
