@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skill picker</title>
+<style>
+  :root{
+    --bg:#fbfbfa; --fg:#191917; --muted:#6f6f6a; --faint:#74746e;
+    --card:#ffffff; --hover:#f4f4f1; --border:#e6e6e1; --border-strong:#d6d6cf;
+    --accent:#3d4bd0; --accent-soft:#eef0ff; --accent-line:#c3c9f6;
+    --bar:#c9a227; --btn-fg:#ffffff;
+    --radius:10px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#121211; --fg:#ecece8; --muted:#a0a09a; --faint:#9c9c96;
+      --card:#181817; --hover:#20201e; --border:#2b2b28; --border-strong:#3a3a36;
+      --accent:#9aa4ff; --accent-soft:#1c1f33; --accent-line:#3b4270;
+      --bar:#d4ad3a; --btn-fg:#10101a;
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg); color:var(--fg);
+    font:400 14px/1.45 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+    display:flex; flex-direction:column; min-height:100vh;
+  }
+  .wrap{width:100%; max-width:760px; margin:0 auto; padding:0 20px}
+
+  header{padding:34px 0 14px}
+  .hd{display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap}
+  h1{margin:0; font-size:19px; font-weight:620; letter-spacing:-.012em}
+  .meta{margin:0; color:var(--muted); font-size:12px; font-variant-numeric:tabular-nums}
+  .meta b{color:var(--fg); font-weight:560}
+
+  .tools{display:flex; gap:10px; margin-top:16px; flex-wrap:wrap}
+  .search{position:relative; flex:1 1 260px; min-width:0}
+  .search svg{position:absolute; left:11px; top:50%; translate:0 -50%; color:var(--faint); pointer-events:none}
+  .search input{
+    width:100%; height:36px; padding:0 34px 0 33px;
+    background:var(--card); color:var(--fg);
+    border:1px solid var(--border); border-radius:8px;
+    font:inherit; font-size:13px; outline:none;
+    transition:border-color .12s, box-shadow .12s;
+  }
+  .search input::placeholder{color:var(--faint)}
+  .search input::-webkit-search-cancel-button{appearance:none}
+  .search input:focus{border-color:var(--accent-line); box-shadow:0 0 0 3px var(--accent-soft)}
+  .search kbd{
+    position:absolute; right:9px; top:50%; translate:0 -50%;
+    font:500 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+    color:var(--faint); border:1px solid var(--border); border-radius:4px;
+    padding:3px 5px; background:var(--bg);
+  }
+  .seg{display:flex; padding:3px; gap:2px; background:var(--card); border:1px solid var(--border); border-radius:8px}
+  .seg button{
+    appearance:none; border:0; background:transparent; color:var(--muted);
+    font:inherit; font-size:12.5px; padding:0 11px; height:30px; border-radius:6px; cursor:pointer;
+    font-variant-numeric:tabular-nums;
+  }
+  .seg button:hover{color:var(--fg)}
+  .seg button[aria-pressed="true"]{background:var(--hover); color:var(--fg); box-shadow:inset 0 0 0 1px var(--border)}
+
+  main{flex:1; padding-bottom:96px}
+  .list{list-style:none; margin:0; padding:0; border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; background:var(--card)}
+  .list:empty{display:none}
+  .row{
+    display:grid; grid-template-columns:18px minmax(0,1fr) 84px 76px; align-items:center; gap:12px;
+    padding:0 14px; height:50px; cursor:pointer; user-select:none;
+    border-top:1px solid var(--border); transition:background .1s;
+  }
+  .row:first-child{border-top:0}
+  .row:hover{background:var(--hover)}
+  .txt{min-width:0}
+  .row input{position:absolute; opacity:0; width:0; height:0}
+  .box{
+    width:16px; height:16px; border:1.5px solid var(--border-strong); border-radius:5px;
+    background:var(--card); display:grid; place-items:center;
+    transition:background .1s, border-color .1s;
+  }
+  .box svg{opacity:0; scale:.6; transition:opacity .1s, scale .12s; color:var(--btn-fg)}
+  .row input:checked + .box{background:var(--accent); border-color:var(--accent)}
+  .row input:checked + .box svg{opacity:1; scale:1}
+  .row input:focus-visible + .box{box-shadow:0 0 0 3px var(--accent-soft); border-color:var(--accent)}
+  .row:has(input:checked){background:var(--accent-soft)}
+
+  .nm{font:500 13px/1.3 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; letter-spacing:-.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block}
+  .row.unused .nm{color:var(--muted); font-weight:400}
+  .sub{display:block; color:var(--faint); font-size:10.5px; margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .stat{display:flex; flex-direction:column; align-items:flex-end; gap:4px}
+  .num{font-size:12px; font-variant-numeric:tabular-nums; color:var(--fg); font-weight:520}
+  .bar{width:84px; height:3px; border-radius:2px; background:var(--hover); overflow:hidden}
+  .bar i{display:block; height:100%; background:var(--bar); border-radius:2px}
+  .sub a{color:var(--muted); text-decoration:none; border-bottom:1px solid var(--border-strong)}
+  .sub a:hover{color:var(--fg); border-bottom-color:var(--muted)}
+  .sub a:focus-visible{outline:none; box-shadow:0 0 0 2px var(--accent-soft); border-radius:2px}
+  .sub a::after{content:"\2197"; font-size:9px; margin-left:2px; vertical-align:1px; opacity:.6}
+  .sub .loc{color:var(--faint)}
+  .sub .sep{color:var(--faint)}
+  .sess{font-size:11px; color:var(--faint); font-variant-numeric:tabular-nums; text-align:right; white-space:nowrap}
+  .sess.hot{color:var(--muted); font-weight:500}
+  .sess.hot::before{content:""; display:inline-block; width:4px; height:4px; border-radius:50%; background:var(--bar); margin-right:4px; vertical-align:1px}
+
+  .empty{margin:28px 2px; color:var(--muted); font-size:13px}
+  .empty b{color:var(--fg); font-weight:560}
+
+  footer{
+    position:sticky; bottom:0; z-index:5;
+    background:var(--bg);
+    background:color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter:blur(10px) saturate(1.2);
+    border-top:1px solid var(--border);
+  }
+  .bar-in{display:flex; align-items:center; justify-content:space-between; gap:14px; height:64px}
+  .left{display:flex; align-items:baseline; gap:14px; min-width:0}
+  .count{font-size:13px; font-variant-numeric:tabular-nums; color:var(--muted)}
+  .count b{color:var(--fg); font-weight:600}
+  .link{
+    appearance:none; border:0; background:none; padding:2px 0; cursor:pointer;
+    color:var(--muted); font:inherit; font-size:12px; border-bottom:1px solid transparent;
+  }
+  .link:hover{color:var(--fg); border-bottom-color:var(--border-strong)}
+  .link:disabled{opacity:.4; cursor:default; border-bottom-color:transparent}
+  .primary{
+    appearance:none; display:inline-flex; align-items:center; gap:7px;
+    height:36px; padding:0 15px; border:1px solid transparent; border-radius:8px;
+    background:var(--accent); color:var(--btn-fg);
+    font:inherit; font-size:13px; font-weight:560; cursor:pointer;
+    transition:filter .12s, opacity .12s, transform .06s;
+  }
+  .primary:hover:not(:disabled){filter:brightness(1.07)}
+  .primary:active:not(:disabled){transform:translateY(.5px)}
+  .primary:focus-visible{outline:none; box-shadow:0 0 0 3px var(--accent-soft), 0 0 0 1px var(--accent)}
+  .primary:disabled{opacity:.42; cursor:default}
+  .primary svg{flex:none}
+  .sr{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0}
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important} }
+  @media (max-width:560px){
+    .row{grid-template-columns:18px minmax(0,1fr) 62px; height:50px; padding:0 10px; gap:10px}
+    .stat .bar{width:62px}
+    .sess{display:none}
+    .bar-in{height:60px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="hd">
+      <h1>Skill picker</h1>
+      <p class="meta" id="meta"></p>
+    </div>
+    <div class="tools">
+      <div class="search">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg>
+        <input id="q" type="search" placeholder="Filter by name" autocomplete="off" spellcheck="false" aria-label="Filter skills by name">
+        <kbd>/</kbd>
+      </div>
+      <div class="seg" role="group" aria-label="Filter by usage">
+        <button type="button" data-filter="all" aria-pressed="true">All <span id="c-all"></span></button>
+        <button type="button" data-filter="used" aria-pressed="false">Used <span id="c-used"></span></button>
+        <button type="button" data-filter="unused" aria-pressed="false">Never <span id="c-unused"></span></button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <ul class="list" id="list"></ul>
+    <p class="empty" id="empty" hidden></p>
+  </main>
+</div>
+
+<footer>
+  <div class="wrap bar-in">
+    <div class="left">
+      <span class="count" id="count"><b>0</b> selected</span>
+      <button type="button" class="link" id="all">Select shown</button>
+      <button type="button" class="link" id="none" disabled>Clear</button>
+    </div>
+    <button type="button" class="primary" id="copy" disabled>
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 3.5v-.5a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 3v5A1.5 1.5 0 0 0 4 9.5h.5"/></svg>
+      <span id="copy-label">Copy CSV</span>
+    </button>
+  </div>
+</footer>
+<p class="sr" id="live" role="status" aria-live="polite"></p>
+
+<script>
+const SKILLS = [{"n":"poteto-mode","l":461,"s":372,"e":110,"r":351,"d":7,"src":null,"url":null},{"n":"poteto-agent","l":297,"s":227,"e":0,"r":297,"d":7,"src":null,"url":null},{"n":"unslop","l":177,"s":157,"e":0,"r":177,"d":7,"src":null,"url":null},{"n":"principle-prove-it-works","l":142,"s":134,"e":0,"r":142,"d":4,"src":null,"url":null},{"n":"principle-laziness-protocol","l":117,"s":108,"e":0,"r":117,"d":4,"src":null,"url":null},{"n":"architect","l":105,"s":87,"e":0,"r":105,"d":5,"src":null,"url":null},{"n":"principle-model-the-domain","l":105,"s":97,"e":0,"r":105,"d":4,"src":null,"url":null},{"n":"t3-orchestration","l":98,"s":63,"e":0,"r":98,"d":5,"src":null,"url":null},{"n":"principle-type-system-discipline","l":89,"s":83,"e":0,"r":89,"d":4,"src":null,"url":null},{"n":"deslop","l":81,"s":75,"e":0,"r":81,"d":5,"src":null,"url":null},{"n":"how","l":80,"s":75,"e":0,"r":80,"d":6,"src":null,"url":null},{"n":"no-comments","l":79,"s":72,"e":0,"r":79,"d":5,"src":null,"url":null},{"n":"tinyfish-search-fetch","l":79,"s":71,"e":1,"r":78,"d":6,"src":null,"url":null},{"n":"comment-sicko","l":78,"s":67,"e":1,"r":77,"d":6,"src":null,"url":null},{"n":"principle-sequence-verifiable-units","l":78,"s":72,"e":0,"r":78,"d":4,"src":null,"url":null},{"n":"principle-boundary-discipline","l":70,"s":66,"e":0,"r":70,"d":4,"src":null,"url":null},{"n":"text-tree-diagrams","l":70,"s":67,"e":4,"r":66,"d":6,"src":null,"url":null},{"n":"technical-writing","l":63,"s":59,"e":0,"r":63,"d":5,"src":null,"url":null},{"n":"code-review","l":55,"s":46,"e":0,"r":55,"d":2,"src":"mattpocock/skills","url":"https://github.com/mattpocock/skills"},{"n":"control-ui","l":42,"s":38,"e":0,"r":42,"d":4,"src":null,"url":null},{"n":"colorfigures","l":27,"s":17,"e":5,"r":22,"d":0,"src":null,"url":null},{"n":"principle-foundational-thinking","l":25,"s":23,"e":0,"r":25,"d":4,"src":null,"url":null},{"n":"agent-browser","l":23,"s":22,"e":0,"r":23,"d":3,"src":"vercel-labs/agent-browser","url":"https://github.com/vercel-labs/agent-browser"},{"n":"principle-minimize-reader-load","l":23,"s":22,"e":0,"r":23,"d":3,"src":null,"url":null},{"n":"principle-guard-the-context-window","l":22,"s":20,"e":0,"r":22,"d":1,"src":null,"url":null},{"n":"principle-build-the-lever","l":21,"s":19,"e":0,"r":21,"d":0,"src":null,"url":null},{"n":"writing-for-agents","l":20,"s":16,"e":5,"r":15,"d":0,"src":"mattpocock/skills","url":"https://github.com/mattpocock/skills"},{"n":"arena","l":18,"s":17,"e":0,"r":18,"d":3,"src":null,"url":null},{"n":"writing-great-skills","l":17,"s":13,"e":5,"r":12,"d":0,"src":"mattpocock/skills","url":"https://github.com/mattpocock/skills"},{"n":"fix-checks","l":15,"s":12,"e":0,"r":15,"d":2,"src":null,"url":null},{"n":"principle-make-operations-idempotent","l":15,"s":14,"e":0,"r":15,"d":1,"src":null,"url":null},{"n":"typescript-best-practices","l":13,"s":12,"e":0,"r":13,"d":2,"src":null,"url":null},{"n":"principle-migrate-callers-then-delete-legacy-apis","l":12,"s":11,"e":0,"r":12,"d":0,"src":null,"url":null},{"n":"principle-experience-first","l":11,"s":10,"e":0,"r":11,"d":0,"src":null,"url":null},{"n":"principle-fix-root-causes","l":11,"s":11,"e":0,"r":11,"d":1,"src":null,"url":null},{"n":"principle-subtract-before-you-add","l":11,"s":10,"e":0,"r":11,"d":1,"src":null,"url":null},{"n":"control-cli","l":9,"s":9,"e":0,"r":9,"d":1,"src":null,"url":null},{"n":"show-me-your-work","l":9,"s":8,"e":0,"r":9,"d":1,"src":null,"url":null},{"n":"emil-design-eng","l":8,"s":6,"e":6,"r":2,"d":0,"src":"emilkowalski/skill","url":"https://github.com/emilkowalski/skill"},{"n":"library-source","l":8,"s":4,"e":0,"r":8,"d":2,"src":null,"url":null},{"n":"figure-it-out","l":7,"s":7,"e":0,"r":7,"d":2,"src":null,"url":null},{"n":"principle-exhaust-the-design-space","l":7,"s":7,"e":0,"r":7,"d":0,"src":null,"url":null},{"n":"principle-outcome-oriented-execution","l":7,"s":6,"e":0,"r":7,"d":1,"src":null,"url":null},{"n":"principle-redesign-from-first-principles","l":7,"s":6,"e":0,"r":7,"d":2,"src":null,"url":null},{"n":"principle-separate-before-serializing-shared-state","l":7,"s":6,"e":0,"r":7,"d":2,"src":null,"url":null},{"n":"principle-never-block-on-the-human","l":6,"s":5,"e":0,"r":6,"d":0,"src":null,"url":null},{"n":"swarm","l":5,"s":4,"e":0,"r":5,"d":0,"src":null,"url":null},{"n":"hyperframes","l":4,"s":4,"e":2,"r":2,"d":0,"src":"heygen-com/hyperframes","url":"https://github.com/heygen-com/hyperframes"},{"n":"pi-fake-model","l":4,"s":3,"e":1,"r":3,"d":0,"src":null,"url":null},{"n":"principle-encode-lessons-in-structure","l":4,"s":4,"e":0,"r":4,"d":1,"src":null,"url":null},{"n":"tdd","l":4,"s":4,"e":0,"r":4,"d":0,"src":"mattpocock/skills","url":"https://github.com/mattpocock/skills"},{"n":"why","l":3,"s":3,"e":0,"r":3,"d":0,"src":null,"url":null},{"n":"better-ui","l":2,"s":2,"e":2,"r":0,"d":0,"src":"jakubkrehel/skills","url":"https://github.com/jakubkrehel/skills"},{"n":"faceless-explainer","l":2,"s":2,"e":2,"r":0,"d":0,"src":"heygen-com/hyperframes","url":"https://github.com/heygen-com/hyperframes"},{"n":"resolving-merge-conflicts","l":2,"s":2,"e":0,"r":2,"d":1,"src":"mattpocock/skills","url":"https://github.com/mattpocock/skills"},{"n":"todo-discipline","l":2,"s":2,"e":0,"r":2,"d":0,"src":null,"url":null},{"n":"better-interface","l":1,"s":1,"e":0,"r":1,"d":0,"src":"jakubkrehel/skills","url":"https://github.com/jakubkrehel/skills"},{"n":"better-layout","l":1,"s":1,"e":0,"r":1,"d":0,"src":"jakubkrehel/skills","url":"https://github.com/jakubkrehel/skills"},{"n":"better-typography","l":1,"s":1,"e":0,"r":1,"d":0,"src":"jakubkrehel/skills","url":"https://github.com/jakubkrehel/skills"},{"n":"break","l":1,"s":1,"e":1,"r":0,"d":0,"src":"jakubkrehel/skills","url":"https://github.com/jakubkrehel/skills"},{"n":"hyperframes-cli","l":1,"s":1,"e":0,"r":1,"d":0,"src":"heygen-com/hyperframes","url":"https://github.com/heygen-com/hyperframes"},{"n":"hyperframes-core","l":1,"s":1,"e":0,"r":1,"d":0,"src":"heygen-com/hyperframes","url":"https://github.com/heygen-com/hyperframes"},{"n":"interrogate","l":1,"s":1,"e":0,"r":1,"d":0,"src":null,"url":null},{"n":"pnpm","l":1,"s":1,"e":0,"r":1,"d":0,"src":"antfu/skills","url":"https://github.com/antfu/skills"},{"n":"variant","l":1,"s":1,"e":1,"r":0,"d":0,"src":"jakubkrehel/skills","url":"https://github.com/jakubkrehel/skills"},{"n":"wayfinder","l":1,"s":1,"e":1,"r":0,"d":0,"src":"mattpocock/skills","url":"https://github.com/mattpocock/skills"},{"n":"animate","l":0,"s":0,"e":0,"r":0,"d":0,"src":"emilkowalski/skill","url":"https://github.com/emilkowalski/skill"},{"n":"animation-vocabulary","l":0,"s":0,"e":0,"r":0,"d":0,"src":"emilkowalski/skill","url":"https://github.com/emilkowalski/skill"},{"n":"apple-design","l":0,"s":0,"e":0,"r":0,"d":0,"src":"emilkowalski/skill","url":"https://github.com/emilkowalski/skill"},{"n":"automate-me","l":0,"s":0,"e":0,"r":0,"d":0,"src":null,"url":null},{"n":"better-accessibility","l":0,"s":0,"e":0,"r":0,"d":0,"src":"jakubkrehel/skills","url":"https://github.com/jakubkrehel/skills"},{"n":"better-colors","l":0,"s":0,"e":0,"r":0,"d":0,"src":"jakubkrehel/skills","url":"https://github.com/jakubkrehel/skills"},{"n":"better-writing","l":0,"s":0,"e":0,"r":0,"d":0,"src":"jakubkrehel/skills","url":"https://github.com/jakubkrehel/skills"},{"n":"blast-radius","l":0,"s":0,"e":0,"r":0,"d":0,"src":null,"url":null},{"n":"break-ui","l":0,"s":0,"e":0,"r":0,"d":0,"src":"emilkowalski/skill","url":"https://github.com/emilkowalski/skill"},{"n":"bro","l":0,"s":0,"e":0,"r":0,"d":0,"src":null,"url":null},{"n":"create-verification-skill","l":0,"s":0,"e":0,"r":0,"d":0,"src":null,"url":null},{"n":"diagnosing-bugs","l":0,"s":0,"e":0,"r":0,"d":0,"src":"mattpocock/skills","url":"https://github.com/mattpocock/skills"},{"n":"embedded-captions","l":0,"s":0,"e":0,"r":0,"d":0,"src":"heygen-com/hyperframes","url":"https://github.com/heygen-com/hyperframes"},{"n":"explain-interface","l":0,"s":0,"e":0,"r":0,"d":0,"src":"jakubkrehel/skills","url":"https://github.com/jakubkrehel/skills"},{"n":"find-animation-opportunities","l":0,"s":0,"e":0,"r":0,"d":0,"src":"emilkowalski/skill","url":"https://github.com/emilkowalski/skill"},{"n":"general-video","l":0,"s":0,"e":0,"r":0,"d":0,"src":"heygen-com/hyperframes","url":"https://github.com/heygen-com/hyperframes"},{"n":"hyperframes-animation","l":0,"s":0,"e":0,"r":0,"d":0,"src":"heygen-com/hyperframes","url":"https://github.com/heygen-com/hyperframes"},{"n":"hyperframes-audio","l":0,"s":0,"e":0,"r":0,"d":0,"src":"heygen-com/hyperframes","url":"https://github.com/heygen-com/hyperframes"},{"n":"hyperframes-creative","l":0,"s":0,"e":0,"r":0,"d":0,"src":"heygen-com/hyperframes","url":"https://github.com/heygen-com/hyperframes"},{"n":"hyperframes-keyframes","l":0,"s":0,"e":0,"r":0,"d":0,"src":"heygen-com/hyperframes","url":"https://github.com/heygen-com/hyperframes"},{"n":"hyperframes-registry","l":0,"s":0,"e":0,"r":0,"d":0,"src":"heygen-com/hyperframes","url":"https://github.com/heygen-com/hyperframes"},{"n":"hyperframes-studio","l":0,"s":0,"e":0,"r":0,"d":0,"src":"heygen-com/hyperframes","url":"https://github.com/heygen-com/hyperframes"},{"n":"improve-animations","l":0,"s":0,"e":0,"r":0,"d":0,"src":"emilkowalski/skill","url":"https://github.com/emilkowalski/skill"},{"n":"interface-review","l":0,"s":0,"e":0,"r":0,"d":0,"src":"jakubkrehel/skills","url":"https://github.com/jakubkrehel/skills"},{"n":"maintain-verification-skill","l":0,"s":0,"e":0,"r":0,"d":0,"src":null,"url":null},{"n":"media-use","l":0,"s":0,"e":0,"r":0,"d":0,"src":"heygen-com/hyperframes","url":"https://github.com/heygen-com/hyperframes"},{"n":"motion-graphics","l":0,"s":0,"e":0,"r":0,"d":0,"src":"heygen-com/hyperframes","url":"https://github.com/heygen-com/hyperframes"},{"n":"prototype","l":0,"s":0,"e":0,"r":0,"d":0,"src":"emilkowalski/skill","url":"https://github.com/emilkowalski/skill"},{"n":"recall","l":0,"s":0,"e":0,"r":0,"d":0,"src":null,"url":null},{"n":"reflect","l":0,"s":0,"e":0,"r":0,"d":0,"src":null,"url":null},{"n":"slideshow","l":0,"s":0,"e":0,"r":0,"d":0,"src":"heygen-com/hyperframes","url":"https://github.com/heygen-com/hyperframes"}];
+const TOTAL_LOADS = 2767;
+
+const list = document.getElementById('list');
+const q = document.getElementById('q');
+const empty = document.getElementById('empty');
+const countEl = document.getElementById('count');
+const live = document.getElementById('live');
+const copyBtn = document.getElementById('copy');
+const copyLabel = document.getElementById('copy-label');
+const clearBtn = document.getElementById('none');
+const allBtn = document.getElementById('all');
+
+let filter = 'all';
+const maxLoads = Math.max(...SKILLS.map(s => s.l));
+const selected = new Set();
+
+document.getElementById('meta').innerHTML =
+  '<b>' + SKILLS.length + '</b> skills &middot; <b>' + SKILLS.filter(s => s.l > 0).length +
+  '</b> used &middot; <b>' + TOTAL_LOADS.toLocaleString() + '</b> loads &middot; <b>' + SKILLS.filter(s => s.src).length + '</b> with a repo';
+document.getElementById('c-all').textContent = SKILLS.length;
+document.getElementById('c-used').textContent = SKILLS.filter(s => s.l > 0).length;
+document.getElementById('c-unused').textContent = SKILLS.filter(s => s.l === 0).length;
+
+const CHECK = '<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6.4 4.7 9 10 3.2"/></svg>';
+
+function row(s) {
+  const li = document.createElement('li');
+  li.className = 'row' + (s.l ? '' : ' unused');
+  li.dataset.name = s.n;
+  const pct = s.l ? Math.max(2, Math.round(100 * s.l / maxLoads)) : 0;
+  li.innerHTML =
+    '<input type="checkbox" value="' + s.n + '" aria-label="' + s.n + '"' + (selected.has(s.n) ? ' checked' : '') + '>' +
+    '<span class="box">' + CHECK + '</span>' +
+    '<span class="txt">' +
+      '<span class="nm">' + s.n + '</span>' +
+      '<span class="sub">' + srcCell(s) + '<span class="sep">&nbsp;&middot;&nbsp;</span>' + (s.l ? (s.e + ' invoked &middot; ' + s.r + ' agent-read') : 'never loaded') + '</span>' +
+    '</span>' +
+    '<span class="stat"><span class="num">' + (s.l || '&mdash;') + '</span>' +
+      '<span class="bar"><i style="width:' + pct + '%"></i></span></span>' +
+    '<span class="sess' + (s.d ? ' hot' : '') + '">' + (s.l ? s.s + ' sess' : '') + '</span>';
+  // the row toggles on click, but a repo link opens instead of selecting
+  li.addEventListener('click', e => {
+    if (e.target.closest('a') || e.target.type === 'checkbox') return;
+    const box = li.querySelector('input');
+    box.checked = !box.checked;
+    box.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  return li;
+}
+
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+
+function srcCell(s) {
+  if (!s.src) return '<span class="loc">local</span>';
+  return '<a href="' + esc(s.url) + '" target="_blank" rel="noreferrer noopener" title="' + esc(s.url) + '">' + esc(s.src) + '</a>';
+}
+
+function visible() {
+  const term = q.value.trim().toLowerCase();
+  return SKILLS.filter(s =>
+    (filter === 'all' || (filter === 'used' ? s.l > 0 : s.l === 0)) &&
+    (!term || s.n.includes(term)));
+}
+
+function render() {
+  const rows = visible();
+  list.replaceChildren(...rows.map(row));
+  empty.hidden = rows.length > 0;
+  empty.replaceChildren(
+    document.createTextNode('No skill matches '),
+    Object.assign(document.createElement('b'), { textContent: q.value }),
+    document.createTextNode('.'),
+  );
+  allBtn.disabled = rows.length === 0;
+  sync();
+}
+
+function sync() {
+  const n = selected.size;
+  countEl.innerHTML = '<b>' + n + '</b> selected';
+  copyBtn.disabled = n === 0;
+  clearBtn.disabled = n === 0;
+}
+
+list.addEventListener('change', e => {
+  const box = e.target;
+  if (box.type !== 'checkbox') return;
+  box.checked ? selected.add(box.value) : selected.delete(box.value);
+  sync();
+});
+
+q.addEventListener('input', render);
+q.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { q.value = ''; render(); q.blur(); }
+});
+
+document.querySelectorAll('.seg button').forEach(b => {
+  b.addEventListener('click', () => {
+    filter = b.dataset.filter;
+    document.querySelectorAll('.seg button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    render();
+  });
+});
+
+allBtn.addEventListener('click', () => {
+  visible().forEach(s => selected.add(s.n));
+  list.querySelectorAll('input').forEach(i => { i.checked = true; });
+  sync();
+});
+
+clearBtn.addEventListener('click', () => {
+  selected.clear();
+  list.querySelectorAll('input').forEach(i => { i.checked = false; });
+  sync();
+});
+
+let order;
+function csv() {
+  order ??= new Map(SKILLS.map((s, i) => [s.n, i]));
+  return [...selected].sort((a, b) => order.get(a) - order.get(b)).join(',');
+}
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:-1000px';
+    document.body.append(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    return ok;
+  }
+}
+
+let timer;
+copyBtn.addEventListener('click', async () => {
+  if (!selected.size) return;
+  const text = csv();
+  const ok = await copyText(text);
+  live.textContent = ok
+    ? 'Copied ' + selected.size + ' skill names as CSV'
+    : 'Copy failed, select the text and copy manually';
+  if (!ok) return;
+  copyLabel.textContent = 'Copied';
+  copyBtn.disabled = true;
+  clearTimeout(timer);
+  timer = setTimeout(() => { copyLabel.textContent = 'Copy CSV'; sync(); }, 1400);
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === '/' && document.activeElement !== q) { e.preventDefault(); q.focus(); q.select(); }
+});
+
+render();
+</script>
+</body>
+</html>
