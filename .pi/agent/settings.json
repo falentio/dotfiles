@@ -1,5 +1,5 @@
 {
-  "lastChangelogVersion": "1.4.0",
+  "lastChangelogVersion": "1.5.0",
   "defaultProvider": "9Router",
   "defaultModel": "deepseek",
   "defaultTools": [
@@ -8,5 +8,6 @@
   "codemode": {
     "mode": "only"
   },
-  "theme": "dark"
+  "theme": "dark",
+  "defaultThinkingLevel": "xhigh"
 }
