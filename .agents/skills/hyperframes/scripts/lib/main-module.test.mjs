@@ -15,10 +15,10 @@ test("skill CLIs run when invoked through a symlinked skills dir", () => {
   try {
     symlinkSync(SKILLS, join(dir, "skills"), "dir");
     for (const script of [
-      "faceless-explainer/scripts/captions.mjs",
+      "hyperframes/references/faceless-explainer/scripts/captions.mjs",
       "pr-to-video/scripts/captions.mjs",
       "product-launch-video/scripts/captions.mjs",
-      "media-use/audio/scripts/heygen-voice.mjs",
+      "hyperframes/references/media-use/audio/scripts/heygen-voice.mjs",
     ]) {
       const run = spawnSync(process.execPath, [join(dir, "skills", script), "not-a-command"], {
         encoding: "utf8",

@@ -6,7 +6,7 @@ For a plugin installation, follow [plugin execution rules](plugin-installation.m
 
 HyperFrames installs the core set eagerly and workflow skills lazily.
 
-- **Core set:** `/hyperframes`, the `hyperframes-*` domain skills, and `/media-use`.
+- **Core set:** `/hyperframes`, the `hyperframes-*` domain skills, and `./media-use/media-use.md`.
 - **Workflow skills:** installed when routing selects them through `npx hyperframes skills update <workflow-name>`.
 
 ## What `init` does
