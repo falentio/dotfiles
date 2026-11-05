@@ -39,7 +39,7 @@ describe("todos extension factory", () => {
 		expect(tool?.label).toBe("Todo");
 		expect(tool?.executionMode).toBe("sequential");
 		expect(tool?.exposure).toBe("model-only");
-		expect(tool?.promptSnippet).toContain("structured todo list");
+		expect(tool?.promptSnippet).toContain("phased plan");
 	});
 
 	it("registers no /todo or /todos-configure command", () => {
@@ -230,7 +230,7 @@ describe("todos extension factory", () => {
 		)?.message;
 		expect(message?.customType).toBe("eager-todo-prelude");
 		expect(message?.display).toBe(false);
-		expect(message?.content).toContain("Consider calling `todo` first");
+		expect(message?.content).toContain("lay out the plan first");
 		expect(message?.content).not.toContain("MUST");
 	});
 

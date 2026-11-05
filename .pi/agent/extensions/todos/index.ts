@@ -129,11 +129,7 @@ export default function todosExtension(pi: ExtensionAPI): void {
 		name: TODO_TOOL_NAME,
 		label: "Todo",
 		description: TODO_TOOL_DESCRIPTION,
-		promptSnippet:
-			"Write a structured todo list to track progress within a session",
-		promptGuidelines: [
-			"Mark tasks done immediately after finishing them; batch todo calls with real work instead of making solo todo turns.",
-		],
+		promptSnippet: "Track a phased plan and mark progress as it lands",
 		parameters: todoSchema,
 		executionMode: "sequential",
 		// model-only keeps the tool out of the codemode callable set (and out of
