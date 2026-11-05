@@ -1,8 +1,10 @@
 import { describe, expect, it } from "bun:test";
 import {
+	extractTodoMarkers,
 	getCompletionTransitions,
 	inferTodoOp,
 	normalizeInProgressTask,
+	normalizeTodoArgs,
 } from "../state.ts";
 import { executeTodoOp } from "../execute.ts";
 import type { TodoParams, TodoPhase } from "../types.ts";
@@ -11,7 +13,7 @@ function makeTool(initialPhases: TodoPhase[] = []) {
 	let phases = initialPhases;
 	return {
 		run(params: unknown) {
-			const outcome = executeTodoOp(phases, params, false);
+			const outcome = executeTodoOp(phases, params, { hasSessionFile: false });
 			if (!outcome.failed && !outcome.readOnly) phases = outcome.phases;
 			return outcome;
 		},
@@ -40,9 +42,9 @@ describe("executeTodoOp auto-start behavior", () => {
 			"in_progress",
 			"pending",
 		]);
-		expect(summaryText(result)).toContain("Remaining items (2):");
-		expect(summaryText(result)).toContain("status [in_progress] (Execution)");
-		expect(summaryText(result)).toContain("diagnostics [pending] (Execution)");
+		expect(summaryText(result)).toContain("  Execution:");
+		expect(summaryText(result)).toContain("- status (in progress)");
+		expect(summaryText(result)).toContain("- diagnostics");
 	});
 
 	it("auto-promotes the next pending task when current task is completed", () => {
@@ -62,13 +64,13 @@ describe("executeTodoOp auto-start behavior", () => {
 		expect(result.completedTasks).toEqual([
 			{ phase: "Execution", content: "status" },
 		]);
-		expect(summaryText(result)).toContain("Remaining items (1):");
+		expect(summaryText(result)).toContain('Marked done: "status"');
 		expect(summaryText(result)).toContain(
-			"diagnostics [in_progress] (Execution)",
+			'Next: "diagnostics" [in_progress] (Execution)',
 		);
 
 		const completedResult = tool.run({ op: "done", task: "diagnostics" });
-		expect(summaryText(completedResult)).toContain("Remaining items: none.");
+		expect(summaryText(completedResult)).toContain("Next: none.");
 	});
 });
 
@@ -138,7 +140,9 @@ describe("TodoTool operations", () => {
 		const bTask = blocked.phases[0]?.tasks.find((task) => task.content === "b");
 		expect(bTask?.status).toBe("blocked");
 		expect(bTask?.blocker).toBe("waiting on sign-off");
-		expect(summaryText(blocked)).toContain("Remaining items (1):");
+		expect(summaryText(blocked)).toContain(
+			'Blocked "b" (Work): waiting on sign-off.',
+		);
 		expect(summaryText(blocked)).toContain("1 blocked");
 
 		const unblocked = tool.run({ op: "unblock", task: "b" });
@@ -273,6 +277,84 @@ describe("TodoTool operations", () => {
 			"completed",
 			"completed",
 			"in_progress",
+		]);
+	});
+
+	it("a phase done leaves abandoned and blocked tasks alone", () => {
+		const tool = makeTool([
+			{
+				name: "Build",
+				tasks: [
+					{ content: "queued", status: "pending" },
+					{ content: "active", status: "in_progress" },
+					{ content: "dropped", status: "abandoned" },
+					{ content: "waiting", status: "blocked", blocker: "sign-off" },
+				],
+			},
+			{ name: "Ship", tasks: [{ content: "tag", status: "pending" }] },
+		]);
+
+		const result = tool.run({ op: "done", phase: "Build" });
+
+		const statuses = Object.fromEntries(
+			result.phases.flatMap((phase) =>
+				phase.tasks.map((task) => [task.content, task.status]),
+			),
+		);
+		expect(statuses).toEqual({
+			queued: "completed",
+			active: "completed",
+			dropped: "abandoned",
+			waiting: "blocked",
+			tag: "in_progress",
+		});
+		expect(summaryText(result)).toContain('Marked done: "queued", "active"');
+		expect(summaryText(result)).toContain(
+			'Next: "tag" [in_progress] (Ship)',
+		);
+	});
+
+	it("a bulk done leaves abandoned and blocked tasks alone", () => {
+		const tool = makeTool([
+			{
+				name: "Work",
+				tasks: [
+					{ content: "queued", status: "pending" },
+					{ content: "dropped", status: "abandoned" },
+					{ content: "waiting", status: "blocked" },
+				],
+			},
+		]);
+
+		const result = tool.run({ op: "done" });
+
+		expect(
+			result.phases[0]?.tasks.map((task) => task.status),
+		).toEqual(["completed", "abandoned", "blocked"]);
+		expect(summaryText(result)).toContain('Marked done: "queued"');
+	});
+
+	it("a phase done with no open task is a silent no-op", () => {
+		const tool = makeTool([
+			{
+				name: "Closed",
+				tasks: [
+					{ content: "shipped", status: "completed" },
+					{ content: "dropped", status: "abandoned" },
+					{ content: "waiting", status: "blocked" },
+				],
+			},
+		]);
+
+		const result = tool.run({ op: "done", phase: "Closed" });
+
+		expect(result.failed).toBe(false);
+		expect(result.completedTasks).toEqual([]);
+		expect(summaryText(result)).not.toContain("Marked done");
+		expect(result.phases[0]?.tasks.map((task) => task.status)).toEqual([
+			"completed",
+			"abandoned",
+			"blocked",
 		]);
 	});
 
@@ -495,7 +577,7 @@ describe("empty target safety", () => {
 	it.each(["done", "rm", "drop", "block", "unblock"] as const)(
 		"empty task with op=%s fails without touching any task",
 		(op) => {
-			const outcome = executeTodoOp(initial, { op, task: "" }, false);
+			const outcome = executeTodoOp(initial, { op, task: "" }, { hasSessionFile: false });
 			expect(outcome.failed).toBe(true);
 			expect(outcome.summary).toContain("Missing task content");
 			expect(outcome.phases).toEqual(initial);
@@ -505,7 +587,7 @@ describe("empty target safety", () => {
 	it.each(["done", "rm", "drop", "block", "unblock"] as const)(
 		"empty phase with op=%s fails without touching any task",
 		(op) => {
-			const outcome = executeTodoOp(initial, { op, phase: "" }, false);
+			const outcome = executeTodoOp(initial, { op, phase: "" }, { hasSessionFile: false });
 			expect(outcome.failed).toBe(true);
 			expect(outcome.summary).toContain("Missing phase name");
 			expect(outcome.phases).toEqual(initial);
@@ -513,7 +595,7 @@ describe("empty target safety", () => {
 	);
 
 	it("omitted targets still mean all tasks (deliberate global op)", () => {
-		const outcome = executeTodoOp(initial, { op: "done" }, false);
+		const outcome = executeTodoOp(initial, { op: "done" }, { hasSessionFile: false });
 		expect(outcome.failed).toBe(false);
 		expect(outcome.phases[0]?.tasks.every((t) => t.status === "completed")).toBe(true);
 	});
@@ -678,5 +760,441 @@ describe("single-line normalization of task content and phase names", () => {
 		const blankItem = tool.run({ op: "append", phase: "A", items: ["\t"] });
 		expect(blankItem.failed).toBe(true);
 		expect(summaryText(blankItem)).toContain("Empty task content");
+	});
+});
+
+describe("summary modes", () => {
+	function plan() {
+		const tool = makeTool();
+		tool.run({
+			op: "init",
+			list: [
+				{ phase: "Build", items: ["Write the parser", "Add fixtures"] },
+				{ phase: "Ship", items: ["Tag release"] },
+			],
+		});
+		return tool;
+	}
+
+	it("done returns a delta: change, next, overall, active phase", () => {
+		const tool = plan();
+		const result = tool.run({ op: "done", task: "Write the parser" });
+		expect(summaryText(result)).toBe(
+			[
+				'Marked done: "Write the parser"',
+				'Next: "Add fixtures" [in_progress] (Build)',
+				"Overall: 1/3 done, 2 open.",
+				'Active phase 1/2 "Build" (1/2).',
+			].join("\n"),
+		);
+	});
+
+	it("start returns a delta", () => {
+		const tool = plan();
+		const result = tool.run({ op: "start", task: "Tag release" });
+		expect(summaryText(result)).toContain('Started: "Tag release"');
+		expect(summaryText(result)).toContain(
+			'Next: "Write the parser" [pending] (Build)',
+		);
+	});
+
+	it("drop returns a delta", () => {
+		const tool = plan();
+		const result = tool.run({ op: "drop", task: "Add fixtures" });
+		expect(summaryText(result)).toContain('Dropped: "Add fixtures"');
+		expect(summaryText(result)).toContain("Overall: 1/3 done, 2 open.");
+	});
+
+	it("block returns a delta with the phase and the reason", () => {
+		const tool = plan();
+		const result = tool.run({
+			op: "block",
+			task: "Tag release",
+			reason: "waiting on sign-off",
+		});
+		expect(summaryText(result)).toContain(
+			'Blocked "Tag release" (Ship): waiting on sign-off.',
+		);
+		expect(summaryText(result)).toContain("Overall: 0/3 done, 2 open, 1 blocked.");
+	});
+
+	it("unblock returns a delta", () => {
+		const tool = plan();
+		tool.run({ op: "block", task: "Tag release", reason: "x" });
+		const result = tool.run({ op: "unblock", task: "Tag release" });
+		expect(summaryText(result)).toContain('Unblocked: "Tag release"');
+	});
+
+	it("init, append, rm and view return the full list", () => {
+		const tool = plan();
+		expect(summaryText(tool.run({ op: "view" }))).toContain("  Build:");
+		expect(
+			summaryText(tool.run({ op: "append", phase: "Ship", items: ["Cut tag"] })),
+		).toContain("  Ship:");
+		expect(summaryText(tool.run({ op: "rm", task: "Cut tag" }))).toContain(
+			"  Ship:",
+		);
+		expect(
+			summaryText(tool.run({ op: "init", items: ["Only task"] })),
+		).toContain("  Tasks:");
+	});
+
+	it("a failed call returns the full list with the error first", () => {
+		const tool = plan();
+		const result = tool.run({ op: "done", task: "nope" });
+		expect(result.failed).toBe(true);
+		expect(summaryText(result)).toContain('Errors: Task "nope" not found');
+		expect(summaryText(result)).toContain("  Build:");
+		expect(summaryText(result)).toContain("Overall: 0/3 done, 3 open.");
+	});
+
+	it("caps change names at six", () => {
+		const tool = makeTool();
+		tool.run({
+			op: "init",
+			list: [
+				{
+					phase: "Bulk",
+					items: ["1", "2", "3", "4", "5", "6", "7", "8"],
+				},
+			],
+		});
+		const result = tool.run({ op: "drop" });
+		expect(summaryText(result)).toContain(
+			'Dropped: "1", "2", "3", "4", "5", "6" (+2 more)',
+		);
+	});
+
+	it("prints no Remaining items block in either mode", () => {
+		const tool = plan();
+		expect(summaryText(tool.run({ op: "view" }))).not.toContain(
+			"Remaining items",
+		);
+		expect(
+			summaryText(tool.run({ op: "done", task: "Write the parser" })),
+		).not.toContain("Remaining items");
+	});
+});
+
+describe("collapsed full list", () => {
+	function closedPlan() {
+		const tool = makeTool();
+		tool.run({
+			op: "init",
+			list: [{ phase: "Work", items: ["kept", "finished", "removed", "next"] }],
+		});
+		tool.run({ op: "done", task: "finished" });
+		tool.run({ op: "drop", task: "removed" });
+		return tool;
+	}
+
+	it("prints open tasks and one closed-count line per phase", () => {
+		const summary = summaryText(closedPlan().run({ op: "view" }));
+		expect(summary).toContain("  Work:");
+		expect(summary).toContain("- kept");
+		expect(summary).toContain("- next");
+		expect(summary).toContain("    (1 done, 1 dropped)");
+	});
+
+	it("omits closed task text from the full list", () => {
+		const summary = summaryText(closedPlan().run({ op: "view" }));
+		expect(summary).not.toContain("finished");
+		expect(summary).not.toContain("removed");
+	});
+
+	it("omits the count line when nothing is closed", () => {
+		const tool = makeTool();
+		const summary = summaryText(tool.run({ op: "init", items: ["only"] }));
+		expect(summary).toContain("- only");
+		expect(summary).not.toMatch(/\(\d+ done/);
+	});
+
+	it("reports a single closed kind without a zero count", () => {
+		const tool = makeTool();
+		tool.run({ op: "init", items: ["a", "b"] });
+		tool.run({ op: "done", task: "b" });
+		const summary = summaryText(tool.run({ op: "view" }));
+		expect(summary).toContain("    (1 done)");
+		expect(summary).not.toContain("dropped");
+	});
+});
+
+describe("update op", () => {
+	function plan() {
+		const tool = makeTool();
+		tool.run({
+			op: "init",
+			list: [
+				{ phase: "Build", items: ["parser", "fixtures", "report"] },
+				{ phase: "Ship", items: ["tag"] },
+			],
+		});
+		return tool;
+	}
+
+	it("renames a task and keeps its status", () => {
+		const tool = plan();
+		const result = tool.run({
+			op: "update",
+			task: "parser",
+			content: "lalr parser",
+		});
+		expect(result.failed).toBe(false);
+		const renamed = result.phases[0]?.tasks.find(
+			(task) => task.content === "lalr parser",
+		);
+		expect(renamed?.status).toBe("in_progress");
+		expect(summaryText(result)).toContain('Renamed "parser" to "lalr parser".');
+	});
+
+	it("keeps a renamed task's position in its phase", () => {
+		const tool = plan();
+		tool.run({ op: "update", task: "report", content: "release notes" });
+		expect(tool.phases[0]?.tasks.map((task) => task.content)).toEqual([
+			"parser",
+			"fixtures",
+			"release notes",
+		]);
+	});
+
+	it("rejects a rename onto an existing task", () => {
+		const tool = plan();
+		const result = tool.run({
+			op: "update",
+			task: "parser",
+			content: "fixtures",
+		});
+		expect(result.failed).toBe(true);
+		expect(summaryText(result)).toContain('Task "fixtures" already exists');
+	});
+
+	it("moves a task to an existing phase at the end", () => {
+		const tool = plan();
+		const result = tool.run({ op: "update", task: "report", phase: "Ship" });
+		expect(
+			result.phases.map((phase) => [
+				phase.name,
+				phase.tasks.map((task) => task.content),
+			]),
+		).toEqual([
+			["Build", ["parser", "fixtures"]],
+			["Ship", ["tag", "report"]],
+		]);
+		expect(summaryText(result)).toContain('Moved "report" to "Ship".');
+	});
+
+	it("moves a task before another in the destination phase", () => {
+		const tool = plan();
+		const result = tool.run({
+			op: "update",
+			task: "report",
+			phase: "Ship",
+			before: "tag",
+		});
+		expect(result.phases[1]?.tasks.map((task) => task.content)).toEqual([
+			"report",
+			"tag",
+		]);
+	});
+
+	it("creates the destination phase when it is missing", () => {
+		const tool = plan();
+		const result = tool.run({ op: "update", task: "tag", phase: "Release" });
+		expect(result.failed).toBe(false);
+		expect(result.phases.map((phase) => phase.name)).toEqual([
+			"Build",
+			"Release",
+		]);
+		expect(result.phases[1]?.tasks.map((task) => task.content)).toEqual(["tag"]);
+	});
+
+	it("reorders within a phase when given only before", () => {
+		const tool = plan();
+		const result = tool.run({ op: "update", task: "report", before: "parser" });
+		expect(result.failed).toBe(false);
+		expect(result.phases[0]?.tasks.map((task) => task.content)).toEqual([
+			"report",
+			"parser",
+			"fixtures",
+		]);
+		expect(summaryText(result)).toContain(
+			'Reordered "report" before "parser".',
+		);
+	});
+
+	it("requires content, phase, or before", () => {
+		const tool = plan();
+		const result = tool.run({ op: "update", task: "parser" });
+		expect(result.failed).toBe(true);
+		expect(summaryText(result)).toContain(
+			"update requires content, phase, or before",
+		);
+	});
+
+	it("rejects a before target outside the destination phase", () => {
+		const tool = plan();
+		const result = tool.run({
+			op: "update",
+			task: "tag",
+			phase: "Ship",
+			before: "parser",
+		});
+		expect(result.failed).toBe(true);
+		expect(summaryText(result)).toContain(
+			'Task "parser" not found in phase "Ship"',
+		);
+	});
+
+	it("targets the renamed content afterwards", () => {
+		const tool = plan();
+		tool.run({ op: "update", task: "parser", content: "lalr parser" });
+		const result = tool.run({ op: "done", task: "lalr parser" });
+		expect(result.failed).toBe(false);
+		expect(result.completedTasks).toEqual([
+			{ phase: "Build", content: "lalr parser" },
+		]);
+	});
+});
+
+describe("normalizeTodoArgs", () => {
+	it("moves a list of strings to items", () => {
+		expect(normalizeTodoArgs({ op: "init", list: ["a", "b"] })).toEqual({
+			op: "init",
+			items: ["a", "b"],
+		});
+	});
+
+	it("converts a phase map to a phased list", () => {
+		expect(normalizeTodoArgs({ list: { Build: ["a"], Ship: ["b"] } })).toEqual({
+			list: [
+				{ phase: "Build", items: ["a"] },
+				{ phase: "Ship", items: ["b"] },
+			],
+		});
+	});
+
+	it("takes a list entry's phase from its name", () => {
+		expect(
+			normalizeTodoArgs({ list: [{ name: "Build", items: ["a"] }] }),
+		).toEqual({ list: [{ name: "Build", phase: "Build", items: ["a"] }] });
+	});
+
+	it("wraps a string of items in an array", () => {
+		expect(
+			normalizeTodoArgs({ list: [{ phase: "Build", items: "a" }] }),
+		).toEqual({ list: [{ phase: "Build", items: ["a"] }] });
+	});
+
+	it("drops a list entry with no items", () => {
+		expect(
+			normalizeTodoArgs({
+				list: [
+					{ phase: "Build", items: [] },
+					{ phase: "Ship", items: ["b"] },
+				],
+			}),
+		).toEqual({ list: [{ phase: "Ship", items: ["b"] }] });
+	});
+
+	it("deletes an unknown op so inference runs", () => {
+		expect(normalizeTodoArgs({ op: "complete", task: "a" })).toEqual({
+			task: "a",
+		});
+		expect(normalizeTodoArgs({ op: "done", task: "a" })).toEqual({
+			op: "done",
+			task: "a",
+		});
+	});
+});
+
+describe("argument shape recovery at execute time", () => {
+	it("infers init from a bare list of strings", () => {
+		const tool = makeTool();
+		const result = tool.run({ list: ["First", "Second"] });
+		expect(result.failed).toBe(false);
+		expect(result.op).toBe("init");
+		expect(result.phases[0]?.tasks.map((task) => task.content)).toEqual([
+			"First",
+			"Second",
+		]);
+	});
+
+	it("infers init from a phase map", () => {
+		const tool = makeTool();
+		const result = tool.run({ list: { Work: ["First"] } });
+		expect(result.failed).toBe(false);
+		expect(result.phases.map((phase) => phase.name)).toEqual(["Work"]);
+	});
+
+	it("recovers from an unknown op name", () => {
+		const tool = makeTool();
+		const result = tool.run({
+			op: "complete",
+			list: [{ phase: "Work", items: ["First"] }],
+		});
+		expect(result.failed).toBe(false);
+		expect(result.op).toBe("init");
+	});
+});
+
+describe("extractTodoMarkers", () => {
+	it("strips a lone done marker and reports its content", () => {
+		const result = extractTodoMarkers(
+			'Before\n<!-- todo: done "Write the parser" -->\nAfter',
+		);
+		expect(result).toEqual({
+			text: "Before\nAfter",
+			marked: ["Write the parser"],
+			unsupported: [],
+		});
+	});
+
+	it("collects several markers in order", () => {
+		const result = extractTodoMarkers(
+			'<!-- todo: done "a" -->\n<!-- todo: done "b" -->\n<!-- todo: done "c" -->',
+		);
+		expect(result.marked).toEqual(["a", "b", "c"]);
+		expect(result.text).toBe("");
+	});
+
+	it("accepts flexible whitespace inside the marker", () => {
+		expect(extractTodoMarkers('<!--todo:done"a"-->')).toEqual({
+			text: "",
+			marked: ["a"],
+			unsupported: [],
+		});
+		expect(extractTodoMarkers('<!--   todo:   done   "b"   -->')).toEqual({
+			text: "",
+			marked: ["b"],
+			unsupported: [],
+		});
+	});
+
+	it("leaves markers inside a fenced block untouched", () => {
+		const text =
+			'Example:\n\u0060\u0060\u0060\n<!-- todo: done "a" -->\n\u0060\u0060\u0060\n<!-- todo: done "b" -->';
+		expect(extractTodoMarkers(text)).toEqual({
+			text: 'Example:\n\u0060\u0060\u0060\n<!-- todo: done "a" -->\n\u0060\u0060\u0060',
+			marked: ["b"],
+			unsupported: [],
+		});
+	});
+
+	it("reports a marker whose op is not done and leaves it in place", () => {
+		expect(extractTodoMarkers('Keep <!-- todo: rm "x" --> here')).toEqual({
+			text: 'Keep <!-- todo: rm "x" --> here',
+			marked: [],
+			unsupported: ["x"],
+		});
+	});
+
+	it("strips an inline marker and collapses the gap it leaves", () => {
+		expect(extractTodoMarkers('done <!-- todo: done "a" --> now').text).toBe(
+			"done now",
+		);
+	});
+
+	it("leaves blank lines alone when no marker is on them", () => {
+		expect(extractTodoMarkers("a\n\n\nb").text).toBe("a\n\n\nb");
 	});
 });

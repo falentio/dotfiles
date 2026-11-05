@@ -6,7 +6,7 @@
  */
 
 import { compile } from "@earendil-works/pi-schema";
-import type { TodoOperation } from "./operations.ts";
+import { TODO_OPERATIONS, type TodoOperation } from "./operations.ts";
 import {
 	TODO_STATUSES,
 	todoSchema,
@@ -14,6 +14,7 @@ import {
 	type TodoItem,
 	type TodoParams,
 	type TodoPhase,
+	type TodoStatus,
 } from "./types.ts";
 
 const todoValidator = compile(todoSchema);
@@ -56,11 +57,18 @@ function todoTransitionKey(phase: string, content: string): string {
 	return `${phase}\u0000${content}`;
 }
 
-export function getCompletionTransitions(
+export interface TodoStatusChange {
+	phase: string;
+	content: string;
+	from: TodoStatus;
+	to: TodoStatus;
+}
+
+export function getStatusChanges(
 	previous: TodoPhase[],
 	updated: TodoPhase[],
-): TodoCompletionTransition[] {
-	const previousStatuses = new Map<string, TodoItem["status"]>();
+): TodoStatusChange[] {
+	const previousStatuses = new Map<string, TodoStatus>();
 	for (const phase of previous) {
 		for (const task of phase.tasks) {
 			previousStatuses.set(
@@ -70,19 +78,32 @@ export function getCompletionTransitions(
 		}
 	}
 
-	const transitions: TodoCompletionTransition[] = [];
+	const changes: TodoStatusChange[] = [];
 	for (const phase of updated) {
 		for (const task of phase.tasks) {
-			if (task.status !== "completed") continue;
-			const previousStatus = previousStatuses.get(
+			const from = previousStatuses.get(
 				todoTransitionKey(phase.name, task.content),
 			);
-			if (previousStatus && previousStatus !== "completed") {
-				transitions.push({ phase: phase.name, content: task.content });
+			if (from !== undefined && from !== task.status) {
+				changes.push({
+					phase: phase.name,
+					content: task.content,
+					from,
+					to: task.status,
+				});
 			}
 		}
 	}
-	return transitions;
+	return changes;
+}
+
+export function getCompletionTransitions(
+	previous: TodoPhase[],
+	updated: TodoPhase[],
+): TodoCompletionTransition[] {
+	return getStatusChanges(previous, updated)
+		.filter((change) => change.to === "completed" && change.from !== "completed")
+		.map(({ phase, content }) => ({ phase, content }));
 }
 
 export function normalizeInProgressTask(phases: TodoPhase[]): void {
@@ -198,8 +219,55 @@ const DEFAULT_INIT_PHASE = "Tasks";
  * task identity that targeting ops match by. Normalizing at this boundary
  * keeps every consumer one-line-safe without touching identity.
  */
-function normalizeSingleLine(value: string): string {
+export function normalizeSingleLine(value: string): string {
 	return value.replace(/\s+/g, " ").trim();
+}
+
+const TODO_MARKER_PATTERN =
+	/<!--[ \t]*todo:[ \t]*([a-z_]+)[ \t]*"([^"\n]*)"[ \t]*-->/g;
+
+export interface TodoMarkerExtraction {
+	/** The reply text with every applied marker stripped. */
+	text: string;
+	marked: string[];
+	unsupported: string[];
+}
+
+/** Extract <!-- todo: done "…" --> markers; a fenced code block is skipped. */
+export function extractTodoMarkers(text: string): TodoMarkerExtraction {
+	const marked: string[] = [];
+	const unsupported: string[] = [];
+	const lines: string[] = [];
+	let inFence = false;
+	for (const line of text.split("\n")) {
+		if (line.trimStart().startsWith("```")) {
+			inFence = !inFence;
+			lines.push(line);
+			continue;
+		}
+		if (inFence) {
+			lines.push(line);
+			continue;
+		}
+		const before = marked.length;
+		let kept = line.replace(
+			TODO_MARKER_PATTERN,
+			(raw: string, op: string, content: string) => {
+				if (op !== "done") {
+					unsupported.push(content);
+					return raw;
+				}
+				marked.push(content);
+				return "";
+			},
+		);
+		if (marked.length > before) {
+			if (kept.trim() === "") continue;
+			kept = kept.replace(/ {2,}/g, " ");
+		}
+		lines.push(kept);
+	}
+	return { text: lines.join("\n"), marked, unsupported };
 }
 
 function initPhases(entry: TodoParams, errors: string[]): TodoPhase[] {
@@ -291,6 +359,73 @@ function appendItems(
 	return phases;
 }
 
+function updateTask(
+	phases: TodoPhase[],
+	entry: TodoParams,
+	errors: string[],
+): TodoPhase[] {
+	const hit = resolveTaskOrError(phases, entry.task, errors);
+	if (!hit) return phases;
+	if (
+		entry.content === undefined &&
+		entry.phase === undefined &&
+		entry.before === undefined
+	) {
+		errors.push("update requires content, phase, or before");
+		return phases;
+	}
+	const target = hit.task;
+	const content =
+		entry.content !== undefined
+			? normalizeSingleLine(entry.content)
+			: target.content;
+	if (!content) {
+		errors.push("Empty task content in update");
+		return phases;
+	}
+	if (content !== target.content && findTaskByContent(phases, content)) {
+		errors.push(`Task "${content}" already exists`);
+		return phases;
+	}
+	const phaseName =
+		entry.phase !== undefined ? normalizeSingleLine(entry.phase) : hit.phase.name;
+	if (!phaseName) {
+		errors.push("Missing phase name for update operation");
+		return phases;
+	}
+	let destination = findPhaseByName(phases, phaseName);
+	if (!destination) {
+		destination = { name: phaseName, tasks: [] };
+		phases.push(destination);
+	}
+	const beforeContent =
+		entry.before !== undefined ? normalizeSingleLine(entry.before) : undefined;
+	if (
+		beforeContent !== undefined &&
+		!destination.tasks.some(
+			(task) => task !== target && task.content === beforeContent,
+		)
+	) {
+		errors.push(`Task "${beforeContent}" not found in phase "${phaseName}"`);
+		return phases;
+	}
+	if (beforeContent === undefined && destination === hit.phase) {
+		target.content = content;
+		return phases;
+	}
+	hit.phase.tasks = hit.phase.tasks.filter((task) => task !== target);
+	target.content = content;
+	if (beforeContent === undefined) {
+		destination.tasks.push(target);
+	} else {
+		const index = destination.tasks.findIndex(
+			(task) => task.content === beforeContent,
+		);
+		destination.tasks.splice(index, 0, target);
+	}
+	return phases;
+}
+
 function removeTasks(
 	phases: TodoPhase[],
 	entry: TodoParams,
@@ -338,7 +473,14 @@ function applyEntry(
 			return phases;
 		}
 		case "done": {
+			const openOnly = entry.task === undefined;
 			for (const task of getTaskTargets(phases, entry, errors)) {
+				if (
+					openOnly &&
+					task.status !== "pending" &&
+					task.status !== "in_progress"
+				)
+					continue;
 				task.status = "completed";
 			}
 			return phases;
@@ -386,6 +528,8 @@ function applyEntry(
 		}
 		case "rm":
 			return removeTasks(phases, entry, errors);
+		case "update":
+			return updateTask(phases, entry, errors);
 		case "append":
 			return appendItems(phases, entry, errors);
 		case "view":
@@ -418,6 +562,44 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** Coerce the argument shapes models send into the schema's shape; only unambiguous repairs. */
+export function normalizeTodoArgs(raw: unknown): unknown {
+	if (!isRecord(raw)) return raw;
+	const args: Record<string, unknown> = { ...raw };
+	if (
+		Array.isArray(args.list) &&
+		args.list.length > 0 &&
+		args.list.every((entry) => typeof entry === "string")
+	) {
+		args.items = args.list;
+		delete args.list;
+	} else if (isRecord(args.list)) {
+		const entries = Object.entries(args.list);
+		if (
+			entries.length > 0 &&
+			entries.every(([, items]) => Array.isArray(items))
+		) {
+			args.list = entries.map(([phase, items]) => ({ phase, items }));
+		}
+	}
+	if (Array.isArray(args.list)) {
+		args.list = args.list.flatMap((entry) => {
+			if (!isRecord(entry)) return [entry];
+			const next: Record<string, unknown> = { ...entry };
+			if (next.phase === undefined && typeof next.name === "string") {
+				next.phase = next.name;
+			}
+			if (typeof next.items === "string") next.items = [next.items];
+			if (Array.isArray(next.items) && next.items.length === 0) return [];
+			return [next];
+		});
+	}
+	if (args.op !== undefined && !TODO_OPERATIONS.some((op) => op === args.op)) {
+		delete args.op;
+	}
+	return args;
+}
+
 /**
  * Validate execute-time arguments, repairing an omitted `op`. The tool's
  * `prepareArguments` shim repairs a missing `op` alongside an unambiguous
@@ -429,15 +611,16 @@ export function resolveTodoParams(
 	raw: unknown,
 	hasExistingPhases: boolean,
 ): TodoParams | string {
-	if (todoValidator.check(raw)) return raw;
-	if (isRecord(raw) && raw.op === undefined) {
-		const inferred = inferTodoOp(raw, hasExistingPhases);
+	const normalized = normalizeTodoArgs(raw);
+	if (todoValidator.check(normalized)) return normalized;
+	if (isRecord(normalized) && normalized.op === undefined) {
+		const inferred = inferTodoOp(normalized, hasExistingPhases);
 		if (inferred) {
-			const repaired = { ...raw, op: inferred };
+			const repaired = { ...normalized, op: inferred };
 			if (todoValidator.check(repaired)) return repaired;
 		}
 	}
-	const summary = todoValidator.errors(raw)
+	const summary = todoValidator.errors(normalized)
 		.map((error) => `${error.path || "(root)"}: ${error.message}`)
 		.join("; ");
 	return `Invalid todo arguments: ${summary}`;

@@ -19,6 +19,7 @@ The agent calls `todo` with one operation:
 | `drop` | `task` or `phase` | Mark abandoned; omit both to mark every task |
 | `block` | `task` or `phase`, optional `reason` | Mark blocked on external input |
 | `unblock` | `task` or `phase` | Return a blocked task to pending |
+| `update` | `task`, optional `content`, `phase`, `before` | Rename, move, or reorder; keeps status |
 | `rm` | optional `task` or `phase` | Remove a task or phase; omit both to clear the list |
 | `append` | `phase`, `items` | Add tasks; creates the phase if missing |
 | `view` | | Read the list |
@@ -26,6 +27,19 @@ The agent calls `todo` with one operation:
 Tasks are referenced by their exact content, never by an id. A missing `op` is
 inferred when the arguments are unambiguous, so `{list: [...]}` becomes an
 `init`.
+
+A status op (`done`, `start`, `drop`, `block`, `unblock`) returns a delta:
+what changed, the next open task, and the counts. `init`, `append`, `rm`,
+`view`, a failed call, and the first call after a compaction return the open
+plan. Completed and abandoned tasks appear as a per-phase count, never as
+text.
+
+A `done` on a phase completes that phase's open tasks only; a blocked or
+abandoned task keeps its status. The agent can also mark a task from its reply
+with `<!-- todo: done "exact task content" -->`: the marker is stripped from
+the text and recorded as the same `todo_snapshot` a tool call writes, so
+finishing that task costs no extra turn. A marker naming a task that no longer
+exists comes back as a note on the next tool result.
 
 State lives in a session snapshot. Every successful mutation writes a
 `todo_snapshot` entry; the extension rebuilds the list from the newest one on
@@ -43,7 +57,7 @@ The extension adds three nudges around the tool, each gated on config:
 
 - An eager prelude on the first user turn asks for a phased `init` before
   work; it is pruned from context once that turn is over.
-- A mid-run nudge after 12 mutating tool results asks the agent to mark
+- A mid-run nudge after 20 mutating tool results asks the agent to mark
   finished tasks done.
 - A completion reminder fires on `agent_before_settle` when the agent stops
   with open tasks and is not waiting on an answer. It appends a hidden message
@@ -71,7 +85,7 @@ Install it once per checkout:
 
 ```sh
 bun install         # pi-schema
-bun run test        # links pi, then 127 tests
+bun run test        # links pi, then runs the suite
 bun run typecheck
 ```
 

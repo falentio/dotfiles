@@ -4,7 +4,7 @@
  * Ported from Oh My Pi's `packages/coding-agent/src/prompts/tools/todo.md`,
  * `src/prompts/system/eager-todo.md`, and
  * `src/prompts/system/mid-run-todo-nudge.md` (Handlebars templates flattened
- * to plain template functions — the extension cannot rely on omp's prompt
+ * to plain template functions; the extension cannot rely on omp's prompt
  * renderer).
  */
 
@@ -23,22 +23,13 @@ export function renderEagerTodoPrompt(context: EagerTodoContext): string {
 	if (forced) {
 		return (
 			`<system-reminder>\n` +
-			`Before substantive work, create a phased todo.\n\n` +
-			`You MUST call \`${toolRef}\` first in this turn.\n` +
-			`You MUST initialize the todo list with a single \`init\` op.\n` +
-			`You MUST cover the entire request from investigation through implementation and verification — not just the next immediate step.\n` +
-			`Task descriptions MUST be concise, specific 5-10 word labels.\n` +
-			`The \`init\` op only accepts phase names and task-label strings; do not invent task metadata fields.\n\n` +
-			`After \`${toolRef}\` succeeds, continue the request in the same turn.\n` +
-			`NEVER call \`${toolRef}\` again unless task state has materially changed.\n` +
+			`Before other work, lay out the plan with one \`${toolRef}\` init call: phases covering the whole request, investigation through verification, one 5-10 word task per item. Then continue the request in the same turn.\n` +
 			`</system-reminder>`
 		);
 	}
 	return (
 		`<system-reminder>\n` +
-		`Consider calling \`${toolRef}\` first to lay out a phased plan with a single \`init\` op. A good list covers the whole request — investigation through implementation and verification — not just the next step, with specific task descriptions a future turn could execute without re-planning.\n` +
-		`A useful list keeps each task to a concise, specific 5-10 word label; the \`init\` op only accepts phase names and task-label strings, so don't invent extra task metadata fields.\n` +
-		`If you create the list, continue the request in the same turn and avoid re-calling \`${toolRef}\` unless task state materially changes.\n` +
+		`For a request with several steps, lay out the plan first with one \`${toolRef}\` init call: phases and one 5-10 word task per item, detailed enough that a later turn can execute each task without re-planning. Then continue the request in the same turn.\n` +
 		`</system-reminder>`
 	);
 }
@@ -51,53 +42,33 @@ export interface MidRunNudgeContext {
 
 /** Hidden mid-run nudge injected after many mutating tool results. */
 export function renderMidRunNudgePrompt(context: MidRunNudgeContext): string {
-	const { toolRef, incompleteCount } = context;
+	const { incompleteCount } = context;
 	const plural = incompleteCount !== 1;
 	return (
 		`<system-reminder>\n` +
-		`${incompleteCount} todo item${plural ? "s" : ""} still open. If you finished a task since last \`${toolRef}\` update, mark it done now so progress stays visible; otherwise keep working.\n` +
+		`${incompleteCount} task${plural ? "s" : ""} still open. If one just landed, write <!-- todo: done "exact task" --> in your reply.\n` +
 		`</system-reminder>`
 	);
 }
 
 function renderOperationTable(): string {
-	const rows = TODO_OP_ROWS.map(
-		(row) => `|\`${row.op}\`|${row.fields}|${row.effect}|`,
-	);
-	return ["|\`op\`|Fields|Effect|", "|---|---|---|", ...rows].join("\n");
+	const rows = TODO_OP_ROWS.map((row) => `|\`${row.op}\`|${row.effect}|`);
+	return [`|\`op\`|Effect|`, "|---|---|", ...rows].join("\n");
 }
 
 /** The todo tool's description (what the model sees in the tools section). */
-export const TODO_TOOL_DESCRIPTION = `**Tasks: verbatim content strings, NEVER auto-generated IDs; no "task-1"/"task-N". Pass content in \`task\`.**
-
-Auto-promote only fires when NOTHING is in progress: an existing in-progress task keeps its place; completing any task with none in progress promotes the earliest still-open task (phase order) to \`in_progress\`. Out-of-order completion may move the pointer back to an earlier phase—expected; completed tasks NEVER revert.
+export const TODO_TOOL_DESCRIPTION = `Track a phased plan. Tasks are addressed by their exact text: pass it in \`task\`. That label is the handle for \`done\`, \`drop\`, \`block\`, and \`update\`.
 
 ## Operations
 
 ${renderOperationTable()}
 
-## Anatomy
-
-- Task content: 5–10 words; what, not how; unique identifier.
-- Phase name: short noun phrase (e.g. \`Foundation\`, \`Auth\`, \`Verification\`); unique identifier. NEVER prefix \`1.\`, \`A)\`, \`Phase 1:\`.
-
 ## Rules
 
-- Mark tasks done immediately after finishing; complete phases in order.
-- NEVER make a todo call the turn's only tool call. Batch with real work: \`init\` with first reads/edits; each \`done\`/\`start\` with next action. Solo todo turns waste a round trip.
-- Waiting on something you can't act on—a user decision, another agent, external service: \`block\` task (optional \`reason\`); remains tracked but avoids stop reminder. \`unblock\` when actionable. If blocker agent-actionable, \`append\` an unblocking task instead.
-- Keep introduced \`task\`/\`phase\` strings stable.
-- Lost exact task text: \`view\` echoes list; NEVER guess from memory.
+- Mark a task done the moment its check passes. When a turn is ending, do it from the reply: \`<!-- todo: done "exact task" -->\`. No tool call.
+- Revise the plan with \`update\`; \`init\` replaces it.
+- \`done\` promotes the next open task to \`in_progress\`.
 
-## Create a list
+## Create a plan
 
-- Task requires 3+ distinct steps.
-- User explicitly requests one.
-- User provides a set of tasks.
-- New instructions arrive mid-task: capture before proceeding.
-
-<critical>
-User gives multi-step plan—phased todo, numbered/bulleted checklist, or "N bugs/items/tasks":
-- MUST \`init\` every item as its own task before working.
-- Enumerate all; NEVER summarize into fewer tasks, sample "the important ones", drop items, or track the rest from memory.
-</critical>`;
+For 3+ steps, a plan the user gives, or one that arrives mid-task. Phase: short noun phrase. Task: 5-10 words, unique. One task per item.`;

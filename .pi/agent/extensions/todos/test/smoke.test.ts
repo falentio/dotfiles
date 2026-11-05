@@ -23,6 +23,7 @@ describe("todos extension factory", () => {
 			"session_tree",
 			"session_compact",
 			"before_agent_start",
+			"message_end",
 			"tool_result",
 			"context",
 			"agent_end",
@@ -38,7 +39,7 @@ describe("todos extension factory", () => {
 		expect(tool?.label).toBe("Todo");
 		expect(tool?.executionMode).toBe("sequential");
 		expect(tool?.exposure).toBe("model-only");
-		expect(tool?.promptSnippet).toContain("structured todo list");
+		expect(tool?.promptSnippet).toContain("phased plan");
 	});
 
 	it("registers no /todo or /todos-configure command", () => {
@@ -59,6 +60,23 @@ describe("todos extension factory", () => {
 		const args = { list: [{ phase: "Work", items: ["a"] }] };
 		expect(tool.prepareArguments?.(args)).toEqual({ ...args, op: "init" });
 		expect(tool.prepareArguments?.({ task: "x" })).toEqual({ task: "x" });
+	});
+
+	it("prepareArguments normalizes shapes before inferring the op", () => {
+		const { api, tools } = makeRecordingAPI();
+		todosExtension(api);
+		const tool = tools.find((t) => t.name === "todo");
+		if (!tool) throw new Error("todo tool missing");
+		expect(tool.prepareArguments?.({ list: ["a"] })).toEqual({
+			items: ["a"],
+			op: "init",
+		});
+		expect(
+			tool.prepareArguments?.({ op: "complete", list: { Build: ["a"] } }),
+		).toEqual({
+			list: [{ phase: "Build", items: ["a"] }],
+			op: "init",
+		});
 	});
 
 	it("the todo tool executes against branch-synced state", async () => {
@@ -212,7 +230,7 @@ describe("todos extension factory", () => {
 		)?.message;
 		expect(message?.customType).toBe("eager-todo-prelude");
 		expect(message?.display).toBe(false);
-		expect(message?.content).toContain("Consider calling `todo` first");
+		expect(message?.content).toContain("lay out the plan first");
 		expect(message?.content).not.toContain("MUST");
 	});
 
@@ -605,7 +623,7 @@ describe("todos extension factory", () => {
 			ctx,
 		);
 
-		for (let i = 0; i < 12; i++) {
+		for (let i = 0; i < 20; i++) {
 			await dispatch(
 				handlers,
 				"tool_result",
@@ -615,5 +633,290 @@ describe("todos extension factory", () => {
 		}
 		expect(sent).toHaveLength(1);
 		expect(sent[0]?.customType).toBe("mid-run-todo-nudge");
+	});
+
+	it("applies a reply marker and writes the same snapshot as a tool call", async () => {
+		const { api, handlers, tools, entries } = makeRecordingAPI();
+		todosExtension(api);
+		const ctx = makeContext(
+			{ cwd: "/tmp/project" },
+			{
+				getBranch: () => [],
+				getCwd: () => "/tmp/project",
+				getSessionFile: () => "/tmp/project/session.jsonl",
+			},
+		);
+		await dispatch(
+			handlers,
+			"session_start",
+			{ type: "session_start", reason: "startup" },
+			ctx,
+		);
+		const tool = tools.find((t) => t.name === "todo");
+		if (!tool) throw new Error("todo tool missing");
+		await tool.execute!(
+			"init",
+			{ op: "init", items: ["Wire workspace"] },
+			undefined,
+			undefined,
+			ctx as ExtensionToolContext,
+		);
+
+		const [result] = (await dispatch(
+			handlers,
+			"message_end",
+			{
+				type: "message_end",
+				message: {
+					role: "assistant",
+					content: [
+						{
+							type: "text",
+							text: 'Wired it.\n<!-- todo: done "Wire workspace" -->',
+						},
+						{
+							type: "toolCall",
+							id: "call-1",
+							name: "bash",
+							arguments: { command: "ls" },
+						},
+					],
+				},
+			},
+			ctx,
+		)) as [{ message: { content: unknown[] } }];
+
+		expect(result?.message.content).toEqual([
+			{ type: "text", text: "Wired it." },
+			{
+				type: "toolCall",
+				id: "call-1",
+				name: "bash",
+				arguments: { command: "ls" },
+			},
+		]);
+		expect(entries).toHaveLength(2);
+		expect(entries[1]?.customType).toBe(TODO_SNAPSHOT_CUSTOM_TYPE);
+		expect(entries[1]?.data).toEqual({
+			v: 1,
+			phases: [
+				{
+					name: "Tasks",
+					tasks: [{ content: "Wire workspace", status: "completed" }],
+				},
+			],
+		});
+	});
+
+	it("keeps a forced full list when a marker lands before the next call", async () => {
+		const { api, handlers, tools, entries } = makeRecordingAPI();
+		todosExtension(api);
+		const ctx = makeContext(
+			{ cwd: "/tmp/project" },
+			{
+				getBranch: () => entries as never,
+				getCwd: () => "/tmp/project",
+				getSessionFile: () => "/tmp/project/session.jsonl",
+			},
+		);
+		await dispatch(
+			handlers,
+			"session_start",
+			{ type: "session_start", reason: "startup" },
+			ctx,
+		);
+		const tool = tools.find((t) => t.name === "todo");
+		if (!tool) throw new Error("todo tool missing");
+		await tool.execute!(
+			"init",
+			{ op: "init", items: ["One", "Two"] },
+			undefined,
+			undefined,
+			ctx as ExtensionToolContext,
+		);
+		await dispatch(
+			handlers,
+			"session_compact",
+			{ type: "session_compact" },
+			ctx,
+		);
+		await dispatch(
+			handlers,
+			"message_end",
+			{
+				type: "message_end",
+				message: {
+					role: "assistant",
+					content: [{ type: "text", text: '<!-- todo: done "One" -->' }],
+				},
+			},
+			ctx,
+		);
+		const result = await tool.execute!(
+			"done",
+			{ op: "done", task: "Two" },
+			undefined,
+			undefined,
+			ctx as ExtensionToolContext,
+		);
+		const text = result.content
+			.map((part) => (part.type === "text" ? part.text : ""))
+			.join("");
+		expect(text).toContain("Tasks:");
+	});
+
+	it("leaves a marker-free assistant message and a user message alone", async () => {
+		const { api, handlers } = makeRecordingAPI();
+		todosExtension(api);
+		const ctx = makeContext({ cwd: "/tmp/project" });
+		expect(
+			await dispatch(
+				handlers,
+				"message_end",
+				{
+					type: "message_end",
+					message: {
+						role: "assistant",
+						content: [{ type: "text", text: "no markers here" }],
+					},
+				},
+				ctx,
+			),
+		).toEqual([undefined]);
+		expect(
+			await dispatch(
+				handlers,
+				"message_end",
+				{
+					type: "message_end",
+					message: { role: "user", content: '<!-- todo: done "x" -->' },
+				},
+				ctx,
+			),
+		).toEqual([undefined]);
+	});
+
+	it("reports a marker whose op is not done", async () => {
+		const notes: string[] = [];
+		const { api, handlers } = makeRecordingAPI();
+		api.sendMessage = (message: { content: unknown }) => {
+			notes.push(String(message.content));
+		};
+		todosExtension(api);
+		const ctx = makeContext({ cwd: "/tmp/project" });
+		await dispatch(
+			handlers,
+			"message_end",
+			{
+				type: "message_end",
+				message: {
+					role: "assistant",
+					content: [{ type: "text", text: '<!-- todo: rm "x" -->' }],
+				},
+			},
+			ctx,
+		);
+		expect(notes).toEqual(['Todo marker skipped: only "done" applies.']);
+	});
+
+	it("reports an unmatched marker as a steered note", async () => {
+		const notes: string[] = [];
+		const { api, handlers, tools } = makeRecordingAPI();
+		api.sendMessage = (message: { content: unknown }) => {
+			notes.push(String(message.content));
+		};
+		todosExtension(api);
+		const ctx = makeContext(
+			{ cwd: "/tmp/project" },
+			{
+				getBranch: () => [],
+				getCwd: () => "/tmp/project",
+				getSessionFile: () => "/tmp/project/session.jsonl",
+			},
+		);
+		await dispatch(
+			handlers,
+			"session_start",
+			{ type: "session_start", reason: "startup" },
+			ctx,
+		);
+		const tool = tools.find((t) => t.name === "todo");
+		if (!tool) throw new Error("todo tool missing");
+		await tool.execute!(
+			"init",
+			{ op: "init", items: ["Wire workspace"] },
+			undefined,
+			undefined,
+			ctx as ExtensionToolContext,
+		);
+
+		const [marked] = (await dispatch(
+			handlers,
+			"message_end",
+			{
+				type: "message_end",
+				message: {
+					role: "assistant",
+					content: [
+						{ type: "text", text: 'Hunted it.\n<!-- todo: done "ghost" -->' },
+					],
+				},
+			},
+			ctx,
+		)) as [{ message: { content: Array<{ text?: string }> } }];
+		expect(marked?.message.content[0]?.text).toBe("Hunted it.");
+		expect(notes).toEqual(['Todo marker skipped: task "ghost" not found.']);
+	});
+
+	it("a compaction makes the next status op return the full list", async () => {
+		const { api, handlers, tools } = makeRecordingAPI();
+		todosExtension(api);
+		const phases = [
+			{
+				name: "Work",
+				tasks: [
+					{ content: "a", status: "in_progress" },
+					{ content: "b", status: "pending" },
+					{ content: "c", status: "pending" },
+				],
+			},
+		];
+		const ctx = makeContext(
+			{ cwd: "/tmp/project" },
+			{
+				getBranch: () => branchWithTodo(phases) as never,
+				getCwd: () => "/tmp/project",
+				getSessionFile: () => "/tmp/project/session.jsonl",
+			},
+		);
+		await dispatch(
+			handlers,
+			"session_start",
+			{ type: "session_start", reason: "startup" },
+			ctx,
+		);
+		await dispatch(handlers, "session_compact", { type: "session_compact" }, ctx);
+
+		const tool = tools.find((t) => t.name === "todo");
+		if (!tool) throw new Error("todo tool missing");
+		const run = async (id: string, params: Parameters<typeof tool.execute>[1]) => {
+			const result = await tool.execute!(
+				id,
+				params,
+				undefined,
+				undefined,
+				ctx as ExtensionToolContext,
+			);
+			return result.content.find((part) => part.type === "text")?.text ?? "";
+		};
+
+		const afterCompact = await run("done", { op: "done", task: "a" });
+		expect(afterCompact).toContain('Marked done: "a"');
+		expect(afterCompact).toContain("  Work:");
+		expect(afterCompact).not.toContain("Next:");
+
+		const afterFullList = await run("start", { op: "start", task: "c" });
+		expect(afterFullList).toContain('Started: "c"');
+		expect(afterFullList).not.toContain("  Work:");
 	});
 });

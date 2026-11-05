@@ -23,8 +23,8 @@ import { getLatestTodoPhasesFromEntries } from "./persistence.ts";
 import { clonePhases, pruneEmptyPhases } from "./state.ts";
 import { TODO_TOOL_NAME, type TodoItem, type TodoPhase } from "./types.ts";
 
-const MID_RUN_NUDGE_MUTATION_THRESHOLD = 12;
-const MID_RUN_NUDGE_MAX_PER_CYCLE = 2;
+const MID_RUN_NUDGE_MUTATION_THRESHOLD = 20;
+const MID_RUN_NUDGE_MAX_PER_CYCLE = 1;
 // omp's `eval` is pi's `codemode`; the other names match pi's built-in tools.
 const MUTATING_TOOLS: Record<string, true> = {
 	bash: true,
@@ -143,6 +143,7 @@ export class TodoTracker {
 	#reminderAwaitingProgress = false;
 	#mutationsSinceLastTouch = 0;
 	#midRunNudgeCount = 0;
+	#lastReminderFingerprint: string | undefined;
 
 	constructor(host: TodoTrackerHost) {
 		this.#host = host;
@@ -276,6 +277,7 @@ export class TodoTracker {
 		if (phases.length === 0) {
 			this.#reminderCount = 0;
 			this.#reminderAwaitingProgress = false;
+			this.#lastReminderFingerprint = undefined;
 			return null;
 		}
 		const incompleteByPhase = phases
@@ -293,8 +295,20 @@ export class TodoTracker {
 		if (incomplete.length === 0) {
 			this.#reminderCount = 0;
 			this.#reminderAwaitingProgress = false;
+			this.#lastReminderFingerprint = undefined;
 			return null;
 		}
+		const fingerprint = incompleteByPhase
+			.map((phase) =>
+				phase.tasks
+					.map(
+						(task) =>
+							`${phase.name}\u0000${task.content}\u0000${task.status}`,
+					)
+					.join("\n"),
+			)
+			.join("\n");
+		if (fingerprint === this.#lastReminderFingerprint) return null;
 		// Never nag after an interrupted or failed run: the user pressed Esc
 		// (or the model errored), treating it as a signal to stop, not as an
 		// invitation for the extension to re-enter the loop on its own.
@@ -315,11 +329,11 @@ export class TodoTracker {
 			.join("\n");
 		this.#mutationsSinceLastTouch = 0;
 		this.#reminderAwaitingProgress = true;
+		this.#lastReminderFingerprint = fingerprint;
 		return (
 			`<system-reminder>\n` +
-			`You stopped with ${incomplete.length} incomplete todo item(s):\n${todoList}\n\n` +
-			`Please continue working on these tasks or mark them complete if finished.\n` +
-			`(Reminder ${this.#reminderCount}/${settings.remindersMax})\n` +
+			`${incomplete.length} task${incomplete.length === 1 ? "" : "s"} still open:\n${todoList}\n\n` +
+			`If one landed, mark it done from the reply: <!-- todo: done "exact task" -->. Otherwise continue the work.\n` +
 			`</system-reminder>`
 		);
 	}

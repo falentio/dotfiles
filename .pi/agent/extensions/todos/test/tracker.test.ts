@@ -79,7 +79,7 @@ describe("createEagerTodoPrelude", () => {
 		);
 		expect(prelude?.customType).toBe(EAGER_TODO_PRELUDE_CUSTOM_TYPE);
 		expect(prelude?.display).toBe(false);
-		expect(prelude?.content).toContain("Consider calling `todo` first");
+		expect(prelude?.content).toContain("lay out the plan first");
 		expect(prelude?.content).not.toContain("MUST");
 	});
 
@@ -89,7 +89,7 @@ describe("createEagerTodoPrelude", () => {
 			"Build the feature",
 			makeContext(),
 		);
-		expect(prelude?.content).toContain("MUST call `todo` first");
+		expect(prelude?.content).toContain("Before other work, lay out the plan");
 	});
 
 	it("skips when todos already exist", () => {
@@ -145,51 +145,54 @@ describe("takeMidRunNudge", () => {
 		const { tracker } = makeTracker({
 			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
 		});
-		for (let i = 0; i < 11; i++) tracker.onToolResult("edit", false);
+		for (let i = 0; i < 19; i++) tracker.onToolResult("edit", false);
 		expect(tracker.takeMidRunNudge(makeContext())).toBeNull();
-	});
-
-	it("fires after 12 mutating tool results and counts toward the cycle budget", () => {
-		const { tracker } = makeTracker({
-			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
-		});
-		for (let i = 0; i < 12; i++) tracker.onToolResult("edit", false);
-		const nudge = tracker.takeMidRunNudge(makeContext());
-		expect(nudge?.customType).toBe(MID_RUN_NUDGE_MESSAGE_TYPE);
-		expect(nudge?.content).toContain("1 todo item still open");
-		expect(tracker.takeMidRunNudge(makeContext())).toBeNull();
-		for (let i = 0; i < 12; i++) tracker.onToolResult("write", false);
+		tracker.onToolResult("edit", false);
 		expect(tracker.takeMidRunNudge(makeContext())).not.toBeNull();
 	});
 
-	it("caps at 2 nudges per cycle", () => {
+	it("fires once after 20 mutating tool results", () => {
 		const { tracker } = makeTracker({
 			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
 		});
-		for (let i = 0; i < 36; i++) tracker.onToolResult("edit", false);
+		for (let i = 0; i < 20; i++) tracker.onToolResult("edit", false);
+		const nudge = tracker.takeMidRunNudge(makeContext());
+		expect(nudge?.customType).toBe(MID_RUN_NUDGE_MESSAGE_TYPE);
+		expect(nudge?.content).toContain("1 task still open");
+		for (let i = 0; i < 20; i++) tracker.onToolResult("write", false);
+		expect(tracker.takeMidRunNudge(makeContext())).toBeNull();
+	});
+
+	it("caps at one nudge per cycle", () => {
+		const { tracker } = makeTracker({
+			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
+		});
+		for (let i = 0; i < 60; i++) tracker.onToolResult("edit", false);
 		expect(tracker.takeMidRunNudge(makeContext())).not.toBeNull();
 		expect(tracker.takeMidRunNudge(makeContext())).toBeNull();
 		tracker.resetCycle();
 		expect(tracker.takeMidRunNudge(makeContext())).toBeNull();
+		for (let i = 0; i < 20; i++) tracker.onToolResult("edit", false);
+		expect(tracker.takeMidRunNudge(makeContext())).not.toBeNull();
 	});
 
 	it("does not fire without incomplete todos, when disabled, or without the tool", () => {
 		const none = makeTracker({});
-		for (let i = 0; i < 12; i++) none.tracker.onToolResult("edit", false);
+		for (let i = 0; i < 20; i++) none.tracker.onToolResult("edit", false);
 		expect(none.tracker.takeMidRunNudge(makeContext())).toBeNull();
 
 		const disabled = makeTracker({
 			config: { enabled: false },
 			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
 		});
-		for (let i = 0; i < 12; i++) disabled.tracker.onToolResult("edit", false);
+		for (let i = 0; i < 20; i++) disabled.tracker.onToolResult("edit", false);
 		expect(disabled.tracker.takeMidRunNudge(makeContext())).toBeNull();
 
 		const noTool = makeTracker({
 			activeTools: ["bash"],
 			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
 		});
-		for (let i = 0; i < 12; i++) noTool.tracker.onToolResult("edit", false);
+		for (let i = 0; i < 20; i++) noTool.tracker.onToolResult("edit", false);
 		expect(noTool.tracker.takeMidRunNudge(makeContext())).toBeNull();
 	});
 
@@ -197,7 +200,7 @@ describe("takeMidRunNudge", () => {
 		const { tracker } = makeTracker({
 			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
 		});
-		for (let i = 0; i < 12; i++) tracker.onToolResult("edit", false);
+		for (let i = 0; i < 20; i++) tracker.onToolResult("edit", false);
 		tracker.onToolResult("todo", false);
 		expect(tracker.takeMidRunNudge(makeContext())).toBeNull();
 	});
@@ -206,7 +209,7 @@ describe("takeMidRunNudge", () => {
 		const { tracker } = makeTracker({
 			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
 		});
-		for (let i = 0; i < 12; i++) tracker.onToolResult("edit", true);
+		for (let i = 0; i < 20; i++) tracker.onToolResult("edit", true);
 		expect(tracker.takeMidRunNudge(makeContext())).toBeNull();
 	});
 
@@ -214,7 +217,7 @@ describe("takeMidRunNudge", () => {
 		const { tracker } = makeTracker({
 			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
 		});
-		for (let i = 0; i < 12; i++) tracker.onToolResult("codemode", false);
+		for (let i = 0; i < 20; i++) tracker.onToolResult("codemode", false);
 		expect(tracker.takeMidRunNudge(makeContext())).not.toBeNull();
 	});
 });
@@ -233,7 +236,7 @@ describe("checkCompletion", () => {
 		expect(reminder).toBeNull();
 	});
 
-	it("returns the reminder with the incomplete list and re-arms the budget", async () => {
+	it("returns the reminder with the incomplete list", async () => {
 		const { tracker } = makeTracker({
 			phases: [
 				{
@@ -250,16 +253,16 @@ describe("checkCompletion", () => {
 			makeContext(),
 			assistantMessage("I stopped here."),
 		);
-		expect(reminder).toContain("2 incomplete todo item(s)");
+		expect(reminder).toContain("2 tasks still open");
 		expect(reminder).toContain("- Work");
 		expect(reminder).toContain("  - a");
 		expect(reminder).toContain("  - b");
 		expect(reminder).not.toContain("  - c");
-		expect(reminder).toContain("(Reminder 1/3)");
+		expect(reminder).toContain('<!-- todo: done "exact task" -->');
 	});
 
-	it("stays silent after a reminder until progress is made", async () => {
-		const { tracker } = makeTracker({
+	it("stays silent after a reminder until the open set changes", async () => {
+		const { tracker, setHostPhases } = makeTracker({
 			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
 		});
 		expect(
@@ -275,6 +278,15 @@ describe("checkCompletion", () => {
 			),
 		).toBeNull();
 		tracker.onToolResult("edit", false);
+		expect(
+			await tracker.checkCompletion(
+				makeContext(),
+				assistantMessage("Stopped again."),
+			),
+		).toBeNull();
+		setHostPhases([
+			{ name: "Work", tasks: [{ content: "a", status: "in_progress" }] },
+		]);
 		expect(
 			await tracker.checkCompletion(
 				makeContext(),
@@ -303,17 +315,21 @@ describe("checkCompletion", () => {
 	});
 
 	it("respects remindersMax", async () => {
-		const { tracker } = makeTracker({
+		const { tracker, setHostPhases } = makeTracker({
 			config: { remindersMax: 2 },
 			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
 		});
+		const setStatus = (status: "pending" | "in_progress") =>
+			setHostPhases([{ name: "Work", tasks: [{ content: "a", status }] }]);
 		expect(
 			await tracker.checkCompletion(makeContext(), assistantMessage("Stop 1.")),
 		).not.toBeNull();
+		setStatus("in_progress");
 		tracker.onToolResult("edit", false);
 		expect(
 			await tracker.checkCompletion(makeContext(), assistantMessage("Stop 2.")),
 		).not.toBeNull();
+		setStatus("pending");
 		tracker.onToolResult("edit", false);
 		expect(
 			await tracker.checkCompletion(makeContext(), assistantMessage("Stop 3.")),
@@ -340,6 +356,79 @@ describe("checkCompletion", () => {
 			assistantMessage("Stopped."),
 		);
 		expect(reminder).toBeNull();
+	});
+
+	it("does not repeat a reminder for an unchanged open set", async () => {
+		const { tracker } = makeTracker({
+			config: { remindersMax: 5 },
+			phases: [
+				{
+					name: "Work",
+					tasks: [
+						{ content: "a", status: "pending" },
+						{ content: "b", status: "in_progress" },
+					],
+				},
+			],
+		});
+		expect(
+			await tracker.checkCompletion(makeContext(), assistantMessage("Stop.")),
+		).not.toBeNull();
+		tracker.resetCycle();
+		tracker.onToolResult("edit", false);
+		expect(
+			await tracker.checkCompletion(
+				makeContext(),
+				assistantMessage("Stop again."),
+			),
+		).toBeNull();
+	});
+
+	it("re-arms a reminder when a task status changes", async () => {
+		const { tracker, setHostPhases } = makeTracker({
+			config: { remindersMax: 5 },
+			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
+		});
+		expect(
+			await tracker.checkCompletion(makeContext(), assistantMessage("Stop.")),
+		).not.toBeNull();
+		setHostPhases([
+			{ name: "Work", tasks: [{ content: "a", status: "in_progress" }] },
+		]);
+		tracker.onToolResult("edit", false);
+		expect(
+			await tracker.checkCompletion(
+				makeContext(),
+				assistantMessage("Stop again."),
+			),
+		).not.toBeNull();
+	});
+
+	it("a cleared list clears the stored open set", async () => {
+		const { tracker, setHostPhases } = makeTracker({
+			phases: [{ name: "Work", tasks: [{ content: "a", status: "pending" }] }],
+		});
+		expect(
+			await tracker.checkCompletion(makeContext(), assistantMessage("Stop.")),
+		).not.toBeNull();
+		setHostPhases([]);
+		tracker.onToolResult("edit", false);
+		expect(
+			await tracker.checkCompletion(
+				makeContext(),
+				assistantMessage("Stop again."),
+			),
+		).toBeNull();
+		setHostPhases([
+			{ name: "Work", tasks: [{ content: "a", status: "pending" }] },
+		]);
+		tracker.onToolResult("edit", false);
+		expect(
+			await tracker.checkCompletion(
+				makeContext(),
+				assistantMessage("Stop again."),
+			),
+		).not.toBeNull();
 	});
 
 	it("reads live host state, so reminders track external mutations", async () => {
@@ -431,7 +520,7 @@ describe("checkCompletion", () => {
 			makeContext(),
 			assistantMessage("Done for now."),
 		);
-		expect(reminder).toContain("incomplete todo item(s)");
+		expect(reminder).toContain("still open");
 	});
 });
 
