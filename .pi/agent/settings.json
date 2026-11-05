@@ -8,12 +8,5 @@
   "codemode": {
     "mode": "only"
   },
-  "retry": {
-    "provider": {
-      "timeoutMs": 20000,
-      "maxRetries": 3,
-      "maxRetryDelayMs": 120000
-    }
-  },
   "theme": "dark"
 }
