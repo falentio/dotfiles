@@ -708,6 +708,63 @@ describe("todos extension factory", () => {
 		});
 	});
 
+	it("keeps a forced full list when a marker lands before the next call", async () => {
+		const { api, handlers, tools, entries } = makeRecordingAPI();
+		todosExtension(api);
+		const ctx = makeContext(
+			{ cwd: "/tmp/project" },
+			{
+				getBranch: () => entries as never,
+				getCwd: () => "/tmp/project",
+				getSessionFile: () => "/tmp/project/session.jsonl",
+			},
+		);
+		await dispatch(
+			handlers,
+			"session_start",
+			{ type: "session_start", reason: "startup" },
+			ctx,
+		);
+		const tool = tools.find((t) => t.name === "todo");
+		if (!tool) throw new Error("todo tool missing");
+		await tool.execute!(
+			"init",
+			{ op: "init", items: ["One", "Two"] },
+			undefined,
+			undefined,
+			ctx as ExtensionToolContext,
+		);
+		await dispatch(
+			handlers,
+			"session_compact",
+			{ type: "session_compact" },
+			ctx,
+		);
+		await dispatch(
+			handlers,
+			"message_end",
+			{
+				type: "message_end",
+				message: {
+					role: "assistant",
+					content: [{ type: "text", text: '<!-- todo: done "One" -->' }],
+				},
+			},
+			ctx,
+		);
+		const result = await tool.execute!(
+			"done",
+			{ op: "done", task: "Two" },
+			undefined,
+			undefined,
+			ctx as ExtensionToolContext,
+		);
+		const text = result.content
+			.map((part) => (part.type === "text" ? part.text : ""))
+			.join("");
+		expect(text).toContain("Tasks:");
+	});
+
 	it("leaves a marker-free assistant message and a user message alone", async () => {
 		const { api, handlers } = makeRecordingAPI();
 		todosExtension(api);

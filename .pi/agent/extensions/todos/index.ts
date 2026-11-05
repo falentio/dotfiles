@@ -105,7 +105,6 @@ export default function todosExtension(pi: ExtensionAPI): void {
 			hasSessionFile: Boolean(ctx.sessionManager.getSessionFile()),
 			forceFullList,
 		});
-		forceFullList = false;
 		if (!outcome.failed && !outcome.readOnly) {
 			setPhases(outcome.phases);
 			// appendEntry still records in memory without a session file; only
@@ -164,6 +163,7 @@ export default function todosExtension(pi: ExtensionAPI): void {
 			ctx: ExtensionToolContext,
 		): Promise<AgentToolResult<TodoToolDetails>> {
 			const outcome = applyMutation(params, ctx);
+			forceFullList = false;
 			// pi signals tool errors by throwing; the model receives the message
 			// text (omp's formatSummary output, errors + full current list).
 			if (outcome.failed) throw new Error(outcome.summary);
@@ -227,6 +227,9 @@ export default function todosExtension(pi: ExtensionAPI): void {
 					`Todo marker skipped: task "${content}" not found.`,
 				);
 			}
+		}
+		if (extraction.unknown.length > 0) {
+			skippedMarkers.push('Todo marker skipped: only "done" applies.');
 		}
 		// One stripped block stands in for every text block: the markers were
 		// parsed across the concatenation, so per-block text cannot be recovered.
