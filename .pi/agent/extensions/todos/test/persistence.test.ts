@@ -196,6 +196,41 @@ describe("getLatestTodoPhasesFromEntries", () => {
 		expect(getLatestTodoPhasesFromEntries(entries)).toBeUndefined();
 	});
 
+	it("reads a versioned snapshot", () => {
+		const entries = [
+			customEntry(TODO_SNAPSHOT_CUSTOM_TYPE, { v: 1, phases: phasesB }),
+		];
+		expect(getLatestTodoPhasesFromEntries(entries)).toEqual(phasesB);
+	});
+
+	it("reads a snapshot written before versions (no v)", () => {
+		const entries = [customEntry(TODO_SNAPSHOT_CUSTOM_TYPE, { phases: phasesB })];
+		expect(getLatestTodoPhasesFromEntries(entries)).toEqual(phasesB);
+	});
+
+	it("stops at a snapshot from a newer version instead of scanning older records", () => {
+		const entries = [
+			customEntry(TODO_SNAPSHOT_CUSTOM_TYPE, { v: 1, phases: phasesA }),
+			customEntry(TODO_SNAPSHOT_CUSTOM_TYPE, { v: 2, phases: phasesC }),
+		];
+		expect(getLatestTodoPhasesFromEntries(entries)).toBeUndefined();
+	});
+
+	it("round-trips task fields the todo types do not model", () => {
+		const phases = [
+			{
+				name: "Work",
+				tasks: [
+					{ content: "a", status: "pending" as const, owner: "someone" },
+				],
+			},
+		];
+		const entries = [
+			customEntry(TODO_SNAPSHOT_CUSTOM_TYPE, { v: 1, phases }),
+		];
+		expect(getLatestTodoPhasesFromEntries(entries)).toEqual(phases);
+	});
+
 	it("honors a valid empty phases array as a cleared list ([] !== undefined)", () => {
 		const entries = [
 			messageEntry("toolResult", "todo", { phases: phasesA }),

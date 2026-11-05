@@ -12,30 +12,23 @@ import {
 	type Schema,
 	type Static,
 } from "@earendil-works/pi-schema";
+import { TODO_OPERATIONS, type TodoOperation } from "./operations.ts";
+
+export const TODO_TOOL_NAME = "todo";
 
 const stringEnum = <const V extends readonly string[]>(
 	values: V,
 	options?: Annotations<V[number]>,
 ): Schema<V[number]> => ({ type: "string", ...oneOf(values, options) });
 
-export type TodoStatus =
-	| "pending"
-	| "in_progress"
-	| "completed"
-	| "abandoned"
-	| "blocked";
-/** Operation names accepted by the todo tool and echoed in successful result details. */
-export type TodoOperation =
-	| "init"
-	| "start"
-	| "done"
-	| "rm"
-	| "drop"
-	| "block"
-	| "unblock"
-	| "append"
-	| "view";
-
+export const TODO_STATUSES = [
+	"pending",
+	"in_progress",
+	"completed",
+	"abandoned",
+	"blocked",
+] as const;
+export type TodoStatus = (typeof TODO_STATUSES)[number];
 export interface TodoItem {
 	content: string;
 	status: TodoStatus;
@@ -53,28 +46,17 @@ export interface TodoCompletionTransition {
 	content: string;
 }
 
+/** No `phases` copy: a second durable copy can disagree with the snapshot after a rewind. */
 export interface TodoToolDetails {
 	/** Operation that produced this snapshot; absent on legacy transcript entries. */
 	op?: TodoOperation;
-	phases: TodoPhase[];
 	storage: "session" | "memory";
 	completedTasks?: TodoCompletionTransition[];
 }
 
-const TodoOp = stringEnum(
-	[
-		"init",
-		"start",
-		"done",
-		"rm",
-		"drop",
-		"block",
-		"unblock",
-		"append",
-		"view",
-	],
-	{ description: "operation to apply" },
-);
+const TodoOp = stringEnum(TODO_OPERATIONS, {
+	description: "operation to apply",
+});
 
 const InitListEntry = obj(
 	{

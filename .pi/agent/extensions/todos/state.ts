@@ -6,11 +6,12 @@
  */
 
 import { compile } from "@earendil-works/pi-schema";
+import type { TodoOperation } from "./operations.ts";
 import {
+	TODO_STATUSES,
 	todoSchema,
 	type TodoCompletionTransition,
 	type TodoItem,
-	type TodoOperation,
 	type TodoParams,
 	type TodoPhase,
 } from "./types.ts";
@@ -36,9 +37,12 @@ function findPhaseByName(
 }
 
 export function cloneTask(task: TodoItem): TodoItem {
-	return task.blocker !== undefined
-		? { content: task.content, status: task.status, blocker: task.blocker }
-		: { content: task.content, status: task.status };
+	return { ...task };
+}
+
+/** Drop phases with no tasks, so an emptied list holds no phases at all. */
+export function pruneEmptyPhases(phases: TodoPhase[]): TodoPhase[] {
+	return phases.filter((phase) => phase.tasks.length > 0);
 }
 
 export function clonePhases(phases: TodoPhase[]): TodoPhase[] {
@@ -112,14 +116,7 @@ export function isTodoPhase(value: unknown): value is TodoPhase {
 		if (typeof task !== "object" || task === null) return false;
 		const candidate = task as Record<string, unknown>;
 		if (typeof candidate.content !== "string") return false;
-		if (
-			candidate.status !== "pending" &&
-			candidate.status !== "in_progress" &&
-			candidate.status !== "completed" &&
-			candidate.status !== "abandoned" &&
-			candidate.status !== "blocked"
-		)
-			return false;
+		if (!TODO_STATUSES.some((status) => status === candidate.status)) return false;
 		return (
 			candidate.blocker === undefined ||
 			typeof candidate.blocker === "string"
@@ -382,7 +379,7 @@ function applyEntry(
 			for (const task of getTaskTargets(phases, entry, errors)) {
 				if (task.status === "blocked") {
 					task.status = "pending";
-					task.blocker = undefined;
+					delete task.blocker;
 				}
 			}
 			return phases;
@@ -451,7 +448,7 @@ export function applyParams(
 	params: TodoParams,
 ): { phases: TodoPhase[]; errors: string[] } {
 	const errors: string[] = [];
-	const next = applyEntry(phases, params, errors);
+	const next = pruneEmptyPhases(applyEntry(phases, params, errors));
 	normalizeInProgressTask(next);
 	return { phases: next, errors };
 }

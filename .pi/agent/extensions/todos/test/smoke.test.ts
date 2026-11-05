@@ -1,6 +1,5 @@
 import { describe, expect, it } from "bun:test";
 import type {
-	ExtensionAPI,
 	ExtensionContext,
 	ExtensionToolContext,
 } from "@earendil-works/pi-coding-agent";
@@ -63,7 +62,7 @@ describe("todos extension factory", () => {
 	});
 
 	it("the todo tool executes against branch-synced state", async () => {
-		const { api, handlers, tools } = makeRecordingAPI();
+		const { api, handlers, tools, entries } = makeRecordingAPI();
 		todosExtension(api);
 
 		const phases = [
@@ -91,7 +90,7 @@ describe("todos extension factory", () => {
 
 		const result = await tool.execute!(
 			"call-1",
-			{ op: "view" },
+			{ op: "start", task: "from branch" },
 			undefined,
 			undefined,
 			ctx as ExtensionToolContext,
@@ -99,7 +98,86 @@ describe("todos extension factory", () => {
 		const text =
 			result.content.find((part) => part.type === "text")?.text ?? "";
 		expect(text).toContain("from branch");
-		expect((result.details as { phases: unknown }).phases).toEqual(phases);
+		expect((result.details as Record<string, unknown>).phases).toBeUndefined();
+		expect(entries).toEqual([
+			{
+				type: "custom",
+				customType: TODO_SNAPSHOT_CUSTOM_TYPE,
+				data: {
+					v: 1,
+					phases: [
+						{
+							name: "Work",
+							tasks: [{ content: "from branch", status: "in_progress" }],
+						},
+					],
+				},
+			},
+		]);
+	});
+
+	it("drops a phase that a restored session left empty", async () => {
+		const { api, handlers, tools } = makeRecordingAPI();
+		todosExtension(api);
+		const ctx = makeContext(
+			{ cwd: "/tmp/project" },
+			{
+				getBranch: () =>
+					branchWithTodo([
+						{ name: "Husk", tasks: [] },
+						{ name: "Work", tasks: [{ content: "real", status: "pending" }] },
+					]) as never,
+				getCwd: () => "/tmp/project",
+				getSessionFile: () => "/tmp/project/session.jsonl",
+			},
+		);
+		await dispatch(
+			handlers,
+			"session_start",
+			{ type: "session_start", reason: "startup" },
+			ctx,
+		);
+		const tool = tools.find((t) => t.name === "todo");
+		if (!tool) throw new Error("todo tool missing");
+		const result = await tool.execute!(
+			"call-1",
+			{ op: "view" },
+			undefined,
+			undefined,
+			ctx as ExtensionToolContext,
+		);
+		const text =
+			result.content.find((part) => part.type === "text")?.text ?? "";
+		expect(text).not.toContain("Husk");
+		expect(text).toContain("real");
+	});
+
+	it("injects no eager prelude for a run started by a custom message", async () => {
+		const { api, handlers } = makeRecordingAPI();
+		todosExtension(api);
+		const ctx = makeContext({ cwd: "/tmp/project" });
+		await dispatch(
+			handlers,
+			"session_start",
+			{ type: "session_start", reason: "startup" },
+			ctx,
+		);
+		const [result] = await dispatch(
+			handlers,
+			"before_agent_start",
+			{
+				type: "before_agent_start",
+				messageType: "custom",
+				message: {
+					role: "custom",
+					customType: "other-extension",
+					content: "wake up",
+					display: false,
+				},
+			},
+			ctx,
+		);
+		expect(result).toBeUndefined();
 	});
 
 	it("before_agent_start injects the configured eager prelude", async () => {
@@ -124,7 +202,7 @@ describe("todos extension factory", () => {
 		const results = await dispatch(
 			handlers,
 			"before_agent_start",
-			{ type: "before_agent_start", prompt: "Build the feature" },
+			{ type: "before_agent_start", messageType: "user", prompt: "Build the feature" },
 			ctx,
 		);
 		const message = (
@@ -137,14 +215,6 @@ describe("todos extension factory", () => {
 		expect(message?.content).toContain("Consider calling `todo` first");
 		expect(message?.content).not.toContain("MUST");
 	});
-
-	async function makeEntryCapture(api: ExtensionAPI) {
-		const entries: Array<{ customType: string; data: unknown }> = [];
-		api.appendEntry = (customType: string, data?: unknown) => {
-			entries.push({ customType, data });
-		};
-		return entries;
-	}
 
 	async function settleAssistant(
 		handlers: Map<string, AnyHandler[]>,
@@ -169,7 +239,7 @@ describe("todos extension factory", () => {
 		const [result] = await dispatch(
 			handlers,
 			"agent_before_settle",
-			{ type: "agent_before_settle" },
+			{ type: "agent_before_settle", entries: [] },
 			ctx,
 		);
 		return result;
@@ -262,6 +332,65 @@ describe("todos extension factory", () => {
 		expect(result?.entries?.[0]?.display).toBe(false);
 	});
 
+	it("appends the reminder to entries proposed by earlier handlers", async () => {
+		const { api, handlers, tools } = makeRecordingAPI();
+		todosExtension(api);
+		const ctx = makeContext(
+			{ cwd: "/tmp/project" },
+			{
+				getBranch: () => [],
+				getCwd: () => "/tmp/project",
+				getSessionFile: () => "/tmp/project/session.jsonl",
+			},
+		);
+		await dispatch(
+			handlers,
+			"session_start",
+			{ type: "session_start", reason: "startup" },
+			ctx,
+		);
+		const tool = tools.find((t) => t.name === "todo");
+		if (!tool) throw new Error("todo tool missing");
+		await tool.execute!(
+			"init",
+			{ op: "init", items: ["Wire workspace"] },
+			undefined,
+			undefined,
+			ctx as ExtensionToolContext,
+		);
+		await dispatch(
+			handlers,
+			"agent_end",
+			{
+				type: "agent_end",
+				messages: [
+					{
+						role: "assistant",
+						content: [{ type: "text", text: "Stopping here." }],
+						stopReason: "stop",
+					},
+				],
+			},
+			ctx,
+		);
+		const earlier = {
+			type: "custom_message",
+			customType: "other-extension",
+			content: "an entry proposed earlier",
+			display: false,
+		};
+		const [result] = (await dispatch(
+			handlers,
+			"agent_before_settle",
+			{ type: "agent_before_settle", entries: [earlier] },
+			ctx,
+		)) as [ReminderResult];
+		expect(result?.entries?.map((entry) => entry.customType)).toEqual([
+			"other-extension",
+			"todo-reminder",
+		]);
+	});
+
 	it("does not remind after completion", async () => {
 		const { api, handlers, tools } = makeRecordingAPI();
 		todosExtension(api);
@@ -298,7 +427,7 @@ describe("todos extension factory", () => {
 		await dispatch(
 			handlers,
 			"before_agent_start",
-			{ type: "before_agent_start", prompt: "Unrelated next prompt" },
+			{ type: "before_agent_start", messageType: "user", prompt: "Unrelated next prompt" },
 			ctx,
 		);
 		const result = await settleAssistant(handlers, ctx);
@@ -306,8 +435,7 @@ describe("todos extension factory", () => {
 	});
 
 	it("writes a todo_snapshot custom entry on a successful mutation", async () => {
-		const { api, handlers, tools } = makeRecordingAPI();
-		const entries = await makeEntryCapture(api);
+		const { api, handlers, tools, entries } = makeRecordingAPI();
 		todosExtension(api);
 		const ctx = makeContext(
 			{ cwd: "/tmp/project" },
@@ -335,6 +463,7 @@ describe("todos extension factory", () => {
 		expect(entries).toHaveLength(1);
 		expect(entries[0]?.customType).toBe(TODO_SNAPSHOT_CUSTOM_TYPE);
 		expect(entries[0]?.data).toEqual({
+			v: 1,
 			phases: [
 				{
 					name: "Tasks",
@@ -345,8 +474,7 @@ describe("todos extension factory", () => {
 	});
 
 	it("writes no snapshot without a session file", async () => {
-		const { api, handlers, tools } = makeRecordingAPI();
-		const entries = await makeEntryCapture(api);
+		const { api, handlers, tools, entries } = makeRecordingAPI();
 		todosExtension(api);
 		const ctx = makeContext(
 			{ cwd: "/tmp/project" },
@@ -371,8 +499,7 @@ describe("todos extension factory", () => {
 	});
 
 	it("writes nothing on a view or a failed mutation", async () => {
-		const { api, handlers, tools } = makeRecordingAPI();
-		const entries = await makeEntryCapture(api);
+		const { api, handlers, tools, entries } = makeRecordingAPI();
 		todosExtension(api);
 		const ctx = makeContext(
 			{ cwd: "/tmp/project" },

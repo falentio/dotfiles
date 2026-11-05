@@ -14,9 +14,10 @@ import type {
 	SessionEntry,
 } from "@earendil-works/pi-coding-agent";
 import { clonePhases, isTodoPhase } from "./state.ts";
-import type { TodoPhase } from "./types.ts";
+import { TODO_TOOL_NAME, type TodoPhase } from "./types.ts";
 
 export const TODO_SNAPSHOT_CUSTOM_TYPE = "todo_snapshot";
+export const TODO_SNAPSHOT_VERSION = 1;
 /** Legacy type written by `@gamaraan/todos-tool`; the reader still replays it. */
 export const USER_TODO_EDIT_CUSTOM_TYPE = "user_todo_edit";
 
@@ -57,9 +58,13 @@ export function getLatestTodoPhasesFromEntries(
 			SNAPSHOT_CUSTOM_TYPES.has(entry.customType)
 		) {
 			const customEntry = entry as CustomEntry<
-				{ phases?: unknown } | undefined
+				{ v?: number; phases?: unknown } | undefined
 			>;
 			const data = customEntry.data;
+			// Newer than us: stop, so an older record below cannot resurrect a stale list.
+			if (data?.v !== undefined && data.v > TODO_SNAPSHOT_VERSION) {
+				return undefined;
+			}
 			const restored = data ? validPersistedPhases(data.phases) : undefined;
 			if (restored !== undefined) return restored;
 			continue;
@@ -73,7 +78,7 @@ export function getLatestTodoPhasesFromEntries(
 		};
 		if (
 			message.role !== "toolResult" ||
-			message.toolName !== "todo" ||
+			message.toolName !== TODO_TOOL_NAME ||
 			message.isError
 		)
 			continue;

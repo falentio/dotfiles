@@ -467,6 +467,22 @@ describe("pruneSupersededTrackerMessages", () => {
 		).toEqual([assistant, reminder]);
 	});
 
+	it("keeps a trailing prelude and drops one a later message superseded", () => {
+		const prelude = {
+			role: "custom",
+			customType: EAGER_TODO_PRELUDE_CUSTOM_TYPE,
+			content: "Consider calling `todo` first",
+			display: false,
+		};
+		expect(pruneSupersededTrackerMessages([user, prelude])).toEqual([
+			user,
+			prelude,
+		]);
+		expect(pruneSupersededTrackerMessages([prelude, assistant])).toEqual([
+			assistant,
+		]);
+	});
+
 	it("leaves non-tracker custom messages and plain histories untouched", () => {
 		const other = { role: "custom", customType: "other", content: "x", display: false };
 		expect(pruneSupersededTrackerMessages([user, other, assistant])).toEqual([

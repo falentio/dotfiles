@@ -8,6 +8,8 @@
  * renderer).
  */
 
+import { TODO_OP_ROWS } from "./operations.ts";
+
 export interface EagerTodoContext {
 	/** Wire name of the todo tool (normally "todo"). */
 	toolRef: string;
@@ -58,6 +60,13 @@ export function renderMidRunNudgePrompt(context: MidRunNudgeContext): string {
 	);
 }
 
+function renderOperationTable(): string {
+	const rows = TODO_OP_ROWS.map(
+		(row) => `|\`${row.op}\`|${row.fields}|${row.effect}|`,
+	);
+	return ["|\`op\`|Fields|Effect|", "|---|---|---|", ...rows].join("\n");
+}
+
 /** The todo tool's description (what the model sees in the tools section). */
 export const TODO_TOOL_DESCRIPTION = `**Tasks: verbatim content strings, NEVER auto-generated IDs; no "task-1"/"task-N". Pass content in \`task\`.**
 
@@ -65,18 +74,7 @@ Auto-promote only fires when NOTHING is in progress: an existing in-progress tas
 
 ## Operations
 
-|\`op\`|Fields|Effect|
-|---|---|---|
-|\`init\`|\`list: [{phase, items: string[]}]\`|Initialize full list; replaces existing|
-|\`init\`|\`items: string[]\`|Flattened single-phase init|
-|\`start\`|\`task\`|Mark in progress|
-|\`done\`|\`task\` or \`phase\`|Mark completed|
-|\`drop\`|\`task\` or \`phase\`|Mark abandoned|
-|\`block\`|\`task\` or \`phase\`; optional \`reason\`|Mark blocked: open, awaiting external input; excluded from stop-time incomplete-todo reminder|
-|\`unblock\`|\`task\` or \`phase\`|Blocked task → \`pending\`|
-|\`rm\`|optional \`task\` or \`phase\`|Remove task/phase; omit both → clear|
-|\`append\`|\`phase\`; \`items: string[]\`|Append tasks to phase; lazily creates phase|
-|\`view\`|—|Read-only; echo list|
+${renderOperationTable()}
 
 ## Anatomy
 

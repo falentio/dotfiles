@@ -20,8 +20,8 @@ import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import type { TodoConfig } from "./config.ts";
 import { renderEagerTodoPrompt, renderMidRunNudgePrompt } from "./prompts.ts";
 import { getLatestTodoPhasesFromEntries } from "./persistence.ts";
-import { clonePhases } from "./state.ts";
-import type { TodoItem, TodoPhase } from "./types.ts";
+import { clonePhases, pruneEmptyPhases } from "./state.ts";
+import { TODO_TOOL_NAME, type TodoItem, type TodoPhase } from "./types.ts";
 
 const MID_RUN_NUDGE_MUTATION_THRESHOLD = 12;
 const MID_RUN_NUDGE_MAX_PER_CYCLE = 2;
@@ -161,7 +161,9 @@ export class TodoTracker {
 	/** Rehydrates todo phases from the current transcript branch. */
 	syncFromBranch(ctx: ExtensionContext): void {
 		this.setPhases(
-			getLatestTodoPhasesFromEntries(this.#host.getBranch(ctx)) ?? [],
+			pruneEmptyPhases(
+				getLatestTodoPhasesFromEntries(this.#host.getBranch(ctx)) ?? [],
+			),
 		);
 	}
 
@@ -177,7 +179,7 @@ export class TodoTracker {
 
 	/** Records a completed tool result before asynchronous event processing begins. */
 	onToolResult(toolName: string, isError: boolean): void {
-		if (toolName === "todo") {
+		if (toolName === TODO_TOOL_NAME) {
 			this.#mutationsSinceLastTouch = 0;
 		} else if (!isError && MUTATING_TOOLS[toolName]) {
 			this.#mutationsSinceLastTouch++;
@@ -187,33 +189,32 @@ export class TodoTracker {
 
 	/** Builds the first-turn eager todo prelude message, or undefined. */
 	createEagerTodoPrelude(
-		promptText: string | undefined,
+		promptText: string,
 		ctx: ExtensionContext,
 	): TodoInjectedMessage | undefined {
 		const settings = this.#host.config();
 		const mode = settings.eager;
 		if (mode === "default" || !settings.enabled) return undefined;
 		if (this.#host.getPhases().length > 0) return undefined;
-		if (promptText !== undefined) {
-			if (
-				this.#host
-					.getBranch(ctx)
-					.some(
-						(entry) =>
-							entry.type === "message" && entry.message.role === "user",
-					)
-			) {
-				return undefined;
-			}
-			const trimmedPromptText = promptText.trimEnd();
-			if (trimmedPromptText.endsWith("?") || trimmedPromptText.endsWith("!"))
-				return undefined;
+		if (
+			this.#host
+				.getBranch(ctx)
+				.some(
+					(entry) =>
+						entry.type === "message" && entry.message.role === "user",
+				)
+		) {
+			return undefined;
 		}
-		if (!this.#host.getActiveToolNames(ctx).includes("todo")) return undefined;
+		const trimmedPromptText = promptText.trimEnd();
+		if (trimmedPromptText.endsWith("?") || trimmedPromptText.endsWith("!"))
+			return undefined;
+		if (!this.#host.getActiveToolNames(ctx).includes(TODO_TOOL_NAME))
+			return undefined;
 		return {
 			customType: EAGER_TODO_PRELUDE_CUSTOM_TYPE,
 			content: renderEagerTodoPrompt({
-				toolRef: "todo",
+				toolRef: TODO_TOOL_NAME,
 				forced: mode === "always",
 			}),
 			display: false,
@@ -227,7 +228,8 @@ export class TodoTracker {
 		if (this.#midRunNudgeCount >= MID_RUN_NUDGE_MAX_PER_CYCLE) return null;
 		const settings = this.#host.config();
 		if (!settings.enabled || !settings.reminders) return null;
-		if (!this.#host.getActiveToolNames(ctx).includes("todo")) return null;
+		if (!this.#host.getActiveToolNames(ctx).includes(TODO_TOOL_NAME))
+			return null;
 		const incomplete = this.#host
 			.getPhases()
 			.flatMap((phase) => phase.tasks)
@@ -240,7 +242,7 @@ export class TodoTracker {
 		return {
 			customType: MID_RUN_NUDGE_MESSAGE_TYPE,
 			content: renderMidRunNudgePrompt({
-				toolRef: "todo",
+				toolRef: TODO_TOOL_NAME,
 				incompleteCount: incomplete.length,
 			}),
 			display: false,
@@ -268,7 +270,8 @@ export class TodoTracker {
 		// mode, tools subset) — reminding the model to edit state it cannot
 		// touch is pure noise. Mirrors the guards on the eager prelude and
 		// mid-run nudge.
-		if (!this.#host.getActiveToolNames(ctx).includes("todo")) return null;
+		if (!this.#host.getActiveToolNames(ctx).includes(TODO_TOOL_NAME))
+			return null;
 		const phases = this.phases;
 		if (phases.length === 0) {
 			this.#reminderCount = 0;
@@ -326,6 +329,7 @@ export class TodoTracker {
 const SUPERSEDED_TRACKER_MESSAGE_TYPES: ReadonlySet<string> = new Set([
 	TODO_REMINDER_CUSTOM_TYPE,
 	MID_RUN_NUDGE_MESSAGE_TYPE,
+	EAGER_TODO_PRELUDE_CUSTOM_TYPE,
 ]);
 
 function isTrackerContextMessage(
@@ -341,7 +345,7 @@ function isTrackerContextMessage(
 }
 
 /**
- * Drop tracker-injected messages (completion reminders, mid-run nudges)
+ * Drop tracker-injected messages
  * from outgoing LLM context once any later real message exists.
  *
  * Each such message describes moment-in-time todo state ("You stopped with

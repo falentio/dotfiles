@@ -15,11 +15,11 @@ The agent calls `todo` with one operation:
 | --- | --- | --- |
 | `init` | `list: [{phase, items}]` or `items` | Create the list; replaces an existing one |
 | `start` | `task` | Mark in progress |
-| `done` | `task` or `phase` | Mark completed |
-| `drop` | `task` or `phase` | Mark abandoned |
+| `done` | `task` or `phase` | Mark completed; omit both to mark every task |
+| `drop` | `task` or `phase` | Mark abandoned; omit both to mark every task |
 | `block` | `task` or `phase`, optional `reason` | Mark blocked on external input |
 | `unblock` | `task` or `phase` | Return a blocked task to pending |
-| `rm` | optional `task` or `phase` | Remove a task or phase; omit both to clear |
+| `rm` | optional `task` or `phase` | Remove a task or phase; omit both to clear the list |
 | `append` | `phase`, `items` | Add tasks; creates the phase if missing |
 | `view` | | Read the list |
 
@@ -27,10 +27,11 @@ Tasks are referenced by their exact content, never by an id. A missing `op` is
 inferred when the arguments are unambiguous, so `{list: [...]}` becomes an
 `init`.
 
-State lives in the tool result and in a session snapshot. Every successful
-call returns `details.phases` and writes a `todo_snapshot` session entry; the
-extension rebuilds the list from the newest of either on the session branch.
-Branching and rewinding show the list correct for that point in history.
+State lives in a session snapshot. Every successful mutation writes a
+`todo_snapshot` entry; the extension rebuilds the list from the newest one on
+the session branch, and replays `details.phases` from an older tool result so
+a session recorded before snapshots still restores. Branching and rewinding
+show the list correct for that point in history.
 
 The tool is registered `model-only`, so the model calls it directly and a
 `codemode` script cannot. A wrapped call would record only the outer `codemode`
@@ -40,7 +41,8 @@ result and the list would not survive a resume.
 
 The extension adds three nudges around the tool, each gated on config:
 
-- An eager prelude on the first turn asks for a phased `init` before work.
+- An eager prelude on the first user turn asks for a phased `init` before
+  work; it is pruned from context once that turn is over.
 - A mid-run nudge after 12 mutating tool results asks the agent to mark
   finished tasks done.
 - A completion reminder fires on `agent_before_settle` when the agent stops
@@ -69,7 +71,7 @@ Install it once per checkout:
 
 ```sh
 bun install         # pi-schema
-bun run test        # links pi, then 113 tests
+bun run test        # links pi, then 127 tests
 bun run typecheck
 ```
 

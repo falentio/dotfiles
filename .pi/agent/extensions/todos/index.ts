@@ -51,10 +51,14 @@ import {
 	TodoTracker,
 	pruneSupersededTrackerMessages,
 } from "./tracker.ts";
-import { TODO_SNAPSHOT_CUSTOM_TYPE } from "./persistence.ts";
+import {
+	TODO_SNAPSHOT_CUSTOM_TYPE,
+	TODO_SNAPSHOT_VERSION,
+} from "./persistence.ts";
 import { clonePhases, inferTodoOp } from "./state.ts";
 import { TODO_TOOL_DESCRIPTION } from "./prompts.ts";
 import {
+	TODO_TOOL_NAME,
 	todoSchema,
 	type TodoParams,
 	type TodoPhase,
@@ -87,7 +91,7 @@ export default function todosExtension(pi: ExtensionAPI): void {
 	});
 
 	const todoTool = defineTool({
-		name: "todo",
+		name: TODO_TOOL_NAME,
 		label: "Todo",
 		description: TODO_TOOL_DESCRIPTION,
 		promptSnippet:
@@ -137,12 +141,14 @@ export default function todosExtension(pi: ExtensionAPI): void {
 				// appendEntry still records in memory without a session file; only
 				// the snapshot is durable when a session file exists.
 				if (outcome.storage === "session") {
-					pi.appendEntry(TODO_SNAPSHOT_CUSTOM_TYPE, { phases: outcome.phases });
+					pi.appendEntry(TODO_SNAPSHOT_CUSTOM_TYPE, {
+						v: TODO_SNAPSHOT_VERSION,
+						phases: outcome.phases,
+					});
 				}
 			}
 			const details: TodoToolDetails = {
 				op: outcome.op,
-				phases: outcome.phases,
 				storage: outcome.storage,
 			};
 			if (outcome.completedTasks.length > 0)
@@ -160,8 +166,10 @@ export default function todosExtension(pi: ExtensionAPI): void {
 	pi.on("session_start", async (_event, ctx) => {
 		if (!TODO_CONFIG.enabled) {
 			const active = pi.getActiveTools();
-			if (active.includes("todo")) {
-				pi.setActiveTools(active.filter((name) => name !== "todo"));
+			if (active.includes(TODO_TOOL_NAME)) {
+				pi.setActiveTools(
+					active.filter((name) => name !== TODO_TOOL_NAME),
+				);
 			}
 		}
 		tracker.syncFromBranch(ctx);
@@ -177,8 +185,8 @@ export default function todosExtension(pi: ExtensionAPI): void {
 
 	pi.on("before_agent_start", async (event, ctx) => {
 		tracker.resetCycle();
-		const prompt = event.messageType === "user" ? event.prompt : undefined;
-		const prelude = tracker.createEagerTodoPrelude(prompt, ctx);
+		if (event.messageType !== "user") return undefined;
+		const prelude = tracker.createEagerTodoPrelude(event.prompt, ctx);
 		return prelude ? { message: prelude } : undefined;
 	});
 
@@ -206,11 +214,12 @@ export default function todosExtension(pi: ExtensionAPI): void {
 		}
 	});
 
-	pi.on("agent_before_settle", async (_event, ctx) => {
+	pi.on("agent_before_settle", async (event, ctx) => {
 		const reminder = await tracker.checkCompletion(ctx, lastAssistant);
 		if (reminder === null) return undefined;
 		return {
 			entries: [
+				...event.entries,
 				{
 					type: "custom_message",
 					customType: TODO_REMINDER_CUSTOM_TYPE,
