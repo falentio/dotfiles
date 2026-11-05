@@ -332,9 +332,8 @@ export class TodoTracker {
 		this.#lastReminderFingerprint = fingerprint;
 		return (
 			`<system-reminder>\n` +
-			`You stopped with ${incomplete.length} incomplete todo item(s):\n${todoList}\n\n` +
-			`Please continue working on these tasks or mark them complete if finished.\n` +
-			`(Reminder ${this.#reminderCount}/${settings.remindersMax})\n` +
+			`${incomplete.length} task${incomplete.length === 1 ? "" : "s"} still open:\n${todoList}\n\n` +
+			`If one landed, mark it done from the reply: <!-- todo: done "exact task" -->. Otherwise continue the work.\n` +
 			`</system-reminder>`
 		);
 	}
