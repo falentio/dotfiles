@@ -260,6 +260,16 @@
       "pluginName": "core-skills",
       "installedAt": "2026-10-10T16:59:01.935Z",
       "updatedAt": "2026-10-19T05:52:01.770Z"
+    },
+    "hallmark": {
+      "source": "nutlope/hallmark",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/nutlope/hallmark.git",
+      "skillPath": "skills/hallmark/SKILL.md",
+      "skillFolderHash": "b7a0dd1c2cba6d37fe21927384dbe0ac13967492",
+      "pluginName": "hallmark",
+      "installedAt": "2026-11-05T08:23:03.916Z",
+      "updatedAt": "2026-11-05T08:23:03.916Z"
     }
   },
   "dismissed": {
@@ -271,6 +281,7 @@
     "codex",
     "cursor",
     "droid",
+    "fx",
     "gemini-cli",
     "github-copilot",
     "kilo",
