@@ -19,6 +19,9 @@
  *   `<agent dir>/skills/todo-discipline` that mandates phased `init` before
  *   work and per-task `done` marking as each task finishes (not retro-batched
  *   at the end).
+ * - **Reply markers**: an assistant reply can carry `<!-- todo: done "…" -->`;
+ *   `message_end` applies each one through the same path as the tool and strips
+ *   it from the text, so marking a task costs no extra tool call.
  * - **Mid-run nudge**: after 20 mutating tool results, a hidden steer
  *   message asks the agent to mark finished tasks done (once per prompt
  *   cycle).
@@ -42,10 +45,11 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import {
 	defineTool,
 	type ExtensionAPI,
+	type ExtensionContext,
 	type ExtensionToolContext,
 } from "@earendil-works/pi-coding-agent";
 import { TODO_CONFIG } from "./config.ts";
-import { executeTodoOp } from "./execute.ts";
+import { executeTodoOp, type TodoExecuteOutcome } from "./execute.ts";
 import {
 	TODO_REMINDER_CUSTOM_TYPE,
 	TodoTracker,
@@ -55,7 +59,12 @@ import {
 	TODO_SNAPSHOT_CUSTOM_TYPE,
 	TODO_SNAPSHOT_VERSION,
 } from "./persistence.ts";
-import { clonePhases, inferTodoOp, normalizeTodoArgs } from "./state.ts";
+import {
+	clonePhases,
+	extractTodoMarkers,
+	inferTodoOp,
+	normalizeTodoArgs,
+} from "./state.ts";
 import { TODO_TOOL_DESCRIPTION } from "./prompts.ts";
 import {
 	TODO_TOOL_NAME,
@@ -68,6 +77,8 @@ import {
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+
+const TODO_MARKER_NOTE_CUSTOM_TYPE = "todo-marker-note";
 
 export default function todosExtension(pi: ExtensionAPI): void {
 	let phases: TodoPhase[] = [];
@@ -83,6 +94,28 @@ export default function todosExtension(pi: ExtensionAPI): void {
 		phases = clonePhases(next);
 	}
 
+	function applyMutation(
+		params: TodoParams,
+		ctx: ExtensionContext,
+	): TodoExecuteOutcome {
+		const outcome = executeTodoOp(getPhases(), params, {
+			hasSessionFile: Boolean(ctx.sessionManager.getSessionFile()),
+			forceFullList,
+		});
+		if (!outcome.failed && !outcome.readOnly) {
+			setPhases(outcome.phases);
+			// appendEntry still records in memory without a session file; only
+			// the snapshot is durable when a session file exists.
+			if (outcome.storage === "session") {
+				pi.appendEntry(TODO_SNAPSHOT_CUSTOM_TYPE, {
+					v: TODO_SNAPSHOT_VERSION,
+					phases: outcome.phases,
+				});
+			}
+		}
+		return outcome;
+	}
+
 	const tracker = new TodoTracker({
 		config: () => TODO_CONFIG,
 		getPhases,
@@ -96,11 +129,7 @@ export default function todosExtension(pi: ExtensionAPI): void {
 		name: TODO_TOOL_NAME,
 		label: "Todo",
 		description: TODO_TOOL_DESCRIPTION,
-		promptSnippet:
-			"Write a structured todo list to track progress within a session",
-		promptGuidelines: [
-			"Mark tasks done immediately after finishing them; batch todo calls with real work instead of making solo todo turns.",
-		],
+		promptSnippet: "Track a phased plan and mark progress as it lands",
 		parameters: todoSchema,
 		executionMode: "sequential",
 		// model-only keeps the tool out of the codemode callable set (and out of
@@ -124,26 +153,11 @@ export default function todosExtension(pi: ExtensionAPI): void {
 			_onUpdate: AgentToolUpdateCallback<TodoToolDetails> | undefined,
 			ctx: ExtensionToolContext,
 		): Promise<AgentToolResult<TodoToolDetails>> {
-			const previousPhases = getPhases();
-			const outcome = executeTodoOp(previousPhases, params, {
-				hasSessionFile: Boolean(ctx.sessionManager.getSessionFile()),
-				forceFullList,
-			});
+			const outcome = applyMutation(params, ctx);
 			forceFullList = false;
 			// pi signals tool errors by throwing; the model receives the message
 			// text (omp's formatSummary output, errors + full current list).
 			if (outcome.failed) throw new Error(outcome.summary);
-			if (!outcome.readOnly) {
-				setPhases(outcome.phases);
-				// appendEntry still records in memory without a session file; only
-				// the snapshot is durable when a session file exists.
-				if (outcome.storage === "session") {
-					pi.appendEntry(TODO_SNAPSHOT_CUSTOM_TYPE, {
-						v: TODO_SNAPSHOT_VERSION,
-						phases: outcome.phases,
-					});
-				}
-			}
 			const details: TodoToolDetails = {
 				op: outcome.op,
 				storage: outcome.storage,
@@ -186,6 +200,44 @@ export default function todosExtension(pi: ExtensionAPI): void {
 		if (event.messageType !== "user") return undefined;
 		const prelude = tracker.createEagerTodoPrelude(event.prompt, ctx);
 		return prelude ? { message: prelude } : undefined;
+	});
+
+	pi.on("message_end", async (event, ctx) => {
+		const { message } = event;
+		if (message.role !== "assistant") return undefined;
+		const skipped: string[] = [];
+		let rewritten = false;
+		const content: AssistantMessage["content"] = message.content.map((part) => {
+			if (part.type !== "text") return part;
+			const extraction = extractTodoMarkers(part.text);
+			if (
+				extraction.marked.length === 0 &&
+				extraction.unsupported.length === 0
+			)
+				return part;
+			if (extraction.unsupported.length > 0) {
+				skipped.push('Todo marker skipped: only "done" applies.');
+			}
+			for (const task of extraction.marked) {
+				if (applyMutation({ op: "done", task }, ctx).failed) {
+					skipped.push('Todo marker skipped: task "' + task + '" not found.');
+				}
+			}
+			if (extraction.text === part.text) return part;
+			rewritten = true;
+			return { ...part, text: extraction.text };
+		});
+		if (skipped.length > 0) {
+			pi.sendMessage(
+				{
+					customType: TODO_MARKER_NOTE_CUSTOM_TYPE,
+					content: skipped.join("\n"),
+					display: false,
+				},
+				{ deliverAs: "steer" },
+			);
+		}
+		return rewritten ? { message: { ...message, content } } : undefined;
 	});
 
 	pi.on("tool_result", async (event, ctx) => {

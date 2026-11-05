@@ -223,6 +223,53 @@ export function normalizeSingleLine(value: string): string {
 	return value.replace(/\s+/g, " ").trim();
 }
 
+const TODO_MARKER_PATTERN =
+	/<!--[ \t]*todo:[ \t]*([a-z_]+)[ \t]*"([^"\n]*)"[ \t]*-->/g;
+
+export interface TodoMarkerExtraction {
+	/** The reply text with every applied marker stripped. */
+	text: string;
+	marked: string[];
+	unsupported: string[];
+}
+
+/** Extract <!-- todo: done "…" --> markers; a fenced code block is skipped. */
+export function extractTodoMarkers(text: string): TodoMarkerExtraction {
+	const marked: string[] = [];
+	const unsupported: string[] = [];
+	const lines: string[] = [];
+	let inFence = false;
+	for (const line of text.split("\n")) {
+		if (line.trimStart().startsWith("```")) {
+			inFence = !inFence;
+			lines.push(line);
+			continue;
+		}
+		if (inFence) {
+			lines.push(line);
+			continue;
+		}
+		const before = marked.length;
+		let kept = line.replace(
+			TODO_MARKER_PATTERN,
+			(raw: string, op: string, content: string) => {
+				if (op !== "done") {
+					unsupported.push(content);
+					return raw;
+				}
+				marked.push(content);
+				return "";
+			},
+		);
+		if (marked.length > before) {
+			if (kept.trim() === "") continue;
+			kept = kept.replace(/ {2,}/g, " ");
+		}
+		lines.push(kept);
+	}
+	return { text: lines.join("\n"), marked, unsupported };
+}
+
 function initPhases(entry: TodoParams, errors: string[]): TodoPhase[] {
 	const list =
 		entry.list ??
@@ -426,7 +473,14 @@ function applyEntry(
 			return phases;
 		}
 		case "done": {
+			const openOnly = entry.task === undefined;
 			for (const task of getTaskTargets(phases, entry, errors)) {
+				if (
+					openOnly &&
+					task.status !== "pending" &&
+					task.status !== "in_progress"
+				)
+					continue;
 				task.status = "completed";
 			}
 			return phases;

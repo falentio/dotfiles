@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+	extractTodoMarkers,
 	getCompletionTransitions,
 	inferTodoOp,
 	normalizeInProgressTask,
@@ -276,6 +277,84 @@ describe("TodoTool operations", () => {
 			"completed",
 			"completed",
 			"in_progress",
+		]);
+	});
+
+	it("a phase done leaves abandoned and blocked tasks alone", () => {
+		const tool = makeTool([
+			{
+				name: "Build",
+				tasks: [
+					{ content: "queued", status: "pending" },
+					{ content: "active", status: "in_progress" },
+					{ content: "dropped", status: "abandoned" },
+					{ content: "waiting", status: "blocked", blocker: "sign-off" },
+				],
+			},
+			{ name: "Ship", tasks: [{ content: "tag", status: "pending" }] },
+		]);
+
+		const result = tool.run({ op: "done", phase: "Build" });
+
+		const statuses = Object.fromEntries(
+			result.phases.flatMap((phase) =>
+				phase.tasks.map((task) => [task.content, task.status]),
+			),
+		);
+		expect(statuses).toEqual({
+			queued: "completed",
+			active: "completed",
+			dropped: "abandoned",
+			waiting: "blocked",
+			tag: "in_progress",
+		});
+		expect(summaryText(result)).toContain('Marked done: "queued", "active"');
+		expect(summaryText(result)).toContain(
+			'Next: "tag" [in_progress] (Ship)',
+		);
+	});
+
+	it("a bulk done leaves abandoned and blocked tasks alone", () => {
+		const tool = makeTool([
+			{
+				name: "Work",
+				tasks: [
+					{ content: "queued", status: "pending" },
+					{ content: "dropped", status: "abandoned" },
+					{ content: "waiting", status: "blocked" },
+				],
+			},
+		]);
+
+		const result = tool.run({ op: "done" });
+
+		expect(
+			result.phases[0]?.tasks.map((task) => task.status),
+		).toEqual(["completed", "abandoned", "blocked"]);
+		expect(summaryText(result)).toContain('Marked done: "queued"');
+	});
+
+	it("a phase done with no open task is a silent no-op", () => {
+		const tool = makeTool([
+			{
+				name: "Closed",
+				tasks: [
+					{ content: "shipped", status: "completed" },
+					{ content: "dropped", status: "abandoned" },
+					{ content: "waiting", status: "blocked" },
+				],
+			},
+		]);
+
+		const result = tool.run({ op: "done", phase: "Closed" });
+
+		expect(result.failed).toBe(false);
+		expect(result.completedTasks).toEqual([]);
+		expect(summaryText(result)).not.toContain("Marked done");
+		expect(result.phases[0]?.tasks.map((task) => task.status)).toEqual([
+			"completed",
+			"abandoned",
+			"blocked",
 		]);
 	});
 
@@ -1055,5 +1134,67 @@ describe("argument shape recovery at execute time", () => {
 		});
 		expect(result.failed).toBe(false);
 		expect(result.op).toBe("init");
+	});
+});
+
+describe("extractTodoMarkers", () => {
+	it("strips a lone done marker and reports its content", () => {
+		const result = extractTodoMarkers(
+			'Before\n<!-- todo: done "Write the parser" -->\nAfter',
+		);
+		expect(result).toEqual({
+			text: "Before\nAfter",
+			marked: ["Write the parser"],
+			unsupported: [],
+		});
+	});
+
+	it("collects several markers in order", () => {
+		const result = extractTodoMarkers(
+			'<!-- todo: done "a" -->\n<!-- todo: done "b" -->\n<!-- todo: done "c" -->',
+		);
+		expect(result.marked).toEqual(["a", "b", "c"]);
+		expect(result.text).toBe("");
+	});
+
+	it("accepts flexible whitespace inside the marker", () => {
+		expect(extractTodoMarkers('<!--todo:done"a"-->')).toEqual({
+			text: "",
+			marked: ["a"],
+			unsupported: [],
+		});
+		expect(extractTodoMarkers('<!--   todo:   done   "b"   -->')).toEqual({
+			text: "",
+			marked: ["b"],
+			unsupported: [],
+		});
+	});
+
+	it("leaves markers inside a fenced block untouched", () => {
+		const text =
+			'Example:\n\u0060\u0060\u0060\n<!-- todo: done "a" -->\n\u0060\u0060\u0060\n<!-- todo: done "b" -->';
+		expect(extractTodoMarkers(text)).toEqual({
+			text: 'Example:\n\u0060\u0060\u0060\n<!-- todo: done "a" -->\n\u0060\u0060\u0060',
+			marked: ["b"],
+			unsupported: [],
+		});
+	});
+
+	it("reports a marker whose op is not done and leaves it in place", () => {
+		expect(extractTodoMarkers('Keep <!-- todo: rm "x" --> here')).toEqual({
+			text: 'Keep <!-- todo: rm "x" --> here',
+			marked: [],
+			unsupported: ["x"],
+		});
+	});
+
+	it("strips an inline marker and collapses the gap it leaves", () => {
+		expect(extractTodoMarkers('done <!-- todo: done "a" --> now').text).toBe(
+			"done now",
+		);
+	});
+
+	it("leaves blank lines alone when no marker is on them", () => {
+		expect(extractTodoMarkers("a\n\n\nb").text).toBe("a\n\n\nb");
 	});
 });

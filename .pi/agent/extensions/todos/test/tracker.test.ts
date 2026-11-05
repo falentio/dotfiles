@@ -79,7 +79,7 @@ describe("createEagerTodoPrelude", () => {
 		);
 		expect(prelude?.customType).toBe(EAGER_TODO_PRELUDE_CUSTOM_TYPE);
 		expect(prelude?.display).toBe(false);
-		expect(prelude?.content).toContain("Consider calling `todo` first");
+		expect(prelude?.content).toContain("lay out the plan first");
 		expect(prelude?.content).not.toContain("MUST");
 	});
 
@@ -89,7 +89,7 @@ describe("createEagerTodoPrelude", () => {
 			"Build the feature",
 			makeContext(),
 		);
-		expect(prelude?.content).toContain("MUST call `todo` first");
+		expect(prelude?.content).toContain("Before other work, lay out the plan");
 	});
 
 	it("skips when todos already exist", () => {
@@ -158,7 +158,7 @@ describe("takeMidRunNudge", () => {
 		for (let i = 0; i < 20; i++) tracker.onToolResult("edit", false);
 		const nudge = tracker.takeMidRunNudge(makeContext());
 		expect(nudge?.customType).toBe(MID_RUN_NUDGE_MESSAGE_TYPE);
-		expect(nudge?.content).toContain("1 todo item still open");
+		expect(nudge?.content).toContain("1 task still open");
 		for (let i = 0; i < 20; i++) tracker.onToolResult("write", false);
 		expect(tracker.takeMidRunNudge(makeContext())).toBeNull();
 	});
@@ -253,12 +253,12 @@ describe("checkCompletion", () => {
 			makeContext(),
 			assistantMessage("I stopped here."),
 		);
-		expect(reminder).toContain("2 incomplete todo item(s)");
+		expect(reminder).toContain("2 tasks still open");
 		expect(reminder).toContain("- Work");
 		expect(reminder).toContain("  - a");
 		expect(reminder).toContain("  - b");
 		expect(reminder).not.toContain("  - c");
-		expect(reminder).toContain("(Reminder 1/2)");
+		expect(reminder).toContain('<!-- todo: done "exact task" -->');
 	});
 
 	it("stays silent after a reminder until the open set changes", async () => {
@@ -520,7 +520,7 @@ describe("checkCompletion", () => {
 			makeContext(),
 			assistantMessage("Done for now."),
 		);
-		expect(reminder).toContain("incomplete todo item(s)");
+		expect(reminder).toContain("still open");
 	});
 });
 

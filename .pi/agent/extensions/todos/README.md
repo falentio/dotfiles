@@ -34,6 +34,13 @@ what changed, the next open task, and the counts. `init`, `append`, `rm`,
 plan. Completed and abandoned tasks appear as a per-phase count, never as
 text.
 
+A `done` on a phase completes that phase's open tasks only; a blocked or
+abandoned task keeps its status. The agent can also mark a task from its reply
+with `<!-- todo: done "exact task content" -->`: the marker is stripped from
+the text and recorded as the same `todo_snapshot` a tool call writes, so
+finishing that task costs no extra turn. A marker naming a task that no longer
+exists comes back as a note on the next tool result.
+
 State lives in a session snapshot. Every successful mutation writes a
 `todo_snapshot` entry; the extension rebuilds the list from the newest one on
 the session branch, and replays `details.phases` from an older tool result so
