@@ -83,6 +83,7 @@ ${renderOperationTable()}
 ## Rules
 
 - Mark tasks done immediately after finishing; complete phases in order.
+- Mark finished work from the reply with \`<!-- todo: done "exact task content" -->\`; it costs no turn. \`done\` with \`phase\` alone completes the phase.
 - Batch todo calls with real work (\`init\` with first reads, each \`done\`/\`start\` with the next action); a solo todo turn wastes a round trip.
 - Stuck on external input: \`block\` with \`reason\`, \`unblock\` when actionable; if the blocker is agent-actionable, \`append\` an unblocking task.
 - Keep introduced \`task\`/\`phase\` strings stable. \`view\` echoes the list; never guess task text from memory.

@@ -223,6 +223,57 @@ export function normalizeSingleLine(value: string): string {
 	return value.replace(/\s+/g, " ").trim();
 }
 
+const TODO_MARKER_PATTERN =
+	/<!--[ \t]*todo:[ \t]*([a-z_]+)[ \t]*"([^"\n]*)"[ \t]*-->/g;
+
+export interface TodoMarkerExtraction {
+	/** The reply text with every applied marker stripped. */
+	text: string;
+	/** Task content of each applied marker, in order. */
+	marked: string[];
+	/** Content of each matched marker whose op is not `done`; left in the text. */
+	unknown: string[];
+}
+
+/**
+ * Apply `<!-- todo: done "…" -->` markers from an assistant reply. Markers in a
+ * fenced code block are documentation, not instructions, and stay untouched.
+ */
+export function extractTodoMarkers(text: string): TodoMarkerExtraction {
+	const marked: string[] = [];
+	const unknown: string[] = [];
+	const lines: string[] = [];
+	let inFence = false;
+	for (const line of text.split("\n")) {
+		if (line.trimStart().startsWith("```")) {
+			inFence = !inFence;
+			lines.push(line);
+			continue;
+		}
+		if (inFence) {
+			lines.push(line);
+			continue;
+		}
+		const before = marked.length;
+		const kept = line.replace(
+			TODO_MARKER_PATTERN,
+			(raw: string, op: string, content: string) => {
+				if (op !== "done") {
+					unknown.push(content);
+					return raw;
+				}
+				marked.push(content);
+				return "";
+			},
+		);
+		// A marker alone on its line takes the line and its newline with it, so
+		// stripping leaves no blank line behind.
+		if (marked.length > before && kept.trim() === "") continue;
+		lines.push(kept);
+	}
+	return { text: lines.join("\n"), marked, unknown };
+}
+
 function initPhases(entry: TodoParams, errors: string[]): TodoPhase[] {
 	const list =
 		entry.list ??

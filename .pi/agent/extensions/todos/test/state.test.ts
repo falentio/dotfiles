@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+	extractTodoMarkers,
 	getCompletionTransitions,
 	inferTodoOp,
 	normalizeInProgressTask,
@@ -1113,5 +1114,67 @@ describe("argument shape recovery at execute time", () => {
 		});
 		expect(result.failed).toBe(false);
 		expect(result.op).toBe("init");
+	});
+});
+
+describe("extractTodoMarkers", () => {
+	it("strips a lone done marker and reports its content", () => {
+		const result = extractTodoMarkers(
+			'Before\n<!-- todo: done "Write the parser" -->\nAfter',
+		);
+		expect(result).toEqual({
+			text: "Before\nAfter",
+			marked: ["Write the parser"],
+			unknown: [],
+		});
+	});
+
+	it("collects several markers in order", () => {
+		const result = extractTodoMarkers(
+			'<!-- todo: done "a" -->\n<!-- todo: done "b" -->\n<!-- todo: done "c" -->',
+		);
+		expect(result.marked).toEqual(["a", "b", "c"]);
+		expect(result.text).toBe("");
+	});
+
+	it("accepts flexible whitespace inside the marker", () => {
+		expect(extractTodoMarkers('<!--todo:done"a"-->')).toEqual({
+			text: "",
+			marked: ["a"],
+			unknown: [],
+		});
+		expect(extractTodoMarkers('<!--   todo:   done   "b"   -->')).toEqual({
+			text: "",
+			marked: ["b"],
+			unknown: [],
+		});
+	});
+
+	it("leaves markers inside a fenced block untouched", () => {
+		const text =
+			'Example:\n\u0060\u0060\u0060\n<!-- todo: done "a" -->\n\u0060\u0060\u0060\n<!-- todo: done "b" -->';
+		expect(extractTodoMarkers(text)).toEqual({
+			text: 'Example:\n\u0060\u0060\u0060\n<!-- todo: done "a" -->\n\u0060\u0060\u0060',
+			marked: ["b"],
+			unknown: [],
+		});
+	});
+
+	it("reports a marker whose op is not done and leaves it in place", () => {
+		expect(extractTodoMarkers('Keep <!-- todo: rm "x" --> here')).toEqual({
+			text: 'Keep <!-- todo: rm "x" --> here',
+			marked: [],
+			unknown: ["x"],
+		});
+	});
+
+	it("strips an inline marker without touching surrounding whitespace", () => {
+		expect(extractTodoMarkers('done <!-- todo: done "a" --> now').text).toBe(
+			"done  now",
+		);
+	});
+
+	it("leaves blank lines alone when no marker is on them", () => {
+		expect(extractTodoMarkers("a\n\n\nb").text).toBe("a\n\n\nb");
 	});
 });

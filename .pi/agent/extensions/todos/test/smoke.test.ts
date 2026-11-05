@@ -23,6 +23,7 @@ describe("todos extension factory", () => {
 			"session_tree",
 			"session_compact",
 			"before_agent_start",
+			"message_end",
 			"tool_result",
 			"context",
 			"agent_end",
@@ -632,6 +633,175 @@ describe("todos extension factory", () => {
 		}
 		expect(sent).toHaveLength(1);
 		expect(sent[0]?.customType).toBe("mid-run-todo-nudge");
+	});
+
+	it("applies a reply marker and writes the same snapshot as a tool call", async () => {
+		const { api, handlers, tools, entries } = makeRecordingAPI();
+		todosExtension(api);
+		const ctx = makeContext(
+			{ cwd: "/tmp/project" },
+			{
+				getBranch: () => [],
+				getCwd: () => "/tmp/project",
+				getSessionFile: () => "/tmp/project/session.jsonl",
+			},
+		);
+		await dispatch(
+			handlers,
+			"session_start",
+			{ type: "session_start", reason: "startup" },
+			ctx,
+		);
+		const tool = tools.find((t) => t.name === "todo");
+		if (!tool) throw new Error("todo tool missing");
+		await tool.execute!(
+			"init",
+			{ op: "init", items: ["Wire workspace"] },
+			undefined,
+			undefined,
+			ctx as ExtensionToolContext,
+		);
+
+		const [result] = (await dispatch(
+			handlers,
+			"message_end",
+			{
+				type: "message_end",
+				message: {
+					role: "assistant",
+					content: [
+						{
+							type: "text",
+							text: 'Wired it.\n<!-- todo: done "Wire workspace" -->',
+						},
+						{
+							type: "toolCall",
+							id: "call-1",
+							name: "bash",
+							arguments: { command: "ls" },
+						},
+					],
+				},
+			},
+			ctx,
+		)) as [{ message: { content: unknown[] } }];
+
+		expect(result?.message.content).toEqual([
+			{ type: "text", text: "Wired it." },
+			{
+				type: "toolCall",
+				id: "call-1",
+				name: "bash",
+				arguments: { command: "ls" },
+			},
+		]);
+		expect(entries).toHaveLength(2);
+		expect(entries[1]?.customType).toBe(TODO_SNAPSHOT_CUSTOM_TYPE);
+		expect(entries[1]?.data).toEqual({
+			v: 1,
+			phases: [
+				{
+					name: "Tasks",
+					tasks: [{ content: "Wire workspace", status: "completed" }],
+				},
+			],
+		});
+	});
+
+	it("leaves a marker-free assistant message and a user message alone", async () => {
+		const { api, handlers } = makeRecordingAPI();
+		todosExtension(api);
+		const ctx = makeContext({ cwd: "/tmp/project" });
+		expect(
+			await dispatch(
+				handlers,
+				"message_end",
+				{
+					type: "message_end",
+					message: {
+						role: "assistant",
+						content: [{ type: "text", text: "no markers here" }],
+					},
+				},
+				ctx,
+			),
+		).toEqual([undefined]);
+		expect(
+			await dispatch(
+				handlers,
+				"message_end",
+				{
+					type: "message_end",
+					message: { role: "user", content: '<!-- todo: done "x" -->' },
+				},
+				ctx,
+			),
+		).toEqual([undefined]);
+	});
+
+	it("reports an unmatched marker on the next tool result and clears it", async () => {
+		const { api, handlers, tools } = makeRecordingAPI();
+		todosExtension(api);
+		const ctx = makeContext(
+			{ cwd: "/tmp/project" },
+			{
+				getBranch: () => [],
+				getCwd: () => "/tmp/project",
+				getSessionFile: () => "/tmp/project/session.jsonl",
+			},
+		);
+		await dispatch(
+			handlers,
+			"session_start",
+			{ type: "session_start", reason: "startup" },
+			ctx,
+		);
+		const tool = tools.find((t) => t.name === "todo");
+		if (!tool) throw new Error("todo tool missing");
+		await tool.execute!(
+			"init",
+			{ op: "init", items: ["Wire workspace"] },
+			undefined,
+			undefined,
+			ctx as ExtensionToolContext,
+		);
+
+		const [marked] = (await dispatch(
+			handlers,
+			"message_end",
+			{
+				type: "message_end",
+				message: {
+					role: "assistant",
+					content: [
+						{ type: "text", text: 'Hunted it.\n<!-- todo: done "ghost" -->' },
+					],
+				},
+			},
+			ctx,
+		)) as [{ message: { content: Array<{ text?: string }> } }];
+		expect(marked?.message.content[0]?.text).toBe("Hunted it.");
+
+		const toolResult = {
+			type: "tool_result",
+			toolName: "bash",
+			isError: false,
+			content: [{ type: "text", text: "ran" }],
+			details: { op: "view" },
+			structuredContent: { phases: [] },
+		};
+		const [patched] = await dispatch(handlers, "tool_result", toolResult, ctx);
+		expect(patched).toEqual({
+			content: [
+				{ type: "text", text: "ran" },
+				{ type: "text", text: 'Todo marker skipped: task "ghost" not found.' },
+			],
+			details: { op: "view" },
+			structuredContent: { phases: [] },
+		});
+		expect(
+			await dispatch(handlers, "tool_result", toolResult, ctx),
+		).toEqual([undefined]);
 	});
 
 	it("a compaction makes the next status op return the full list", async () => {

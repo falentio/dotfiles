@@ -19,6 +19,9 @@
  *   `<agent dir>/skills/todo-discipline` that mandates phased `init` before
  *   work and per-task `done` marking as each task finishes (not retro-batched
  *   at the end).
+ * - **Reply markers**: an assistant reply can carry `<!-- todo: done "…" -->`;
+ *   `message_end` applies each one through the same path as the tool and strips
+ *   it from the text, so marking a task costs no extra tool call.
  * - **Mid-run nudge**: after 20 mutating tool results, a hidden steer
  *   message asks the agent to mark finished tasks done (once per prompt
  *   cycle).
@@ -42,10 +45,11 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import {
 	defineTool,
 	type ExtensionAPI,
+	type ExtensionContext,
 	type ExtensionToolContext,
 } from "@earendil-works/pi-coding-agent";
 import { TODO_CONFIG } from "./config.ts";
-import { executeTodoOp } from "./execute.ts";
+import { executeTodoOp, type TodoExecuteOutcome } from "./execute.ts";
 import {
 	TODO_REMINDER_CUSTOM_TYPE,
 	TodoTracker,
@@ -55,7 +59,12 @@ import {
 	TODO_SNAPSHOT_CUSTOM_TYPE,
 	TODO_SNAPSHOT_VERSION,
 } from "./persistence.ts";
-import { clonePhases, inferTodoOp, normalizeTodoArgs } from "./state.ts";
+import {
+	clonePhases,
+	extractTodoMarkers,
+	inferTodoOp,
+	normalizeTodoArgs,
+} from "./state.ts";
 import { TODO_TOOL_DESCRIPTION } from "./prompts.ts";
 import {
 	TODO_TOOL_NAME,
@@ -82,6 +91,36 @@ export default function todosExtension(pi: ExtensionAPI): void {
 	function setPhases(next: TodoPhase[]): void {
 		phases = clonePhases(next);
 	}
+
+	/**
+	 * Apply one op and write its snapshot, shared by the tool call and a reply
+	 * marker so both leave the same durable record. Neither path decides what a
+	 * failure means; each caller does.
+	 */
+	function applyMutation(
+		params: TodoParams,
+		ctx: ExtensionContext,
+	): TodoExecuteOutcome {
+		const outcome = executeTodoOp(getPhases(), params, {
+			hasSessionFile: Boolean(ctx.sessionManager.getSessionFile()),
+			forceFullList,
+		});
+		forceFullList = false;
+		if (!outcome.failed && !outcome.readOnly) {
+			setPhases(outcome.phases);
+			// appendEntry still records in memory without a session file; only
+			// the snapshot is durable when a session file exists.
+			if (outcome.storage === "session") {
+				pi.appendEntry(TODO_SNAPSHOT_CUSTOM_TYPE, {
+					v: TODO_SNAPSHOT_VERSION,
+					phases: outcome.phases,
+				});
+			}
+		}
+		return outcome;
+	}
+
+	const skippedMarkers: string[] = [];
 
 	const tracker = new TodoTracker({
 		config: () => TODO_CONFIG,
@@ -124,26 +163,10 @@ export default function todosExtension(pi: ExtensionAPI): void {
 			_onUpdate: AgentToolUpdateCallback<TodoToolDetails> | undefined,
 			ctx: ExtensionToolContext,
 		): Promise<AgentToolResult<TodoToolDetails>> {
-			const previousPhases = getPhases();
-			const outcome = executeTodoOp(previousPhases, params, {
-				hasSessionFile: Boolean(ctx.sessionManager.getSessionFile()),
-				forceFullList,
-			});
-			forceFullList = false;
+			const outcome = applyMutation(params, ctx);
 			// pi signals tool errors by throwing; the model receives the message
 			// text (omp's formatSummary output, errors + full current list).
 			if (outcome.failed) throw new Error(outcome.summary);
-			if (!outcome.readOnly) {
-				setPhases(outcome.phases);
-				// appendEntry still records in memory without a session file; only
-				// the snapshot is durable when a session file exists.
-				if (outcome.storage === "session") {
-					pi.appendEntry(TODO_SNAPSHOT_CUSTOM_TYPE, {
-						v: TODO_SNAPSHOT_VERSION,
-						phases: outcome.phases,
-					});
-				}
-			}
 			const details: TodoToolDetails = {
 				op: outcome.op,
 				storage: outcome.storage,
@@ -188,12 +211,55 @@ export default function todosExtension(pi: ExtensionAPI): void {
 		return prelude ? { message: prelude } : undefined;
 	});
 
+	pi.on("message_end", async (event, ctx) => {
+		const { message } = event;
+		if (message.role !== "assistant") return undefined;
+		const extraction = extractTodoMarkers(
+			message.content
+				.filter((part) => part.type === "text")
+				.map((part) => part.text)
+				.join("\n"),
+		);
+		if (extraction.marked.length === 0) return undefined;
+		for (const content of extraction.marked) {
+			if (applyMutation({ op: "done", task: content }, ctx).failed) {
+				skippedMarkers.push(
+					`Todo marker skipped: task "${content}" not found.`,
+				);
+			}
+		}
+		// One stripped block stands in for every text block: the markers were
+		// parsed across the concatenation, so per-block text cannot be recovered.
+		const content: AssistantMessage["content"] = [];
+		let placed = false;
+		for (const part of message.content) {
+			if (part.type !== "text") {
+				content.push(part);
+				continue;
+			}
+			if (placed) continue;
+			placed = true;
+			if (extraction.text.trim() !== "") content.push({ ...part, text: extraction.text });
+		}
+		return { message: { ...message, content } };
+	});
+
 	pi.on("tool_result", async (event, ctx) => {
 		tracker.onToolResult(event.toolName, event.isError);
 		const nudge = tracker.takeMidRunNudge(ctx);
 		if (nudge) {
 			pi.sendMessage(nudge, { deliverAs: "steer" });
 		}
+		if (skippedMarkers.length === 0) return undefined;
+		const notes = skippedMarkers.join("\n");
+		skippedMarkers.length = 0;
+		// Replacing content alone would drop structured content; it may no
+		// longer match, so pass the tool's own through unchanged.
+		return {
+			content: [...event.content, { type: "text" as const, text: notes }],
+			details: event.details,
+			structuredContent: event.structuredContent,
+		};
 	});
 
 	pi.on("context", async (event) => {
