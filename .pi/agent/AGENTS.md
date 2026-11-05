@@ -38,6 +38,30 @@ Work that touches a frontend page, with a dev server up, ends its reply with a *
 
 A repo or project file you name in a reply is written as a path from the repo root, prefixed `./`: `./src/index.ts`, never the bare `index.ts`. A bare filename is ambiguous the moment two files share it, and it does not resolve from the repo or travel with the branch. This holds wherever a path appears, in prose and in evidence alike.
 
+## PR
+
+- Never open PR unless requested
+
+## After a PR
+
+Opening a PR starts a review gate, and the gate is mandatory.
+
+Each prompt may be worded freely; it must carry the instructions below, so the child does the same job every time.
+
+1. **Review.** Spawn one `tools.mcp__t3_code__delegate_task` to review the PR. Its prompt must name the PR number, name `/skill:code-review` and `/skill:poteto-mode` as skills to read, and ask for the findings, each with evidence, written to a markdown file under `/tmp`. A working prompt:
+
+```text
+review pr #<n> using /skill:code-review /skill:poteto-mode write down evidence to /tmp with format markdown
+```
+
+2. **Fix.** When the review's terminal notification arrives, spawn a second `tools.mcp__t3_code__delegate_task` to fix every finding, handing it the review's `/tmp` file as the worklist. Its prompt must name that file, name `/skill:poteto-mode`, and ask for every finding fixed. A working prompt:
+
+```text
+fix all findings in <path> using /skill:poteto-mode
+```
+
+Naming `/skill:poteto-mode` in each prompt is what loads the persona: it travels as a skill the child reads, never as the `role` line.
+
 ## Evidence
 
 Report every evidence path per [File references](#file-references): relative to the repo root, prefixed `./` (`![picker guest-challenge](./.audit/proof/picker.png)`, `./.audit/proof/run.log`). A capture the tool saved outside the workspace is copied in first.

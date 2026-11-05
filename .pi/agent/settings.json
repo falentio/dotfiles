@@ -9,5 +9,18 @@
     "mode": "only"
   },
   "theme": "dark",
-  "defaultThinkingLevel": "xhigh"
+  "defaultThinkingLevel": "xhigh",
+  "retry": {
+    "enabled": true,
+    "baseDelayMs": 5000,
+    "maxRetries": 3,
+    "maxAgentDelayMs": 90000,
+    "provider": {
+      "timeoutMs": 450000,
+      "maxRetries": 3,
+      "maxRetryDelayMs": 90000
+    }
+  },
+  "hideThinkingBlock": false,
+  "httpIdleTimeoutMs": 300000
 }
