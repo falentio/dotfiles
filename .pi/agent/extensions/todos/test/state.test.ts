@@ -279,6 +279,64 @@ describe("TodoTool operations", () => {
 		]);
 	});
 
+	it("a phase done leaves abandoned and blocked tasks alone", () => {
+		const tool = makeTool([
+			{
+				name: "Build",
+				tasks: [
+					{ content: "queued", status: "pending" },
+					{ content: "active", status: "in_progress" },
+					{ content: "dropped", status: "abandoned" },
+					{ content: "waiting", status: "blocked", blocker: "sign-off" },
+				],
+			},
+			{ name: "Ship", tasks: [{ content: "tag", status: "pending" }] },
+		]);
+
+		const result = tool.run({ op: "done", phase: "Build" });
+
+		const statuses = Object.fromEntries(
+			result.phases.flatMap((phase) =>
+				phase.tasks.map((task) => [task.content, task.status]),
+			),
+		);
+		expect(statuses).toEqual({
+			queued: "completed",
+			active: "completed",
+			dropped: "abandoned",
+			waiting: "blocked",
+			tag: "in_progress",
+		});
+		expect(summaryText(result)).toContain('Marked done: "queued", "active"');
+		expect(summaryText(result)).toContain(
+			'Next: "tag" [in_progress] (Ship)',
+		);
+	});
+
+	it("a phase done with no open task is a silent no-op", () => {
+		const tool = makeTool([
+			{
+				name: "Closed",
+				tasks: [
+					{ content: "shipped", status: "completed" },
+					{ content: "dropped", status: "abandoned" },
+					{ content: "waiting", status: "blocked" },
+				],
+			},
+		]);
+
+		const result = tool.run({ op: "done", phase: "Closed" });
+
+		expect(result.failed).toBe(false);
+		expect(result.completedTasks).toEqual([]);
+		expect(summaryText(result)).not.toContain("Marked done");
+		expect(result.phases[0]?.tasks.map((task) => task.status)).toEqual([
+			"completed",
+			"abandoned",
+			"blocked",
+		]);
+	});
+
 	it("clears the whole list when rm omits task and phase", () => {
 		const tool = makeTool();
 		tool.run({

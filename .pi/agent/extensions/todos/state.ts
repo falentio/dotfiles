@@ -426,7 +426,18 @@ function applyEntry(
 			return phases;
 		}
 		case "done": {
+			// A phase (or whole-list) done completes open tasks only. Resurrecting an
+			// abandoned task or closing a blocked one it was never asked to finish
+			// would lose the record of what actually happened; naming one task stays
+			// an explicit instruction and completes it whatever its status.
+			const openOnly = entry.task === undefined && entry.phase !== undefined;
 			for (const task of getTaskTargets(phases, entry, errors)) {
+				if (
+					openOnly &&
+					task.status !== "pending" &&
+					task.status !== "in_progress"
+				)
+					continue;
 				task.status = "completed";
 			}
 			return phases;
