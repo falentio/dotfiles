@@ -314,6 +314,26 @@ describe("TodoTool operations", () => {
 		);
 	});
 
+	it("a bulk done leaves abandoned and blocked tasks alone", () => {
+		const tool = makeTool([
+			{
+				name: "Work",
+				tasks: [
+					{ content: "queued", status: "pending" },
+					{ content: "dropped", status: "abandoned" },
+					{ content: "waiting", status: "blocked" },
+				],
+			},
+		]);
+
+		const result = tool.run({ op: "done" });
+
+		expect(
+			result.phases[0]?.tasks.map((task) => task.status),
+		).toEqual(["completed", "abandoned", "blocked"]);
+		expect(summaryText(result)).toContain('Marked done: "queued"');
+	});
+
 	it("a phase done with no open task is a silent no-op", () => {
 		const tool = makeTool([
 			{
@@ -1168,9 +1188,9 @@ describe("extractTodoMarkers", () => {
 		});
 	});
 
-	it("strips an inline marker without touching surrounding whitespace", () => {
+	it("strips an inline marker and collapses the gap it leaves", () => {
 		expect(extractTodoMarkers('done <!-- todo: done "a" --> now').text).toBe(
-			"done  now",
+			"done now",
 		);
 	});
 

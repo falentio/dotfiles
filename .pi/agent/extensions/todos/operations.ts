@@ -20,7 +20,7 @@ export const TODO_OP_ROWS = [
 		op: "done",
 		fields: "`task` or `phase`",
 		effect:
-			"Mark completed; `phase` alone completes that phase's open tasks; omit both to mark every task",
+			"Mark completed; `phase` alone completes that phase's open tasks; omit both to mark every open task",
 	},
 	{
 		op: "drop",

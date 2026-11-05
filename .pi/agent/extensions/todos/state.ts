@@ -255,7 +255,7 @@ export function extractTodoMarkers(text: string): TodoMarkerExtraction {
 			continue;
 		}
 		const before = marked.length;
-		const kept = line.replace(
+		let kept = line.replace(
 			TODO_MARKER_PATTERN,
 			(raw: string, op: string, content: string) => {
 				if (op !== "done") {
@@ -268,7 +268,10 @@ export function extractTodoMarkers(text: string): TodoMarkerExtraction {
 		);
 		// A marker alone on its line takes the line and its newline with it, so
 		// stripping leaves no blank line behind.
-		if (marked.length > before && kept.trim() === "") continue;
+		if (marked.length > before) {
+			if (kept.trim() === "") continue;
+			kept = kept.replace(/ {2,}/g, " ");
+		}
 		lines.push(kept);
 	}
 	return { text: lines.join("\n"), marked, unknown };
@@ -481,7 +484,7 @@ function applyEntry(
 			// abandoned task or closing a blocked one it was never asked to finish
 			// would lose the record of what actually happened; naming one task stays
 			// an explicit instruction and completes it whatever its status.
-			const openOnly = entry.task === undefined && entry.phase !== undefined;
+			const openOnly = entry.task === undefined;
 			for (const task of getTaskTargets(phases, entry, errors)) {
 				if (
 					openOnly &&
