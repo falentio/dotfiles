@@ -1,15 +1,6 @@
 {
   "version": 3,
   "skills": {
-    "pnpm": {
-      "source": "antfu/skills",
-      "sourceType": "github",
-      "sourceUrl": "https://github.com/antfu/skills.git",
-      "skillPath": "skills/pnpm/SKILL.md",
-      "skillFolderHash": "3e2f92c74abae6e9d2e4fc45b5d73a7b307348c9",
-      "installedAt": "2026-04-13T15:22:46.991Z",
-      "updatedAt": "2026-04-13T15:22:46.991Z"
-    },
     "tdd": {
       "source": "mattpocock/skills",
       "sourceType": "github",
