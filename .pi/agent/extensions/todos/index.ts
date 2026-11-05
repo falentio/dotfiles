@@ -78,6 +78,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+const TODO_MARKER_NOTE_CUSTOM_TYPE = "todo-marker-note";
+
 export default function todosExtension(pi: ExtensionAPI): void {
 	let phases: TodoPhase[] = [];
 	let lastAssistant: AssistantMessage | undefined;
@@ -92,11 +94,6 @@ export default function todosExtension(pi: ExtensionAPI): void {
 		phases = clonePhases(next);
 	}
 
-	/**
-	 * Apply one op and write its snapshot, shared by the tool call and a reply
-	 * marker so both leave the same durable record. Neither path decides what a
-	 * failure means; each caller does.
-	 */
 	function applyMutation(
 		params: TodoParams,
 		ctx: ExtensionContext,
@@ -118,8 +115,6 @@ export default function todosExtension(pi: ExtensionAPI): void {
 		}
 		return outcome;
 	}
-
-	const skippedMarkers: string[] = [];
 
 	const tracker = new TodoTracker({
 		config: () => TODO_CONFIG,
@@ -214,40 +209,39 @@ export default function todosExtension(pi: ExtensionAPI): void {
 	pi.on("message_end", async (event, ctx) => {
 		const { message } = event;
 		if (message.role !== "assistant") return undefined;
-		const extraction = extractTodoMarkers(
-			message.content
-				.filter((part) => part.type === "text")
-				.map((part) => part.text)
-				.join("\n"),
-		);
-		if (extraction.marked.length === 0 && extraction.unknown.length === 0) {
-			return undefined;
-		}
-		if (extraction.unknown.length > 0) {
-			skippedMarkers.push('Todo marker skipped: only "done" applies.');
-		}
-		for (const content of extraction.marked) {
-			if (applyMutation({ op: "done", task: content }, ctx).failed) {
-				skippedMarkers.push(
-					`Todo marker skipped: task "${content}" not found.`,
-				);
+		const skipped: string[] = [];
+		let rewritten = false;
+		const content: AssistantMessage["content"] = message.content.map((part) => {
+			if (part.type !== "text") return part;
+			const extraction = extractTodoMarkers(part.text);
+			if (
+				extraction.marked.length === 0 &&
+				extraction.unsupported.length === 0
+			)
+				return part;
+			if (extraction.unsupported.length > 0) {
+				skipped.push('Todo marker skipped: only "done" applies.');
 			}
-		}
-		if (extraction.marked.length === 0) return undefined;
-		// One stripped block stands in for every text block: the markers were
-		// parsed across the concatenation, so per-block text cannot be recovered.
-		const content: AssistantMessage["content"] = [];
-		let placed = false;
-		for (const part of message.content) {
-			if (part.type !== "text") {
-				content.push(part);
-				continue;
+			for (const task of extraction.marked) {
+				if (applyMutation({ op: "done", task }, ctx).failed) {
+					skipped.push('Todo marker skipped: task "' + task + '" not found.');
+				}
 			}
-			if (placed) continue;
-			placed = true;
-			if (extraction.text.trim() !== "") content.push({ ...part, text: extraction.text });
+			if (extraction.text === part.text) return part;
+			rewritten = true;
+			return { ...part, text: extraction.text };
+		});
+		if (skipped.length > 0) {
+			pi.sendMessage(
+				{
+					customType: TODO_MARKER_NOTE_CUSTOM_TYPE,
+					content: skipped.join("\n"),
+					display: false,
+				},
+				{ deliverAs: "steer" },
+			);
 		}
-		return { message: { ...message, content } };
+		return rewritten ? { message: { ...message, content } } : undefined;
 	});
 
 	pi.on("tool_result", async (event, ctx) => {
@@ -256,16 +250,6 @@ export default function todosExtension(pi: ExtensionAPI): void {
 		if (nudge) {
 			pi.sendMessage(nudge, { deliverAs: "steer" });
 		}
-		if (skippedMarkers.length === 0) return undefined;
-		const notes = skippedMarkers.join("\n");
-		skippedMarkers.length = 0;
-		// Replacing content alone would drop structured content; it may no
-		// longer match, so pass the tool's own through unchanged.
-		return {
-			content: [...event.content, { type: "text" as const, text: notes }],
-			details: event.details,
-			structuredContent: event.structuredContent,
-		};
 	});
 
 	pi.on("context", async (event) => {

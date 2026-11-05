@@ -1145,7 +1145,7 @@ describe("extractTodoMarkers", () => {
 		expect(result).toEqual({
 			text: "Before\nAfter",
 			marked: ["Write the parser"],
-			unknown: [],
+			unsupported: [],
 		});
 	});
 
@@ -1161,12 +1161,12 @@ describe("extractTodoMarkers", () => {
 		expect(extractTodoMarkers('<!--todo:done"a"-->')).toEqual({
 			text: "",
 			marked: ["a"],
-			unknown: [],
+			unsupported: [],
 		});
 		expect(extractTodoMarkers('<!--   todo:   done   "b"   -->')).toEqual({
 			text: "",
 			marked: ["b"],
-			unknown: [],
+			unsupported: [],
 		});
 	});
 
@@ -1176,7 +1176,7 @@ describe("extractTodoMarkers", () => {
 		expect(extractTodoMarkers(text)).toEqual({
 			text: 'Example:\n\u0060\u0060\u0060\n<!-- todo: done "a" -->\n\u0060\u0060\u0060',
 			marked: ["b"],
-			unknown: [],
+			unsupported: [],
 		});
 	});
 
@@ -1184,7 +1184,7 @@ describe("extractTodoMarkers", () => {
 		expect(extractTodoMarkers('Keep <!-- todo: rm "x" --> here')).toEqual({
 			text: 'Keep <!-- todo: rm "x" --> here',
 			marked: [],
-			unknown: ["x"],
+			unsupported: ["x"],
 		});
 	});
 

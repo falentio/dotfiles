@@ -797,7 +797,11 @@ describe("todos extension factory", () => {
 	});
 
 	it("reports a marker whose op is not done", async () => {
+		const notes: string[] = [];
 		const { api, handlers } = makeRecordingAPI();
+		api.sendMessage = (message: { content: unknown }) => {
+			notes.push(String(message.content));
+		};
 		todosExtension(api);
 		const ctx = makeContext({ cwd: "/tmp/project" });
 		await dispatch(
@@ -812,24 +816,15 @@ describe("todos extension factory", () => {
 			},
 			ctx,
 		);
-		const [patched] = (await dispatch(
-			handlers,
-			"tool_result",
-			{
-				type: "tool_result",
-				toolName: "bash",
-				isError: false,
-				content: [{ type: "text", text: "ok" }],
-			},
-			ctx,
-		)) as [{ content: { type: string; text: string }[] }];
-		expect(patched?.content.at(-1)?.text).toBe(
-			'Todo marker skipped: only "done" applies.',
-		);
+		expect(notes).toEqual(['Todo marker skipped: only "done" applies.']);
 	});
 
-	it("reports an unmatched marker on the next tool result and clears it", async () => {
+	it("reports an unmatched marker as a steered note", async () => {
+		const notes: string[] = [];
 		const { api, handlers, tools } = makeRecordingAPI();
+		api.sendMessage = (message: { content: unknown }) => {
+			notes.push(String(message.content));
+		};
 		todosExtension(api);
 		const ctx = makeContext(
 			{ cwd: "/tmp/project" },
@@ -870,27 +865,7 @@ describe("todos extension factory", () => {
 			ctx,
 		)) as [{ message: { content: Array<{ text?: string }> } }];
 		expect(marked?.message.content[0]?.text).toBe("Hunted it.");
-
-		const toolResult = {
-			type: "tool_result",
-			toolName: "bash",
-			isError: false,
-			content: [{ type: "text", text: "ran" }],
-			details: { op: "view" },
-			structuredContent: { phases: [] },
-		};
-		const [patched] = await dispatch(handlers, "tool_result", toolResult, ctx);
-		expect(patched).toEqual({
-			content: [
-				{ type: "text", text: "ran" },
-				{ type: "text", text: 'Todo marker skipped: task "ghost" not found.' },
-			],
-			details: { op: "view" },
-			structuredContent: { phases: [] },
-		});
-		expect(
-			await dispatch(handlers, "tool_result", toolResult, ctx),
-		).toEqual([undefined]);
+		expect(notes).toEqual(['Todo marker skipped: task "ghost" not found.']);
 	});
 
 	it("a compaction makes the next status op return the full list", async () => {

@@ -229,19 +229,14 @@ const TODO_MARKER_PATTERN =
 export interface TodoMarkerExtraction {
 	/** The reply text with every applied marker stripped. */
 	text: string;
-	/** Task content of each applied marker, in order. */
 	marked: string[];
-	/** Content of each matched marker whose op is not `done`; left in the text. */
-	unknown: string[];
+	unsupported: string[];
 }
 
-/**
- * Apply `<!-- todo: done "…" -->` markers from an assistant reply. Markers in a
- * fenced code block are documentation, not instructions, and stay untouched.
- */
+/** Extract <!-- todo: done "…" --> markers; a fenced code block is skipped. */
 export function extractTodoMarkers(text: string): TodoMarkerExtraction {
 	const marked: string[] = [];
-	const unknown: string[] = [];
+	const unsupported: string[] = [];
 	const lines: string[] = [];
 	let inFence = false;
 	for (const line of text.split("\n")) {
@@ -259,22 +254,20 @@ export function extractTodoMarkers(text: string): TodoMarkerExtraction {
 			TODO_MARKER_PATTERN,
 			(raw: string, op: string, content: string) => {
 				if (op !== "done") {
-					unknown.push(content);
+					unsupported.push(content);
 					return raw;
 				}
 				marked.push(content);
 				return "";
 			},
 		);
-		// A marker alone on its line takes the line and its newline with it, so
-		// stripping leaves no blank line behind.
 		if (marked.length > before) {
 			if (kept.trim() === "") continue;
 			kept = kept.replace(/ {2,}/g, " ");
 		}
 		lines.push(kept);
 	}
-	return { text: lines.join("\n"), marked, unknown };
+	return { text: lines.join("\n"), marked, unsupported };
 }
 
 function initPhases(entry: TodoParams, errors: string[]): TodoPhase[] {
@@ -480,10 +473,6 @@ function applyEntry(
 			return phases;
 		}
 		case "done": {
-			// A phase (or whole-list) done completes open tasks only. Resurrecting an
-			// abandoned task or closing a blocked one it was never asked to finish
-			// would lose the record of what actually happened; naming one task stays
-			// an explicit instruction and completes it whatever its status.
 			const openOnly = entry.task === undefined;
 			for (const task of getTaskTargets(phases, entry, errors)) {
 				if (
