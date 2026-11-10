@@ -1,4 +1,5 @@
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { ENDPOINTS, type EndpointId } from "./endpoints.ts";
 import type { Limit } from "./pool.ts";
 
@@ -27,9 +28,11 @@ export const invalid = (status: number, body: unknown): TinyfishToolError => ({
 
 export const transport = (message: string): TinyfishToolError => ({ type: "tinyfish-transport", message });
 
+/** Not `import.meta.dir`: pi also loads extensions under Node, where only the URL exists. */
+const EXTENSION_DIR = dirname(fileURLToPath(import.meta.url));
+
 /** The command that puts a key in the store. The operator's whole fix for an empty or dead pool. */
-export const addKeyCommand = (): string =>
-	`printf '%s' '<key>' | ${join(import.meta.dir, "bin", "tinyfish-auth-set")}`;
+export const addKeyCommand = (): string => `printf '%s' '<key>' | ${join(EXTENSION_DIR, "bin", "tinyfish-auth-set")}`;
 
 /** `search: 30/min`, from the server's own numbers when it gave them. */
 const limitText = (endpoint: EndpointId, limit: Limit | null): string =>
