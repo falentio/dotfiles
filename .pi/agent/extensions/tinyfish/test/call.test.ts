@@ -33,6 +33,9 @@ const deps = (overrides: Partial<CallDeps> = {}): CallDeps => ({
 
 const search = { endpoint: "search" as const, params: { query: "q" } };
 
+/** A reload that serves a second account, for the revival case. */
+const twoAccounts = async () => storeOf("a1", "a2");
+
 /** A transport that records the key it was handed and replays a script, repeating the last arm. */
 const scripted = (outcomes: readonly Outcome[], seen: string[] = []) => {
 	let turn = 0;
@@ -154,8 +157,7 @@ describe("the store reload", () => {
 		const spentNow = createPool({ store: storeOf("a1"), now: time.now, wait: time.wait });
 		const lease = await spentNow.acquire("search");
 		lease.release({ kind: "spent", walletUrl: "https://wallet" });
-		const reload = async () => storeOf("a1", "a2");
-		const body = await callPool(deps({ pool: spentNow, transport: scripted([{ kind: "ok" }]), reload }), search);
+		const body = await callPool(deps({ pool: spentNow, transport: scripted([{ kind: "ok" }]), reload: twoAccounts }), search);
 		expect(body).toEqual({ results: [] });
 		expect(stub.seen).toEqual([]);
 	});
