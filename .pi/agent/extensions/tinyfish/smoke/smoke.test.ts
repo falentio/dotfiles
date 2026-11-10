@@ -59,7 +59,7 @@ function runPi(): Promise<{ code: number | null; out: string; err: string }> {
 				"off",
 				// codemode ships as an extension too, so --no-extensions would remove the tools namespace.
 				"--tools", "+codemode",
-				`In one codemode script call tools.tinyfish_search({ query: "smoke" }), then tools.tinyfish_fetch_content({ urls: ["https://x.test"], format: "markdown" }), then reply with only their text.`,
+				`In one codemode script call tools.tinyfish_search({ query: "smoke" }) and tools.tinyfish_fetch_content({ urls: ["https://x.test"], format: "markdown" }), then reply with only a line of the form SMOKE <total_results> <results length> <fetch errors length>.`,
 			],
 			{
 				cwd: dir,
@@ -110,7 +110,7 @@ STDOUT:
 ${out}
 STDERR:
 ${err}`).toBe(0);
-			expect(out).toContain('"total_results":1');
+			expect(out).toContain("SMOKE 1 1 0");
 			expect(stub.seen).toContain("smoke-key");
 			expect(stub.hit("smoke-key", "fetch")).toBeGreaterThan(0);
 		},
