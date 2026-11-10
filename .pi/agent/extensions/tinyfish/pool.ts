@@ -228,10 +228,12 @@ export const select = (registry: Registry, endpoint: EndpointId, now: number): S
 	if (live.kind === "take") return live;
 	const spent = order((record) => record.health.kind === "spent" && usable(record, endpoint, now));
 	if (spent.kind === "take") return spent;
-	const upcoming = registry.records
-		.map((record) => ({ record, releaseAt: readyAt(record, endpoint) }))
-		.filter((arrival) => Number.isFinite(arrival.releaseAt))
-		.sort((a, b) => a.releaseAt - b.releaseAt)[0];
+	let upcoming: { record: AccountRecord; releaseAt: number } | undefined;
+	for (const record of registry.records) {
+		const releaseAt = readyAt(record, endpoint);
+		if (!Number.isFinite(releaseAt)) continue;
+		if (upcoming === undefined || releaseAt < upcoming.releaseAt) upcoming = { record, releaseAt };
+	}
 	if (upcoming === undefined) return { kind: "exhausted", reason: { kind: "all-dead" } };
 	return { kind: "wait", readyAt: upcoming.releaseAt, unless: depletionOf(upcoming.record, endpoint) };
 };
