@@ -163,7 +163,7 @@ the finding.
 `bun run test` is the offline suite: it drives the real `acquire`/`release` with a fake clock and a
 real `Bun.serve` stub, so nothing about the transport is mocked and no case spends wall-clock time.
 
-`bun run test:smoke` loads the extension into a real `pi -p` run and calls both tools through the
-`tools.tinyfish_*` namespace against the stub. It needs a configured provider. The run keeps
-`codemode`, which ships as an extension, so it passes `--tools +codemode` and leaves extension
-discovery on; isolation comes from a temp `PI_CODING_AGENT_DIR` with no `extensions/` in it.
+`bun run test:smoke` copies the extension into a temp agent dir's `extensions/` and calls both tools
+from a real `pi -p` run against the stub. No `-e`, so the run proves the discovery layout that loads
+it on a fresh machine. It needs a configured provider. The run keeps `codemode`, which ships as an
+extension, so it passes `--tools +codemode`; isolation is the temp `PI_CODING_AGENT_DIR`.
