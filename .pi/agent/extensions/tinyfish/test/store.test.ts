@@ -60,12 +60,13 @@ describe("readStore", () => {
 		expect(await readFile(`${store}.broken`, "utf8")).toBe("not json");
 	});
 
-	it("keeps the first backup, so a second broken read leaves it alone", async () => {
+	it("keeps each break under its own name, so the path reported holds its own bytes", async () => {
 		await writeFile(store, "first");
-		await readStore(store);
-		await writeFile(store, "second");
 		expect((await readStore(store)).brokenAt).toBe(`${store}.broken`);
+		await writeFile(store, "second");
+		expect((await readStore(store)).brokenAt).toBe(`${store}.broken.2`);
 		expect(await readFile(`${store}.broken`, "utf8")).toBe("first");
+		expect(await readFile(`${store}.broken.2`, "utf8")).toBe("second");
 	});
 
 	it("keeps a key another process added between the read and the write", async () => {
