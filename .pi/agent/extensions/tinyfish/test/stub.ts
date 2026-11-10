@@ -1,8 +1,3 @@
-/**
- * A real server, one base path per endpoint, so the suite exercises the actual URL, header, status,
- * and body the extension puts on the wire. It records every key it saw and answers from a script.
- */
-
 export type Endpoint = "search" | "fetch";
 
 type Scripted = { readonly status: number; readonly body?: unknown; readonly headers?: Record<string, string> };
