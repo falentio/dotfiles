@@ -67,7 +67,15 @@ it("answers wait with the earliest release when nothing is due", () => {
 	expect(select(registry, "search", 0)).toEqual({
 		kind: "wait",
 		readyAt: 30_000,
-		unless: { kind: "all-cooling", endpoint: "search", releaseAt: 30_000, limit: rateLimited(30_000).limit, spentCount: 0, spentAt: null },
+		unless: {
+			kind: "all-cooling",
+			endpoint: "search",
+			releaseAt: 30_000,
+			limit: rateLimited(30_000).limit,
+			spentCount: 0,
+			spentAt: null,
+			tried: [],
+		},
 	});
 });
 
@@ -85,6 +93,7 @@ it("counts the spent records behind a paced pool and names the soonest of them",
 			limit: rateLimited(30_000).limit,
 			spentCount: 1,
 			spentAt: 900_000,
+			tried: [],
 		},
 	});
 });

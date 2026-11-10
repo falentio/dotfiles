@@ -14,6 +14,8 @@ export type Depletion =
 			readonly spentCount: number;
 			/** The soonest of those returns, or null when none is spent. */
 			readonly spentAt: number | null;
+			/** The labels this call burned, so a rotated key is named rather than a mystery. */
+			readonly tried: readonly string[];
 	  }
 	| { readonly kind: "all-spent"; readonly walletUrl: string | null }
 	| { readonly kind: "all-dead" }
@@ -81,7 +83,8 @@ const renderExhaustion = (reason: Exhaustion): string => {
 				reason.spentAt === null
 					? ""
 					: ` ${reason.spentCount} of them ${reason.spentCount === 1 ? "is" : "are"} out of credits; the soonest returns in ${span(reason.spentAt - reason.releaseAt)}.`;
-			return `TinyFish wait limit hit: every key is cooling on ${limitText(reason.endpoint, reason.limit)}, next free at ${clock(new Date(reason.releaseAt))}.${spent} Retry then.`;
+			const burned = reason.tried.length === 0 ? "" : ` Tried: ${reason.tried.join(", ")}.`;
+			return `TinyFish wait limit hit: every key is cooling on ${limitText(reason.endpoint, reason.limit)}, next free at ${clock(new Date(reason.releaseAt))}.${spent}${burned} Retry then.`;
 		}
 		case "all-spent":
 			return `Every TinyFish key is out of credits.${reason.walletUrl === null ? "" : ` Top up at ${reason.walletUrl}.`}`;

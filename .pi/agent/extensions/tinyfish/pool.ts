@@ -217,6 +217,7 @@ const depletionOf = (registry: Registry, record: AccountRecord, endpoint: Endpoi
 		endpoint,
 		releaseAt: readyAt(record, endpoint),
 		limit: standing.kind === "cooling" ? standing.limit : null,
+		tried: [],
 		...spentOf(registry),
 	};
 };

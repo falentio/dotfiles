@@ -49,6 +49,7 @@ export const callPool = async (
 	const deadline = deps.pool.now() + (deps.poolConfig ?? POOL_CONFIG).maxWaitMs;
 	let turns = 0;
 	let reloaded = false;
+	const tried: string[] = [];
 	for (;;) {
 		let lease;
 		try {
@@ -56,7 +57,7 @@ export const callPool = async (
 		} catch (error) {
 			const reason = exhaustionOf(error);
 			if (reason === null) throw error;
-			if (reason.kind === "all-cooling" && reason.releaseAt > deadline) throw capError(reason);
+			if (reason.kind === "all-cooling" && reason.releaseAt > deadline) throw capError(reason, tried);
 			// A key added out of process joins here, at the moment the pool runs dry, with no restart.
 			// Once per call is enough: a second look that finds nothing is the same store as the first.
 			if (reloaded) throw error;
@@ -64,6 +65,7 @@ export const callPool = async (
 			deps.pool.reload(await reload());
 			continue;
 		}
+		tried.push(lease.account.label);
 		let attempt: Attempt;
 		try {
 			attempt = await wire(request, lease, signal ?? new AbortController().signal);
@@ -93,9 +95,9 @@ export const callPool = async (
 	}
 };
 
-/** Past the cap the pool answered "wait", so the reason carries the endpoint and the limit it named. */
-const capError = (reason: Extract<Depletion, { kind: "all-cooling" }>): Error =>
-	toolError(exhausted(reason));
+/** Past the cap the pool answered "wait", so the reason carries the endpoint, the limit, and the keys burned. */
+const capError = (reason: Extract<Depletion, { kind: "all-cooling" }>, tried: readonly string[]): Error =>
+	toolError(exhausted({ ...reason, tried: [...new Set(tried)] }));
 
 export const createClient = (deps: CallDeps): Client => ({
 	search: (params, signal) => callPool(deps, { endpoint: "search", params }, signal),
