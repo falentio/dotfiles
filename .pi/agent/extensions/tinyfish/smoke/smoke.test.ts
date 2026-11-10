@@ -4,7 +4,7 @@ import { copyFileSync, cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } f
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { piCommand } from "../../../test-support/pi-install.mjs";
-import { json, startStub, type Stub } from "./stub.ts";
+import { json, startStub, type Stub } from "../test/stub.ts";
 
 const EXT_DIR = join(import.meta.dir, "..");
 const PI = piCommand();

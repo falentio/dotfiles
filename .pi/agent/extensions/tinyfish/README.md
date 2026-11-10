@@ -174,10 +174,9 @@ the finding.
 
 ## Tests
 
-`bun run test` is the offline suite: it drives the real `acquire`/`release` with a fake clock and a
-real `Bun.serve` stub, so nothing about the transport is mocked and no case spends wall-clock time.
+`bun run test` is the offline suite under `test/`: it drives the real `acquire`/`release` with a fake
+clock and a real `Bun.serve` stub, so nothing about the transport is mocked and no case spends
+wall-clock time.
 
-`bun run test:smoke` copies the extension into a temp agent dir's `extensions/` and calls both tools
-from a real `pi -p` run against the stub. No `-e`, so the run proves the discovery layout that loads
-it on a fresh machine. It needs a configured provider. The run keeps `codemode`, which ships as an
-extension, so it passes `--tools +codemode`; isolation is the temp `PI_CODING_AGENT_DIR`.
+`bun run test:smoke` is the one run that needs a real provider, and it lives under `smoke/` beside
+the offline suite the way the sibling extensions keep theirs. `./smoke/README.md` has the shape.
