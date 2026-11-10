@@ -27,22 +27,22 @@ describe("parseStore", () => {
 			{ id: "a1", label: "kev", key: "k1", weight: 2 },
 		]);
 	});
-	
+
 	it("drops an entry with no key and keeps the rest", () => {
 		const parsed = parseStore({ accounts: [{ id: "a1" }, { id: "a2", key: "k2" }] });
 		expect(parsed.accounts.map((account) => account.id)).toEqual(["a2"]);
 	});
-	
+
 	it("is total over junk", () => {
 		for (const junk of [null, 3, "x", [], {}, { accounts: "no" }]) expect(parseStore(junk).accounts).toEqual([]);
 	});
-	
+
 	it("defaults the weight and the label", () => {
 		const [first] = parseStore({ accounts: [{ key: "k1" }] }).accounts;
 		expect(first?.weight).toBe(1);
 		expect(first?.label).toBe("a1");
 	});
-	
+
 	it("drops a cursor that names no account", () => {
 		expect(parseStore({ accounts: [{ id: "a1", key: "k1" }], cursor: "a9" }).cursor).toBeNull();
 		expect(parseStore({ accounts: [{ id: "a1", key: "k1" }], cursor: "a1" }).cursor).toBe("a1");
@@ -95,18 +95,18 @@ describe("captureFromCli", () => {
 		expect(captured.accounts.map((account) => account.key)).toMatchObject(["k1"]);
 		expect(mode(store)).resolves.toBe(0o600);
 	});
-	
+
 	it("adds nothing for the same key twice", async () => {
 		await writeFile(config, JSON.stringify({ api_key: "k1" }));
 		const once = await captureFromCli(EMPTY_STORE, config);
 		expect(await captureFromCli(once, config)).toBe(once);
 	});
-	
+
 	it("ignores a config with no api_key", async () => {
 		await writeFile(config, JSON.stringify({ other: 1 }));
 		expect(await captureFromCli(EMPTY_STORE, config)).toBe(EMPTY_STORE);
 	});
-	
+
 	it("ignores a missing config", async () => {
 		expect(await captureFromCli(EMPTY_STORE, join(dir, "absent.json"))).toBe(EMPTY_STORE);
 	});
@@ -119,22 +119,22 @@ describe("addAccount", () => {
 		expect(again.duplicateOf).toBe("a1");
 		expect(again.store).toBe(once.store);
 	});
-	
+
 	it("names no duplicate for a new key", async () => {
 		expect((await addAccount("k1", EMPTY_STORE)).duplicateOf).toBeNull();
 	});
-	
+
 	it("writes the key with mode 0600", async () => {
 		await addAccount("k1", EMPTY_STORE);
 		expect(await mode(store)).toBe(0o600);
 		expect(JSON.parse(await readFile(store, "utf8")).accounts[0].key).toBe("k1");
 	});
-	
+
 	it("is idempotent by key", async () => {
 		const once = await addAccount("k1", EMPTY_STORE);
 		expect((await addAccount("k1", once.store)).store).toBe(once.store);
 	});
-	
+
 	it("mints an id a deleted middle entry left behind", async () => {
 		const store2 = await addAccount("k1", EMPTY_STORE);
 		const withGap = { accounts: [store2.store.accounts[0]!], cursor: null };
