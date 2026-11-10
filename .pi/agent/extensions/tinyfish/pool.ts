@@ -295,13 +295,12 @@ export const createPool = (seed: PoolSeed): Pool => {
 		snapshot: () => registry,
 		reload(store) {
 			const kept = new Map(registry.records.map((record) => [record.account.id, record]));
-			registry = {
-				cursor: registry.cursor,
-				records: store.accounts.map((account) => {
-					const record = kept.get(account.id);
-					return record === undefined ? { account, health: { kind: "live" }, standing: allOpen(null) } : { ...record, account };
-				}),
-			};
+			const records = store.accounts.map((account): AccountRecord => {
+				const record = kept.get(account.id);
+				return record === undefined ? { account, health: { kind: "live" }, standing: allOpen(null) } : { ...record, account };
+			});
+			const from = cursorOf(registry);
+			registry = { cursor: from === null ? -1 : records.findIndex((record) => record.account.id === from), records };
 		},
 	};
 };
