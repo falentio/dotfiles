@@ -113,6 +113,17 @@ describe("captureFromCli", () => {
 });
 
 describe("addAccount", () => {
+	it("names the id a duplicate key already holds and writes nothing", async () => {
+		const once = await addAccount("k1", EMPTY_STORE);
+		const again = await addAccount("k1", once.store);
+		expect(again.duplicateOf).toBe("a1");
+		expect(again.store).toBe(once.store);
+	});
+	
+	it("names no duplicate for a new key", async () => {
+		expect((await addAccount("k1", EMPTY_STORE)).duplicateOf).toBeNull();
+	});
+	
 	it("writes the key with mode 0600", async () => {
 		await addAccount("k1", EMPTY_STORE);
 		expect(await mode(store)).toBe(0o600);
@@ -121,13 +132,13 @@ describe("addAccount", () => {
 	
 	it("is idempotent by key", async () => {
 		const once = await addAccount("k1", EMPTY_STORE);
-		expect(await addAccount("k1", once)).toBe(once);
+		expect((await addAccount("k1", once.store)).store).toBe(once.store);
 	});
 	
 	it("mints an id a deleted middle entry left behind", async () => {
 		const store2 = await addAccount("k1", EMPTY_STORE);
-		const withGap = { accounts: [store2.accounts[0]!], cursor: null };
+		const withGap = { accounts: [store2.store.accounts[0]!], cursor: null };
 		const next = await addAccount("k2", withGap);
-		expect(next.accounts.map((account) => account.id)).toEqual(["a1", "a2"]);
+		expect(next.store.accounts.map((account) => account.id)).toEqual(["a1", "a2"]);
 	});
 });

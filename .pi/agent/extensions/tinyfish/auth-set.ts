@@ -9,8 +9,10 @@ if (key === "") {
 	process.exit(1);
 }
 
-const before = (await readStore()).store;
-const after = await addAccount(key, before);
+const added = await addAccount(key, (await readStore()).store);
 
-if (after === before) console.log(`already in ${storePath()}`);
-else console.log(`added key ${after.accounts.at(-1)?.id} to ${storePath()}`);
+if (added.duplicateOf === null) {
+	console.log(`added key ${added.store.accounts.at(-1)?.id} to ${storePath()}`);
+} else {
+	console.log(`already present as ${added.duplicateOf}; delete it from ${storePath()} and re-add to revive`);
+}
