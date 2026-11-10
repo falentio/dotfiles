@@ -90,7 +90,7 @@ describe("the extension inside pi", () => {
 			stub.script("smoke-key", "search", [
 				json(200, { query: "smoke", results: [{ position: 1, site_name: "x", title: "t", snippet: "s", url: "https://x.test" }], total_results: 1, page: 0 }),
 			]);
-			const { code, out, err } = await runPi();
+			const { code, out } = await runPi();
 			expect(code).toBe(0);
 			expect(out).toContain('"total_results":1');
 			expect(stub.seen).toContain("smoke-key");
