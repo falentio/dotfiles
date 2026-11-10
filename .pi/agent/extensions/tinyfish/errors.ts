@@ -22,8 +22,7 @@ export type Exhaustion = Depletion | { readonly kind: "transient"; readonly turn
 
 export type TinyfishToolError =
 	| { readonly type: "tinyfish-exhausted"; readonly reason: Exhaustion }
-	| { readonly type: "tinyfish-invalid"; readonly status: number; readonly body: unknown }
-	| { readonly type: "tinyfish-transport"; readonly message: string };
+	| { readonly type: "tinyfish-invalid"; readonly status: number; readonly body: unknown };
 
 export const exhausted = (reason: Exhaustion): TinyfishToolError => ({ type: "tinyfish-exhausted", reason });
 
@@ -32,8 +31,6 @@ export const invalid = (status: number, body: unknown): TinyfishToolError => ({
 	status,
 	body,
 });
-
-export const transport = (message: string): TinyfishToolError => ({ type: "tinyfish-transport", message });
 
 /** Not `import.meta.dir`: pi also loads extensions under Node, where only the URL exists. */
 const EXTENSION_DIR = dirname(fileURLToPath(import.meta.url));
@@ -60,8 +57,6 @@ const clock = (at: number): string => `${new Date(at).toISOString().slice(11, 19
 
 export const render = (error: TinyfishToolError): string => {
 	switch (error.type) {
-		case "tinyfish-transport":
-			return `TinyFish transport failure: ${error.message}`;
 		case "tinyfish-invalid":
 			return `TinyFish rejected the request (HTTP ${error.status}): ${JSON.stringify(error.body)}`;
 		case "tinyfish-exhausted":
@@ -92,9 +87,3 @@ const renderExhaustion = (reason: Exhaustion): string => {
 
 export const toolError = (error: TinyfishToolError): Error => new Error(render(error), { cause: error });
 
-export const isToolError = (value: unknown): value is TinyfishToolError =>
-	typeof value === "object" &&
-	value !== null &&
-	"type" in value &&
-	typeof value.type === "string" &&
-	value.type.startsWith("tinyfish-");
