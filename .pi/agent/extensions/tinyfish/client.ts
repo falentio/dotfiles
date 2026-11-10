@@ -9,10 +9,9 @@ export interface CallDeps {
 	readonly pool: Pool;
 	readonly config: CallConfig;
 	readonly poolConfig: PoolConfig;
+	/** All three default to the real thing and exist so a test can drive one turn by hand. */
 	readonly transport?: Transport;
-	/** Re-read for one last look when the pool comes up empty; defaults to the real store. */
 	readonly reload?: () => Promise<AccountStore>;
-	/** Millis inside `backoffMs`, injected so a test does not spend them. */
 	readonly sleep?: (ms: number) => Promise<void>;
 }
 
