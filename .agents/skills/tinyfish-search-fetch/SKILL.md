@@ -5,7 +5,7 @@ description: Use this skill before any TinyFish web research (MANDATORY). Run Se
 
 # Search and fetch with TinyFish
 
-Call TinyFish from the Code Mode `execute` tool. The runtime exposes `tools.tinyfish_search` and `tools.tinyfish_fetch_content`. Both are local extension tools with `codemode` exposure, so they are callable only from a script and never declared to the model. Both are also registered under the MCP name a pre-move prompt already holds, `tools["tinyfish.search"]` (read `tools.tinyfish.search`) and `tools["tinyfish.fetch_content"]` (read `tools.tinyfish.fetch_content`), which resolve the same way.
+Call TinyFish from the Code Mode `execute` tool. The runtime exposes `tools.tinyfish_search` and `tools.tinyfish_fetch_content`. Both are local extension tools with `codemode` exposure, so they are callable only from a script and never declared to the model. A tool name becomes one flat script identifier, so `tools.tinyfish.search` from the MCP era is gone: an old prompt must call `tools["tinyfish.search"]` or the flat name above. Rewrite old calls rather than bracketing them.
 
 Search returns ranked result metadata. Fetch returns content from known URLs.
 

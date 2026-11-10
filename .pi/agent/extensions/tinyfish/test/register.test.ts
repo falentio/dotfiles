@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import tinyfish from "../index.ts";
-import { DOTTED, TOOL_NAMES } from "../names.ts";
+import { MCP_NAMES, TOOL_NAMES } from "../names.ts";
 import { startStub, type Stub } from "./stub.ts";
 
 let stub: Stub;
@@ -50,20 +50,14 @@ const call = async (name: string, params: Record<string, unknown>) => {
 const searchBody = (body: unknown) => stub.script("key-a1", "search", [{ status: 200, body }]);
 
 describe("the registered tools", () => {
-	it("registers each definition under the flat name and the dotted MCP alias", () => {
-		expect([...registered().keys()].sort()).toEqual(
-			[TOOL_NAMES.search, DOTTED.search, TOOL_NAMES.fetch, DOTTED.fetch].sort(),
-		);
+	it("registers each definition exactly once, under the flat name", () => {
+		expect([...registered().keys()].sort()).toEqual([TOOL_NAMES.search, TOOL_NAMES.fetch].sort());
 	});
 
-	it("gives the pair one definition, so the alias cannot drift", () => {
-		const tools = registered();
-		const strip = (name: string) => {
-			const { name: _name, ...rest } = tools.get(name) as ToolDefinition;
-			return rest;
-		};
-		expect(strip(DOTTED.search)).toEqual(strip(TOOL_NAMES.search));
-		expect(strip(DOTTED.fetch)).toEqual(strip(TOOL_NAMES.fetch));
+	it("keeps the MCP-era name, which the bracket form still reaches", () => {
+		for (const [kind, flat] of Object.entries(TOOL_NAMES)) {
+			expect(MCP_NAMES[kind as keyof typeof MCP_NAMES].replace(".", "_")).toBe(flat);
+		}
 	});
 
 	it("declares an output schema, which is what makes a script receive structured content", () => {
