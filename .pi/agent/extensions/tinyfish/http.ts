@@ -62,6 +62,7 @@ const windowOf = (body: unknown, headers: Headers): { windowMs: number; limit: L
 /**
  * Status to arm. `null` for a non-2xx the contract does not name (302 through a proxy, HTML from a
  * gateway, a 5xx), so the call loop decides: it backs off and rotates rather than spending the key.
+ * An undeclared 4xx is a fixed wrongness, so it is `invalid`: retrying a 404 four times buys nothing.
  */
 export const classify = (status: number, body: unknown, headers: Headers): Ok | NonOk | null => {
 	if (status >= 200 && status < 300) return { kind: "ok" };
@@ -71,7 +72,7 @@ export const classify = (status: number, body: unknown, headers: Headers): Ok | 
 		const walletUrl = nested(nested(body, "error"), "details");
 		return { kind: "spent", walletUrl: isRecord(walletUrl) ? String(walletUrl.wallet_url ?? "") || null : null };
 	}
-	if (status === 400 || status === 422) return { kind: "invalid", error: invalid(status, body) };
+	if (status >= 400 && status < 500) return { kind: "invalid", error: invalid(status, body) };
 	return null;
 };
 
