@@ -68,6 +68,16 @@ describe("readStore", () => {
 		expect(await readFile(`${store}.broken`, "utf8")).toBe("first");
 	});
 
+	it("keeps a key another process added between the read and the write", async () => {
+		const parsed = parseStore({ accounts: [{ id: "a1", key: "k1" }], cursor: null });
+		await writeFile(store, JSON.stringify({ accounts: [{ id: "a1", key: "k1" }, { id: "a2", key: "k2" }], cursor: null }));
+		await saveCursor(parsed, "a1");
+		expect(JSON.parse(await readFile(store, "utf8"))).toMatchObject({
+			accounts: [{ id: "a1" }, { id: "a2" }],
+			cursor: "a1",
+		});
+	});
+
 	it("writes a shutdown cursor from the store it was handed, not from a re-read", async () => {
 		await writeFile(store, "not json");
 		const loaded = await readStore(store);

@@ -153,7 +153,15 @@ const nextId = (store: AccountStore): AccountId => {
 	return `a${n}`;
 };
 
-/** The store that was parsed in, not a fresh read: a shutdown write never comes from a guess. */
+/**
+ * Written from the store that was parsed in, not a fresh read, so a shutdown never comes from a guess.
+ * The account list is re-read once and merged, because `tinyfish-auth-set` adds keys from another
+ * process and a blind write here would drop one.
+ */
 export const saveCursor = async (store: AccountStore, cursor: AccountId | null): Promise<void> => {
-	await writeStore({ ...store, cursor }, storePath());
+	const latest = await readStore();
+	const known = new Set(store.accounts.map((account) => account.id));
+	const merged = latest.store.accounts.filter((account) => !known.has(account.id));
+	const accounts = merged.length === 0 ? store.accounts : [...store.accounts, ...merged];
+	await writeStore({ accounts, cursor }, storePath());
 };
