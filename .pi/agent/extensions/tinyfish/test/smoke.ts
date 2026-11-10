@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { spawn } from "node:child_process";
-import { copyFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { piCommand } from "../../../test-support/pi-install.mjs";
@@ -19,6 +19,18 @@ beforeAll(() => {
 	agentDir = mkdtempSync(join(tmpdir(), "tinyfish-smoke-agent-"));
 	// Providers stay real: bandar is the one that answers here.
 	for (const file of ["models.json", "auth.json"]) copyFileSync(join(homedir(), ".pi", "agent", file), join(agentDir, file));
+	// No `-e`: the extension is copied into the agent dir's discovery path, so this run proves the
+	// layout that loads it on a fresh machine.
+	mkdirSync(join(agentDir, "extensions"), { recursive: true });
+	const target = join(agentDir, "extensions", "tinyfish");
+	cpSync(EXT_DIR, target, {
+		recursive: true,
+		filter: (source) => !source.includes("node_modules") || !source.includes("@earendil-works"),
+	});
+	// The schema package is the extension's one runtime import, so it has to travel with the copy.
+	cpSync(join(EXT_DIR, "node_modules", "@earendil-works", "pi-schema"), join(target, "node_modules", "@earendil-works", "pi-schema"), {
+		recursive: true,
+	});
 	writeFileSync(
 		join(dir, "accounts.json"),
 		JSON.stringify({ accounts: [{ id: "a1", label: "smoke", key: "smoke-key", weight: 1 }], cursor: null }),
@@ -45,10 +57,9 @@ function runPi(): Promise<{ code: number | null; out: string; err: string }> {
 				"--no-session",
 				"--thinking",
 				"off",
-				"-e", join(EXT_DIR, "index.ts"),
-				// codemode ships as an extension, so --no-extensions would remove the tools namespace itself.
+				// codemode ships as an extension too, so --no-extensions would remove the tools namespace.
 				"--tools", "+codemode",
-				`In one codemode script call tools.tinyfish_search({ query: "smoke" }) and tools.tinyfish_fetch_content({ urls: ["https://x.test"], format: "markdown", links: false, image_links: false, page_metadata: false }), then reply with only their text.`,
+				`In one codemode script call tools.tinyfish_search({ query: "smoke" }), then tools.tinyfish_fetch_content({ urls: ["https://x.test"], format: "markdown" }), then reply with only their text.`,
 			],
 			{
 				cwd: dir,
@@ -83,13 +94,22 @@ function runPi(): Promise<{ code: number | null; out: string; err: string }> {
 
 describe("the extension inside pi", () => {
 	it(
-		"registers both tools and serves them through the namespace",
+		"is found by discovery and serves both tools",
 		async () => {
 			stub.script("smoke-key", "search", [
-				json(200, { query: "smoke", results: [{ position: 1, site_name: "x", title: "t", snippet: "s", url: "https://x.test" }], total_results: 1, page: 0 }),
+				json(200, {
+					query: "smoke",
+					results: [{ position: 1, site_name: "x", title: "t", snippet: "s", url: "https://x.test" }],
+					total_results: 1,
+					page: 0,
+				}),
 			]);
-			const { code, out } = await runPi();
-			expect(code).toBe(0);
+			const { code, out, err } = await runPi();
+			expect(code, `pi exited ${code}
+STDOUT:
+${out}
+STDERR:
+${err}`).toBe(0);
 			expect(out).toContain('"total_results":1');
 			expect(stub.seen).toContain("smoke-key");
 			expect(stub.hit("smoke-key", "fetch")).toBeGreaterThan(0);
