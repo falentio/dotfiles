@@ -60,6 +60,11 @@ describe("the registered tools", () => {
 		}
 	});
 
+	it("takes a fetch with only urls and format, which is the call the MCP accepted", async () => {
+		await call(TOOL_NAMES.fetch, { urls: ["https://x.test"], format: "markdown" });
+		expect(stub.hit("key-a1", "fetch")).toBe(1);
+	});
+
 	it("declares an output schema, which is what makes a script receive structured content", () => {
 		for (const tool of registered().values()) expect(tool.outputSchema).toBeDefined();
 	});
