@@ -150,6 +150,16 @@ describe("the store reload", () => {
 		expect(reads).toBe(1);
 	});
 
+	it("revives a spent pool from a reload, so a top-up joins without a restart", async () => {
+		const spentNow = createPool({ store: storeOf("a1"), now: time.now, wait: time.wait });
+		const lease = await spentNow.acquire("search");
+		lease.release({ kind: "spent", walletUrl: "https://wallet" });
+		const reload = async () => storeOf("a1", "a2");
+		const body = await callPool(deps({ pool: spentNow, transport: scripted([{ kind: "ok" }]), reload }), search);
+		expect(body).toEqual({ results: [] });
+		expect(stub.seen).toEqual([]);
+	});
+
 	it("reloads only once per call, then reports the empty store", async () => {
 		let reads = 0;
 		const reload = async () => {

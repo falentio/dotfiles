@@ -58,7 +58,8 @@ export const callPool = async (
 			if (reason === null) throw error;
 			if (reason.kind === "all-cooling" && reason.releaseAt > deadline) throw capError(reason);
 			// A key added out of process joins here, at the moment the pool runs dry, with no restart.
-			if (reason.kind !== "no-accounts" || reloaded) throw error;
+			// Once per call is enough: a second look that finds nothing is the same store as the first.
+			if (reloaded) throw error;
 			reloaded = true;
 			deps.pool.reload(await reload());
 			continue;
