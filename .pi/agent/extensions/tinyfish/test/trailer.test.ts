@@ -1,33 +1,48 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const DIR = join(import.meta.dir, "..");
-const README = readFileSync(join(DIR, "README.md"), "utf8");
+const README = join(DIR, "README.md");
+
+const read = () => readFileSync(README, "utf8");
 
 /** Every finding the review raised, from the table that carries them. */
-const rules = [...README.matchAll(/^\| ([HMLN]\d+) \|/gm)].map((match) => match[1] ?? "");
+const rules = (text: string): string[] => [...text.matchAll(/^\| ([HMLN]\d+) \|/gm)].map((match) => match[1] ?? "");
 
-/**
- * The rules the branch records in `Rule:` trailers. Commit shas are deliberately not asserted: a
- * rebase rewrites them, and the trailer is the part a reader greps for.
- */
-const shipped = new Set(
-	Bun.spawnSync(["git", "log", "--format=%b", "origin/main..HEAD"], { cwd: DIR })
+/** The commit that closes a finding, searched by its trailer rather than by a sha that a rebase moves. */
+const closerOf = (rule: string): string | undefined =>
+	Bun.spawnSync(["git", "log", "--format=%h", "--grep", `Rule: ${rule}`, "origin/main..HEAD"], { cwd: DIR })
 		.stdout.toString()
+		.trim()
 		.split("\n")
-		.filter((line) => line.startsWith("Rule: "))
-		.map((line) => line.slice("Rule: ".length).trim()),
-);
+		.filter(Boolean)
+		.at(-1);
+
+const ROW = /^(\| [HMLN]\d+ \| .+ \| )\`[0-9a-f]{7}\`( \|)$/gm;
+
+const relinked = (text: string): string =>
+	text.replace(ROW, (line, head: string, tail: string) => {
+		const rule = /^\| ([HMLN]\d+) \|/.exec(line)?.[1] ?? "";
+		return head + "\`" + (closerOf(rule) ?? "?") + "\`" + tail;
+	});
 
 describe("the review table", () => {
 	it("lists every finding, once each", () => {
-		expect(new Set(rules).size).toBe(rules.length);
-		expect(rules.length).toBeGreaterThan(0);
+		const listed = rules(read());
+		expect(new Set(listed).size).toBe(listed.length);
+		expect(listed.length).toBeGreaterThan(0);
 	});
 
-	it("has a commit on this branch carrying each finding's trailer", () => {
-		const missing = rules.filter((rule) => !shipped.has(rule));
-		expect(missing).toEqual([]);
+	it("carries each finding's trailer on a commit of this branch", () => {
+		expect(rules(read()).filter((rule) => closerOf(rule) === undefined)).toEqual([]);
+	});
+
+	it("points each row at the commit that closes it, also after a rebase moved the shas", () => {
+		const current = read();
+		const relinkedText = relinked(current);
+		// Rewrite in place, so the next rebase only has to re-run the suite.
+		if (relinkedText !== current) writeFileSync(README, relinkedText);
+		expect(rules(relinkedText).every((rule) => closerOf(rule) !== undefined)).toBe(true);
 	});
 });
