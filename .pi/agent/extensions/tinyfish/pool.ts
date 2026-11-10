@@ -48,10 +48,8 @@ export interface Lease {
 export interface Pool {
 	/** `deadline` bounds the total wait; the caller owns it so one call has one budget, not one per turn. */
 	acquire(endpoint: EndpointId, signal?: AbortSignal, deadline?: number): Promise<Lease>;
-	/** The pool's clock, so a caller can compute a deadline in the same units the pacing uses. */
 	now(): number;
 	snapshot(): Registry;
-	/** Re-seed from a freshly read store, keeping health, standing, and order by account id. */
 	reload(store: AccountStore): void;
 }
 
@@ -177,7 +175,7 @@ export const graded = (
 	return { ...registry, records: registry.records.map((r, i) => (i === index ? next : r)) };
 };
 
-/** When this record could serve this endpoint again. One function, so nothing above branches on health. */
+/** When this record could serve this endpoint again, for every health arm in one place. */
 export const readyAt = (record: AccountRecord, endpoint: EndpointId): number => {
 	switch (record.health.kind) {
 		case "dead":
