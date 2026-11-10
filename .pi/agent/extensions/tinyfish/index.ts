@@ -3,7 +3,7 @@ import { captureFromCli, EMPTY_STORE, readStore, saveCursor, storePath, type Acc
 import { CALL_CONFIG, POOL_CONFIG } from "./config.ts";
 import { createClient, type Client } from "./client.ts";
 import { envelope, OUTPUT_SCHEMA } from "./envelope.ts";
-import { DOTTED, TOOL_NAMES } from "./names.ts";
+import { TOOL_NAMES } from "./names.ts";
 import {
 	FETCH_DESCRIPTION,
 	FETCH_PARAMETERS,
@@ -14,13 +14,7 @@ import {
 } from "./params.ts";
 import { createPool, cursorOf, type Pool } from "./pool.ts";
 
-const NAMESPACE = {
-	name: "tinyfish",
-	description: "TinyFish web search and page fetch",
-	// `tools` has no `tinyfish` member, so the dotted names are registered tools of their own rather
-	// than lookup aliases; these only make discovery and `describeNamespace` answer to the group.
-	aliases: [DOTTED.search, DOTTED.fetch],
-} as const;
+const NAMESPACE = { name: "tinyfish", description: "TinyFish web search and page fetch" } as const;
 
 type Definition = Omit<ToolDefinition, "name">;
 
@@ -63,9 +57,7 @@ export default function tinyfish(pi: ExtensionAPI): void {
 	};
 
 	pi.registerTool({ ...search, name: TOOL_NAMES.search });
-	pi.registerTool({ ...search, name: DOTTED.search });
 	pi.registerTool({ ...fetchContent, name: TOOL_NAMES.fetch });
-	pi.registerTool({ ...fetchContent, name: DOTTED.fetch });
 
 	pi.on("session_start", async (_event, ctx) => {
 		const loaded = await readStore();

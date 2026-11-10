@@ -1,13 +1,13 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { DOTTED, TOOL_NAMES } from "../names.ts";
+import { MCP_NAMES, TOOL_NAMES } from "../names.ts";
 
 const REPO = join(import.meta.dir, "..", "..", "..", "..", "..");
 const SKILL = join(REPO, ".agents", "skills", "tinyfish-search-fetch", "SKILL.md");
 
 const flat = new Set<string>(Object.values(TOOL_NAMES));
-const dotted = new Set<string>(Object.values(DOTTED));
+const dotted = new Set<string>(Object.values(MCP_NAMES));
 
 const brackets = (skill: string): string[] =>
 	[...skill.matchAll(/tools\["([a-z_.]+)"\]/g)].map((match) => match[1] ?? "");
@@ -24,13 +24,12 @@ describe("the skill", () => {
 		expect(unknown).toEqual([]);
 	});
 
-	it("reaches the dotted alias only through the bracket form", () => {
-		const aliased = new Set(brackets(skill));
-		expect(aliased.size).toBeGreaterThan(0);
-		for (const name of aliased) expect(dotted.has(name)).toBe(true);
-		// A dotted name may be named in prose, but then it is documented in the bracket form too.
+	it("never writes a dotted call, which tools has no member for", () => {
+		const called = new Set(brackets(skill));
+		for (const name of called) expect(dotted.has(name)).toBe(true);
+		// A dotted name may be named in prose, but the call itself is documented in the bracket form.
 		for (const name of bare(skill).filter((candidate) => candidate.includes("."))) {
-			expect(aliased.has(name)).toBe(true);
+			expect(called.has(name)).toBe(true);
 		}
 	});
 });
