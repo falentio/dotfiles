@@ -5,7 +5,16 @@ import type { Limit } from "./pool.ts";
 
 /** Why nothing can serve this endpoint. Every arm is actionable by the operator. */
 export type Depletion =
-	| { readonly kind: "all-cooling"; readonly endpoint: EndpointId; readonly releaseAt: number; readonly limit: Limit | null }
+	| {
+			readonly kind: "all-cooling";
+			readonly endpoint: EndpointId;
+			readonly releaseAt: number;
+			readonly limit: Limit | null;
+			/** Keys out of credits alongside the paced ones, so "retry" and "top up" read apart. */
+			readonly spentCount: number;
+			/** The soonest of those returns, or null when none is spent. */
+			readonly spentAt: number | null;
+	  }
 	| { readonly kind: "all-spent"; readonly walletUrl: string | null }
 	| { readonly kind: "all-dead" }
 	| { readonly kind: "no-accounts" };
@@ -67,8 +76,13 @@ const renderExhaustion = (reason: Exhaustion): string => {
 	switch (reason.kind) {
 		case "no-accounts":
 			return addKeyCommand();
-		case "all-cooling":
-			return `TinyFish wait limit hit: every key is cooling on ${limitText(reason.endpoint, reason.limit)}, next free at ${clock(new Date(reason.releaseAt))}. Retry then.`;
+		case "all-cooling": {
+			const spent =
+				reason.spentAt === null
+					? ""
+					: ` ${reason.spentCount} of them ${reason.spentCount === 1 ? "is" : "are"} out of credits; the soonest returns in ${span(reason.spentAt - reason.releaseAt)}.`;
+			return `TinyFish wait limit hit: every key is cooling on ${limitText(reason.endpoint, reason.limit)}, next free at ${clock(new Date(reason.releaseAt))}.${spent} Retry then.`;
+		}
 		case "all-spent":
 			return `Every TinyFish key is out of credits.${reason.walletUrl === null ? "" : ` Top up at ${reason.walletUrl}.`}`;
 		case "all-dead":
