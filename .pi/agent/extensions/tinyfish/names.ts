@@ -1,11 +1,8 @@
 export const TOOL_NAMES = { search: "tinyfish_search", fetch: "tinyfish_fetch_content" } as const;
 
 /**
- * The MCP-era name. A tool name becomes one flat script identifier (a "." normalizes to "_"), so this
- * is reachable as `tools["tinyfish.search"]` and never as `tools.tinyfish.search`. Nothing registers it:
- * registering it twice would only double `searchTools` and `describeNamespace`.
+ * The MCP-era name. A tool name becomes one flat script identifier and "." normalizes to "_", so this
+ * resolves to the same member as `TOOL_NAMES` and is never a `tools.tinyfish` object. It is exposed to
+ * scripts as a lookup table, because nothing else can reach it.
  */
-export const MCP_NAMES = {
-	search: `tinyfish.${TOOL_NAMES.search.slice("tinyfish_".length)}`,
-	fetch: `tinyfish.${TOOL_NAMES.fetch.slice("tinyfish_".length)}`,
-} as const;
+export const MCP_NAMES = { search: "tinyfish.search", fetch: "tinyfish.fetch_content" } as const;

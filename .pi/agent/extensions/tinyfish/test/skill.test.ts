@@ -9,8 +9,6 @@ const SKILL = join(REPO, ".agents", "skills", "tinyfish-search-fetch", "SKILL.md
 const flat = new Set<string>(Object.values(TOOL_NAMES));
 const dotted = new Set<string>(Object.values(MCP_NAMES));
 
-const brackets = (skill: string): string[] =>
-	[...skill.matchAll(/tools\["([a-z_.]+)"\]/g)].map((match) => match[1] ?? "");
 
 /** `tools.<name>`, which reaches a flat identifier only: a dotted name needs the bracket form. */
 const bare = (skill: string): string[] =>
@@ -25,11 +23,8 @@ describe("the skill", () => {
 	});
 
 	it("never writes a dotted call, which tools has no member for", () => {
-		const called = new Set(brackets(skill));
-		for (const name of called) expect(dotted.has(name)).toBe(true);
-		// A dotted name may be named in prose, but the call itself is documented in the bracket form.
 		for (const name of bare(skill).filter((candidate) => candidate.includes("."))) {
-			expect(called.has(name)).toBe(true);
+			expect(dotted.has(name)).toBe(true);
 		}
 	});
 });

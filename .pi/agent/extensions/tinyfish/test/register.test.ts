@@ -54,7 +54,7 @@ describe("the registered tools", () => {
 		expect([...registered().keys()].sort()).toEqual([TOOL_NAMES.search, TOOL_NAMES.fetch].sort());
 	});
 
-	it("keeps the MCP-era name, which the bracket form still reaches", () => {
+	it("keeps the MCP-era name resolved to a real member, so a stale prompt has a mapping", () => {
 		for (const [kind, flat] of Object.entries(TOOL_NAMES)) {
 			expect(MCP_NAMES[kind as keyof typeof MCP_NAMES].replace(".", "_")).toBe(flat);
 		}
