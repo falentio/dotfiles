@@ -1,5 +1,5 @@
 import { readStore, type AccountStore } from "./accounts.ts";
-import { POOL_CONFIG, type CallConfig, type PoolConfig } from "./config.ts";
+import type { CallConfig, PoolConfig } from "./config.ts";
 import { exhausted, toolError, type Depletion, type Exhaustion } from "./errors.ts";
 import { send, type Attempt, type EndpointRequest, type Transport } from "./http.ts";
 import type { FetchParams, SearchParams } from "./params.ts";
@@ -8,7 +8,7 @@ import type { Pool } from "./pool.ts";
 export interface CallDeps {
 	readonly pool: Pool;
 	readonly config: CallConfig;
-	readonly poolConfig?: PoolConfig;
+	readonly poolConfig: PoolConfig;
 	readonly transport?: Transport;
 	/** Re-read for one last look when the pool comes up empty; defaults to the real store. */
 	readonly reload?: () => Promise<AccountStore>;
@@ -46,7 +46,7 @@ export const callPool = async (
 	const wire = deps.transport ?? send;
 	const sleep = deps.sleep ?? defaultSleep;
 	const reload = deps.reload ?? (async () => (await readStore()).store);
-	const deadline = deps.pool.now() + (deps.poolConfig ?? POOL_CONFIG).maxWaitMs;
+	const deadline = deps.pool.now() + deps.poolConfig.maxWaitMs;
 	let turns = 0;
 	let reloaded = false;
 	const tried: string[] = [];

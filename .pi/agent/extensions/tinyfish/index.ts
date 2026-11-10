@@ -21,7 +21,7 @@ export default function tinyfish(pi: ExtensionAPI): void {
 	const deps = () => {
 		if (built === undefined) {
 			const pool = createPool({ store, config: POOL_CONFIG });
-			built = { client: createClient({ pool, config: CALL_CONFIG }), pool };
+			built = { client: createClient({ pool, config: CALL_CONFIG, poolConfig: POOL_CONFIG }), pool };
 		}
 		return built;
 	};
