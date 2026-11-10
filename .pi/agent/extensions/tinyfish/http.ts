@@ -1,5 +1,5 @@
 import { DEFAULT_WINDOW_MS } from "./config.ts";
-import { ENDPOINTS } from "./endpoints.ts";
+import { ENDPOINTS, type EndpointId } from "./endpoints.ts";
 import { invalid } from "./errors.ts";
 import type { Lease, Limit, NonOk, Ok } from "./pool.ts";
 import type { FetchParams, SearchParams } from "./params.ts";
@@ -32,7 +32,7 @@ const searchUrl = (params: SearchParams): string => {
 };
 
 /** The limit a 429 named: its body first, then its header, then the full default window. */
-const windowOf = (body: unknown, headers: Headers): { windowMs: number; limit: Limit } => {
+const windowOf = (body: unknown, headers: Headers, endpoint: EndpointId): { windowMs: number; limit: Limit } => {
 	const details = nested(nested(body, "error"), "details");
 	const seconds = nested(details, "window_seconds");
 	const header = Number(headers.get("retry-after"));
@@ -46,7 +46,7 @@ const windowOf = (body: unknown, headers: Headers): { windowMs: number; limit: L
 	return {
 		windowMs,
 		limit: {
-			limit: typeof limit === "number" ? limit : ENDPOINTS.search.perWindow,
+			limit: typeof limit === "number" ? limit : ENDPOINTS[endpoint].perWindow,
 			unit: typeof nested(details, "unit") === "string" ? String(nested(details, "unit")) : "minute",
 			windowSeconds: Math.round(windowMs / 1000),
 		},
@@ -57,9 +57,9 @@ const windowOf = (body: unknown, headers: Headers): { windowMs: number; limit: L
  * Status to arm. `null` for a non-2xx the contract does not name (302 through a proxy, HTML from a
  * gateway, a 5xx), so the call loop decides: it backs off and rotates rather than spending the key.
  */
-export const classify = (status: number, body: unknown, headers: Headers): Ok | NonOk | null => {
+export const classify = (status: number, body: unknown, headers: Headers, endpoint: EndpointId): Ok | NonOk | null => {
 	if (status >= 200 && status < 300) return { kind: "ok" };
-	if (status === 429) return { kind: "rate-limited", ...windowOf(body, headers) };
+	if (status === 429) return { kind: "rate-limited", ...windowOf(body, headers, endpoint) };
 	if (status === 401) return { kind: "dead-key" };
 	if (status === 402 || status === 403) {
 		const walletUrl = nested(nested(body, "error"), "details");
@@ -100,7 +100,7 @@ export const send: Transport = async (request, lease, signal) => {
 			return raw;
 		}
 	})();
-	const outcome = classify(response.status, payload, response.headers);
+	const outcome = classify(response.status, payload, response.headers, request.endpoint);
 	if (outcome === null) return { outcome: { kind: "transient" } };
 	return outcome.kind === "ok" ? { outcome, body: payload } : { outcome };
 };
