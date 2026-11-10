@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { addAccount, captureFromCli, EMPTY_STORE, parseStore, readStore } from "../accounts.ts";
+import { addAccount, captureFromCli, EMPTY_STORE, parseStore, readStore, saveCursor } from "../accounts.ts";
 
 let dir: string;
 let store: string;
@@ -50,13 +50,31 @@ describe("parseStore", () => {
 });
 
 describe("readStore", () => {
-	it("yields an empty store for a missing file", async () => {
-		expect(await readStore(store)).toEqual(EMPTY_STORE);
+	it("yields an empty store and no backup for a missing file", async () => {
+		expect(await readStore(store)).toEqual({ store: EMPTY_STORE, brokenAt: null });
 	});
-	
-	it("yields an empty store for a file that is not JSON", async () => {
+
+	it("keeps the bytes of a file that will not parse and reports where", async () => {
 		await writeFile(store, "not json");
-		expect(await readStore(store)).toEqual(EMPTY_STORE);
+		expect(await readStore(store)).toEqual({ store: EMPTY_STORE, brokenAt: `${store}.broken` });
+		expect(await readFile(`${store}.broken`, "utf8")).toBe("not json");
+	});
+
+	it("keeps the first backup, so a second broken read leaves it alone", async () => {
+		await writeFile(store, "first");
+		await readStore(store);
+		await writeFile(store, "second");
+		expect((await readStore(store)).brokenAt).toBe(`${store}.broken`);
+		expect(await readFile(`${store}.broken`, "utf8")).toBe("first");
+	});
+
+	it("writes a shutdown cursor from the store it was handed, not from a re-read", async () => {
+		await writeFile(store, "not json");
+		const loaded = await readStore(store);
+		const parsed = parseStore({ accounts: [{ id: "a1", key: "k1" }], cursor: null });
+		await saveCursor(parsed, "a1");
+		expect(JSON.parse(await readFile(store, "utf8"))).toMatchObject({ accounts: [{ id: "a1", key: "k1" }], cursor: "a1" });
+		expect(loaded.store).toEqual(EMPTY_STORE);
 	});
 });
 

@@ -45,7 +45,7 @@ export const callPool = async (
 ): Promise<unknown> => {
 	const wire = deps.transport ?? send;
 	const sleep = deps.sleep ?? defaultSleep;
-	const reload = deps.reload ?? readStore;
+	const reload = deps.reload ?? (async () => (await readStore()).store);
 	const deadline = deps.pool.now() + (deps.poolConfig ?? POOL_CONFIG).maxWaitMs;
 	let turns = 0;
 	let reloaded = false;

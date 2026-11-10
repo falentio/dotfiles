@@ -9,7 +9,7 @@ if (key === "") {
 	process.exit(1);
 }
 
-const before = await readStore();
+const before = (await readStore()).store;
 const after = await addAccount(key, before);
 
 if (after === before) console.log(`already in ${storePath()}`);
