@@ -5,9 +5,9 @@ description: Use this skill before any TinyFish web research (MANDATORY). Run Se
 
 # Search and fetch with TinyFish
 
-Call TinyFish from the Code Mode `execute` tool. The runtime exposes `tools.tinyfish_search` and `tools.tinyfish_fetch_content`. Both are local extension tools with `codemode` exposure, so they are callable only from a script and never declared to the model. A tool name becomes one flat script identifier and never a nested path, so the MCP-era `tools.tinyfish.search` is now `tools.tinyfish_search`. A prompt written before the move has to be rewritten; `describeNamespace("tinyfish")` names the mapping.
+Call TinyFish from the Code Mode `execute` tool. The runtime exposes `tools.tinyfish_search`, `tools.tinyfish_fetch_content`, and `tools.tinyfish_research`. Both are local extension tools with `codemode` exposure, so they are callable only from a script and never declared to the model. A tool name becomes one flat script identifier and never a nested path, so the MCP-era `tools.tinyfish.search` is now `tools.tinyfish_search`. A prompt written before the move has to be rewritten; `describeNamespace("tinyfish")` names the mapping.
 
-Search returns ranked result metadata. Fetch returns content from known URLs.
+Search returns ranked result metadata. Fetch returns content from known URLs. Research does both in one call: it ranks, reads the top few, and returns their text.
 
 ## Accounts
 
@@ -29,23 +29,30 @@ What the errors mean:
 
 ## Call shape
 
+Reach for `research` when the answer needs page text: one call does the search and the reading, and a page that will not load lands in `errors` instead of failing the batch.
+
 ```js
-const found = await tools.tinyfish_search({ query: "...", page: 0 });
-const fetched = await tools.tinyfish_fetch_content({
-  urls: found.results.slice(0, 3).map((r) => r.url),
-  format: "markdown",
-  page_metadata: true,
-});
+const found = await tools.tinyfish_research({ query: "...", top: 3, purpose: "..." });
 return {
-  sources: fetched.results.map((r) => ({ url: r.final_url, title: r.title })),
-  failed: fetched.errors,
+  sources: found.results.map((r) => ({ url: r.final_url, title: r.title })),
+  text: found.results.map((r) => r.text.slice(0, 2000)),
+  failed: found.errors,
 };
+```
+
+Search then Fetch separately when you need to choose from the ranking yourself, or to re-read URLs you already have:
+
+```js
+const found = await tools.tinyfish_search({ query: "..." });
+const urls = found.results.filter((r) => r.site_name === "docs.example.com").map((r) => r.url);
+const fetched = await tools.tinyfish_fetch_content({ urls, page_metadata: true });
+return { sources: fetched.results.map((r) => ({ url: r.final_url, title: r.title })), failed: fetched.errors };
 ```
 
 Rules for the runtime:
 
 - Await every call. Pending calls are interrupted when the block ends.
-- `tools.tinyfish_fetch_content` requires `urls` and `format`. `links`, `image_links`, and `page_metadata` are optional and default to `false`.
+- `tools.tinyfish_fetch_content` requires only `urls`. Everything else is optional and sent only when set, so `{ urls: [...] }` is a valid call and answers markdown.
 - A request-level validation error throws. Conflicting search filters and a batch carrying a validator both throw. Wrap the block in `try/catch` when the arguments come from a user or a model.
 - A per-URL failure does not throw. It appears in the `errors` array of the fetch envelope.
 - Return JSON-serializable data. Read the live signature with `tools.tinyfish_search({ query: "tinyfish" })` inside `execute` when a parameter shape matters.
@@ -79,10 +86,10 @@ Use `purpose` as a short statement of the user's goal, not as a second keyword l
 ## Fetch
 
 1. Normalize the input to public `http` or `https` URLs. Batch at most ten URLs per call. The URL set is valid before the tool call.
-2. Always pass `format`, and pass each output flag you want on. `links`, `image_links`, and `page_metadata` default to `false`, so `format` alone is a valid call.
+2. Leave out what you do not need. `urls` alone is a valid call: the API answers markdown with no extra fields. Turn a flag on only when its fields matter.
 3. Define the extraction goal in `purpose` when the task needs focused extraction. Keep the purpose under `2000` characters.
 4. Choose one output format. Use `format: "markdown"` for readable page content, `"html"` when markup matters, and `"json"` for the structured document tree.
-5. Set output flags deliberately. Set `links: true` when outbound URLs matter. Set `image_links: true` when image URLs matter. Set `page_metadata: true` when titles, descriptions, authors, dates, or Open Graph data matter. Set `iframe_links: true` when embedded frames matter.
+5. Set output flags deliberately. Set `page_metadata: true` when titles, descriptions, authors, dates, or Open Graph data matter; it is the one worth reaching for. Set `links: true` when outbound URLs matter. `image_links` and `iframe_links` still work but are undeclared, so pass them by name when image or frame URLs matter.
 6. Scope extraction when the page has a clear region. Use `exclude_selectors` before `include_selectors` to remove noise and keep the target region. Each selector array has at most twenty entries, and each entry has at most one thousand characters.
 7. Treat selector results as a contract. A partial include match returns matched content and `unmatched_selectors`. A total miss returns `selector_not_matched` with candidate selectors. Retry with a useful candidate or change the selector. Keep a scoped request scoped.
 8. Set freshness intentionally. Omit `ttl` to accept the cache, use `ttl: 0` for a live preference, and use a positive number of seconds for a bounded freshness preference. Use `per_url_timeout_ms` only when a page needs a custom deadline.
@@ -242,7 +249,7 @@ Search metadata is not full page content. Fetch the URL before treating a snippe
 
 Use the live `tools.tinyfish_fetch_content` schema as the runtime contract. Read it with `tools.tinyfish_search({ query: "tinyfish" })` inside `execute`. The HTTP API endpoint is `POST https://api.fetch.tinyfish.ai`. The extension writes `X-API-Key` and `Content-Type: application/json` for you. Fetch requests are free at any wallet balance, but the key still needs API access.
 
-Required fields are `urls` and `format`. The output flags `links`, `image_links`, and `page_metadata` default to `false`. Selector parameters can contain CSS comma-grouping. Invalid CSS syntax throws from the tool call, and the error names the offending selector.
+`urls` is the only required field. The output flags are sent only when set; `image_links` and `iframe_links` are undeclared but accepted. Selector parameters can contain CSS comma-grouping. Invalid CSS syntax throws from the tool call, and the error names the offending selector.
 
 ### Fetch result envelope
 

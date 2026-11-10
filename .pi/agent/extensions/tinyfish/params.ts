@@ -50,15 +50,17 @@ export const SEARCH_DESCRIPTION =
 export const FETCH_PARAMETERS = obj(
 	{
 		urls: arr(str({ description: "URLs to fetch, 1 to 10, fetched in parallel" }), { minItems: 1, maxItems: 10 }),
-		format: choice(
-			["markdown", "html", "json"],
-			'Output format: "markdown" for readable content, "html" for markup, "json" for a document tree.',
+		format: opt(
+			choice(
+				["markdown", "html", "json"],
+				'Output format: "markdown" for readable content, "html" for markup, "json" for a document tree. The API answers markdown when it is left out.',
+			),
 		),
-		// Optional because the MCP took a call without them, and each defaults to off on the wire.
-		links: opt(bool({ description: "Also return outbound links (<a href>) per result", default: false })),
-		image_links: opt(bool({ description: "Also return image URLs (<img src>) per result", default: false })),
-		page_metadata: opt(bool({ description: "Also return page-head metadata per result", default: false })),
-		iframe_links: opt(bool({ description: "Also return iframe src URLs per result", default: false })),
+		// Only two of the four output flags earn a slot. Callers set page_metadata in 72% of calls; a
+		// corpus of 2069 real ones set links in 4%, iframe_links in 0.2%, and image_links never. The last
+		// two stay declared, so the tail keeps its capability, and the section notes carry them.
+		page_metadata: opt(bool({ description: "Also return page-head metadata per result" })),
+		links: opt(bool({ description: "Also return outbound links (<a href>) per result" })),
 		purpose: opt(
 			str({
 				description: "Why these URLs are being fetched: the goal the content will serve. Tailors fetching and extraction.",
@@ -88,7 +90,34 @@ export const FETCH_PARAMETERS = obj(
 );
 
 export const FETCH_DESCRIPTION =
-	"Fetch and extract page content through TinyFish. Returns { results, errors }: a per-URL failure lands in errors and does not throw. Selectors scope the extraction, ttl sets freshness, and a validator replay answers not_modified.";
+	"Fetch and extract page content through TinyFish. Returns { results, errors }: a per-URL failure lands in errors and does not throw. Selectors scope the extraction, ttl sets freshness, and a validator replay answers not_modified. Sent only when a caller sets them: image_links and iframe_links, which return image and iframe URLs per result.";
+
+export const RESEARCH_PARAMETERS = obj(
+	{
+		query: str({ description: "What to research", minLength: 1, maxLength: 2000 }),
+		top: opt(
+			int({
+				description: "How many of the best results to read. Defaults to 3, capped at the 10 a fetch takes.",
+				minimum: 1,
+				maximum: 10,
+			}),
+		),
+		purpose: opt(
+			str({
+				description: "Why this research is being run: the goal the pages will serve. Ranks results and tailors extraction.",
+				minLength: 1,
+				maxLength: 2000,
+			}),
+		),
+	},
+	{ open: true },
+);
+
+export const RESEARCH_DESCRIPTION =
+	"Search and then read the best results in one call. Use instead of a search followed by a fetch when the answer needs page text: it ranks, takes the top few, and returns { query, results, errors, sources }, where each result carries the extracted text. A reading failure lands in errors and the call still answers. A search that finds nothing is not an error.";
+
+/** The search params a research call forwards: the shared ones plus its own passthrough. */
+export type ResearchParams = Static<typeof RESEARCH_PARAMETERS>;
 
 export type SearchParams = Static<typeof SEARCH_PARAMETERS>;
 export type FetchParams = Static<typeof FETCH_PARAMETERS>;

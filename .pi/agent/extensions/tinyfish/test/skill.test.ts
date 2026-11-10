@@ -22,6 +22,10 @@ describe("the skill", () => {
 		expect(unknown).toEqual([]);
 	});
 
+	it("names every registered tool, so a new one cannot ship undocumented", () => {
+		for (const name of flat) expect(skill).toContain(`tools.${name}`);
+	});
+
 	it("never writes a dotted call, which tools has no member for", () => {
 		for (const name of bare(skill).filter((candidate) => candidate.includes("."))) {
 			expect(dotted.has(name)).toBe(true);

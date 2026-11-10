@@ -6,6 +6,8 @@ export interface Stub {
 	readonly searchBase: string;
 	readonly fetchBase: string;
 	readonly seen: string[];
+	/** Clears the delivery counters, so a test asserts its own calls and not the previous test's. */
+	reset(): void;
 	hit(key: string, endpoint: Endpoint): number;
 	script(key: string, endpoint: Endpoint, answers: readonly Scripted[]): void;
 	stop(): void;
@@ -54,6 +56,10 @@ export function startStub(): Stub {
 		searchBase: `${origin}/search`,
 		fetchBase: `${origin}/fetch`,
 		seen,
+		reset: () => {
+			seen.length = 0;
+			delivered.clear();
+		},
 		hit: (key, endpoint) => delivered.get(`${key} ${endpoint}`) ?? 0,
 		script: (key, endpoint, answers) => void scripts.set(`${key} ${endpoint}`, { answers, taken: 0 }),
 		stop: () => void server.stop(true),

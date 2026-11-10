@@ -17,9 +17,11 @@ export type Transport = (request: EndpointRequest, lease: Lease, signal: AbortSi
 
 const nested = (value: unknown, key: string): unknown => (isRecord(value) ? value[key] : undefined);
 
-/** A left-out output flag posts `false`, which is what the MCP defaulted it to. */
-const fetchBody = (params: FetchParams): string =>
-	JSON.stringify({ ...params, links: params.links ?? false, image_links: params.image_links ?? false, page_metadata: params.page_metadata ?? false });
+/**
+ * Only the keys a caller set. `false` and a missing key answer the same field set from the API, so a
+ * filled-in default is bytes nobody reads, and the model copies back whatever the schema shows.
+ */
+const fetchBody = (params: FetchParams): string => JSON.stringify(params);
 
 const searchUrl = (params: SearchParams): string => {
 	const url = new URL(ENDPOINTS.search.baseUrl());

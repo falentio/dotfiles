@@ -5,7 +5,7 @@ import { join } from "node:path";
 import type { ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import tinyfish from "../index.ts";
 import { MCP_NAMES, TOOL_NAMES } from "../names.ts";
-import { startStub, type Stub } from "./stub.ts";
+import { json, startStub, type Stub } from "./stub.ts";
 
 let stub: Stub;
 let dir: string;
@@ -51,7 +51,7 @@ const searchBody = (body: unknown) => stub.script("key-a1", "search", [{ status:
 
 describe("the registered tools", () => {
 	it("registers each definition exactly once, under the flat name", () => {
-		expect([...registered().keys()].sort()).toEqual([TOOL_NAMES.search, TOOL_NAMES.fetch].sort());
+		expect([...registered().keys()].sort()).toEqual(Object.values(TOOL_NAMES).sort());
 	});
 
 	it("keeps the MCP-era name resolved to a real member, so a stale prompt has a mapping", () => {
@@ -63,6 +63,13 @@ describe("the registered tools", () => {
 	it("takes a fetch with only urls and format, which is the call the MCP accepted", async () => {
 		await call(TOOL_NAMES.fetch, { urls: ["https://x.test"], format: "markdown" });
 		expect(stub.hit("key-a1", "fetch")).toBe(1);
+	});
+
+	it("takes a research call that names only the query, with top defaulting to three", async () => {
+		stub.script("key-a1", "search", [json(200, { query: "q", results: [{ title: "A", url: "https://a.test/1" }] })]);
+		stub.script("key-a1", "fetch", [json(200, { results: [], errors: [] })]);
+		const result = await call(TOOL_NAMES.research, { query: "q" });
+		expect((result.structuredContent as { sources: string[] }).sources).toEqual(["https://a.test/1"]);
 	});
 
 	it("declares an output schema, which is what makes a script receive structured content", () => {
@@ -85,8 +92,10 @@ describe("a call result", () => {
 		expect((await call(TOOL_NAMES.search, { query: "q" })).structuredContent).toEqual({ value: "plain" });
 	});
 
-	it("keeps the body as text in content, for the path the model reads", async () => {
-		searchBody({ results: [] });
-		expect((await call(TOOL_NAMES.search, { query: "q" })).content).toEqual([{ type: "text", text: '{"results":[]}' }]);
+	it("summarizes in content instead of repeating the body, which is the structured side's job", async () => {
+		searchBody({ query: "q", total_results: 0, results: [], errors: [] });
+		expect((await call(TOOL_NAMES.search, { query: "q" })).content).toEqual([
+			{ type: "text", text: '0 results for "q"' },
+		]);
 	});
 });

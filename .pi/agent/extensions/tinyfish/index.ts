@@ -7,9 +7,12 @@ import { MCP_NAMES, TOOL_NAMES } from "./names.ts";
 import {
 	FETCH_DESCRIPTION,
 	FETCH_PARAMETERS,
+	RESEARCH_DESCRIPTION,
+	RESEARCH_PARAMETERS,
 	SEARCH_DESCRIPTION,
 	SEARCH_PARAMETERS,
 	type FetchParams,
+	type ResearchParams,
 	type SearchParams,
 } from "./params.ts";
 import { createPool, cursorOf, type Pool } from "./pool.ts";
@@ -62,8 +65,22 @@ export default function tinyfish(pi: ExtensionAPI): void {
 		},
 	};
 
+	const research: Definition = {
+		label: "TinyFish research",
+		description: RESEARCH_DESCRIPTION,
+		parameters: RESEARCH_PARAMETERS,
+		outputSchema: OUTPUT_SCHEMA,
+		exposure: "codemode",
+		namespace: NAMESPACE,
+		annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+		async execute(_id, params, signal) {
+			return envelope(await deps().client.research(params as ResearchParams, signal));
+		},
+	};
+
 	pi.registerTool({ ...search, name: TOOL_NAMES.search });
 	pi.registerTool({ ...fetchContent, name: TOOL_NAMES.fetch });
+	pi.registerTool({ ...research, name: TOOL_NAMES.research });
 
 	pi.on("session_start", async (_event, ctx) => {
 		const loaded = await readStore();

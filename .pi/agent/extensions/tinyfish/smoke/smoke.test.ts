@@ -59,7 +59,7 @@ function runPi(): Promise<{ code: number | null; out: string; err: string }> {
 				"off",
 				// codemode ships as an extension too, so --no-extensions would remove the tools namespace.
 				"--tools", "+codemode",
-				`In one codemode script call tools.tinyfish_search({ query: "smoke" }) and tools.tinyfish_fetch_content({ urls: ["https://x.test"], format: "markdown" }), then reply with only a line of the form SMOKE <total_results> <results length> <fetch errors length>.`,
+				`In one codemode script call tools.tinyfish_search({ query: "smoke" }), tools.tinyfish_fetch_content({ urls: ["https://x.test"] }), and tools.tinyfish_research({ query: "smoke", top: 1 }), then reply with only a line of the form SMOKE <total_results> <results length> <fetch errors length> <research results length>.`,
 			],
 			{
 				cwd: dir,
@@ -94,7 +94,7 @@ function runPi(): Promise<{ code: number | null; out: string; err: string }> {
 
 describe("the extension inside pi", () => {
 	it(
-		"is found by discovery and serves both tools",
+		"is found by discovery and serves all three tools",
 		async () => {
 			stub.script("smoke-key", "search", [
 				json(200, {
@@ -104,13 +104,14 @@ describe("the extension inside pi", () => {
 					page: 0,
 				}),
 			]);
+			stub.script("smoke-key", "fetch", [json(200, { results: [{ url: "https://x.test", text: "hi" }], errors: [] })]);
 			const { code, out, err } = await runPi();
 			expect(code, `pi exited ${code}
 STDOUT:
 ${out}
 STDERR:
 ${err}`).toBe(0);
-			expect(out).toContain("SMOKE 1 1 0");
+			expect(out).toContain("SMOKE 1 1 0 1");
 			expect(stub.seen).toContain("smoke-key");
 			expect(stub.hit("smoke-key", "fetch")).toBeGreaterThan(0);
 		},

@@ -17,7 +17,7 @@ beforeAll(() => {
 afterAll(() => stub.stop());
 
 beforeEach(() => {
-	stub.seen.length = 0;
+	stub.reset();
 	time = clock();
 	shared = pool("a1", "a2");
 });
@@ -278,12 +278,13 @@ describe("the wire", () => {
 				urls: ["https://example.com"],
 				format: "markdown",
 				links: false,
-				image_links: false,
 				page_metadata: true,
 			});
 			expect(JSON.parse(bodies[0] ?? "{}")).toMatchObject({ urls: ["https://example.com"], page_metadata: true });
-			await createClient(deps()).fetchContent({ urls: ["https://example.com"], format: "markdown" });
-			expect(JSON.parse(bodies[1] ?? "{}")).toMatchObject({ links: false, image_links: false, page_metadata: false });
+			// Only the keys a caller set: an omitted flag is not filled in, because the wire treats a
+			// missing key and false the same and the words are bytes on every call.
+			await createClient(deps()).fetchContent({ urls: ["https://example.com"] });
+			expect(Object.keys(JSON.parse(bodies[1] ?? "{}"))).toEqual(["urls"]);
 		} finally {
 			server.stop(true);
 			process.env.TINYFISH_FETCH_BASE_URL = stub.fetchBase;
@@ -292,14 +293,53 @@ describe("the wire", () => {
 
 	it("keeps a per-URL failure in errors instead of throwing", async () => {
 		stub.script("key-a1", "fetch", [json(200, { results: [], errors: [{ url: "https://x.test", error: "bot_blocked" }] })]);
-		const body = (await createClient(deps()).fetchContent({
-			urls: ["https://x.test"],
-			format: "markdown",
-			links: false,
-			image_links: false,
-			page_metadata: false,
-		})) as { errors: unknown[] };
+		const body = (await createClient(deps()).fetchContent({ urls: ["https://x.test"] })) as { errors: unknown[] };
 		expect(body.errors).toHaveLength(1);
+	});
+
+	it("researches in one call: ranks, then reads the top results in order", async () => {
+		stub.script("key-a1", "search", [
+			json(200, {
+				query: "q",
+				total_results: 3,
+				results: [
+					{ title: "A", url: "https://a.test/1" },
+					{ title: "B", url: "https://b.test/2" },
+					{ title: "C", url: "https://c.test/3" },
+				],
+			}),
+		]);
+		stub.script("key-a1", "fetch", [json(200, { results: [{ url: "https://a.test/1", text: "hello" }], errors: [] })]);
+		const body = (await createClient(deps({ pool: pool("a1") })).research({ query: "q", top: 2 })) as {
+			sources: string[];
+			results: unknown[];
+		};
+		expect(body.sources).toEqual(["https://a.test/1", "https://b.test/2"]);
+		expect(stub.hit("key-a1", "fetch")).toBe(1);
+		expect(body.results).toHaveLength(1);
+	});
+
+	it("answers a research that found nothing without spending a fetch", async () => {
+		stub.script("key-a1", "search", [json(200, { query: "q", total_results: 0, results: [] })]);
+		const body = (await createClient(deps({ pool: pool("a1") })).research({ query: "q" })) as { sources: string[]; results: unknown[] };
+		expect(body.sources).toEqual([]);
+		expect(body.results).toEqual([]);
+		expect(stub.hit("key-a1", "fetch")).toBe(0);
+	});
+
+	it("keeps a reading failure in errors and still answers the search", async () => {
+		stub.script("key-a1", "search", [json(200, { query: "q", results: [{ title: "A", url: "https://a.test/1" }] })]);
+		stub.script("key-a1", "fetch", [json(200, { results: [], errors: [{ url: "https://a.test/1", error: "bot_blocked" }] })]);
+		const body = (await createClient(deps({ pool: pool("a1") })).research({ query: "q" })) as { errors: { error: string }[] };
+		expect(body.errors[0]?.error).toBe("bot_blocked");
+	});
+
+	it("caps top at the ten a fetch takes", async () => {
+		const results = Array.from({ length: 20 }, (_u, i) => ({ title: "T", url: `https://x${i}.test` }));
+		stub.script("key-a1", "search", [json(200, { query: "q", results })]);
+		stub.script("key-a1", "fetch", [json(200, { results: [], errors: [] })]);
+		const body = (await createClient(deps({ pool: pool("a1") })).research({ query: "q", top: 50 })) as { sources: string[] };
+		expect(body.sources).toHaveLength(10);
 	});
 
 	it("surfaces a 400 without rotating", async () => {
@@ -339,7 +379,7 @@ describe("the wire", () => {
 		const only = pool("a1");
 		const wire = createClient(deps({ pool: only, poolConfig: { maxWaitMs: 10_000 } }));
 		await expect(
-			wire.fetchContent({ urls: ["https://x.test"], format: "markdown", links: false, image_links: false, page_metadata: false }),
+			wire.fetchContent({ urls: ["https://x.test"], format: "markdown" }),
 		).rejects.toThrow("fetch: 150/minute (the local default; the server named no limit)");
 	});
 

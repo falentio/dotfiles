@@ -1,7 +1,8 @@
 # tinyfish
 
-Two codemode tools, `tools.tinyfish_search` and `tools.tinyfish_fetch_content`, call the TinyFish
-REST API from this machine. The MCP server is gone. The tools hold N API keys in
+Three codemode tools, `tools.tinyfish_search`, `tools.tinyfish_fetch_content`, and
+`tools.tinyfish_research`, call the TinyFish REST API from this machine. Research wraps the other two:
+it ranks, reads the top few, and answers the text. The MCP server is gone. The tools hold N API keys in
 `~/.tinyfish/accounts.json`, hand each request an account under a lease, and read the
 account's cooldown off how the request came back.
 
@@ -14,28 +15,30 @@ Read it as three parties:
 
 ## The agent view
 
-The names, the parameters, and the envelope are the MCP's, so a prompt written before the move
-keeps calling. Both tools stay reachable only from codemode scripts, because
+The names and the parameter schemas started as the MCP's; the shapes below are what a corpus of 3379
+real calls changed. The tools stay reachable only from codemode scripts, because
 `./.pi/agent/settings.json` sets `codemode.mode: "only"`. A rate limit that used to throw now costs
 wall-clock time instead, so a burst keeps working.
 
 ```js
-const found = await tools.tinyfish_search({ query: "python pdf invoice parser", page: 0 });
-const pages = await tools.tinyfish_fetch_content({
-  urls: found.results.slice(0, 3).map((r) => r.url),
-  format: "markdown",
-  links: false,
-  image_links: false,
-  page_metadata: true,
-});
+const found = await tools.tinyfish_research({ query: "python pdf invoice parser", top: 3 });
+return { sources: found.results.map((r) => [r.final_url, r.title]), text: found.results.map((r) => r.text) };
+```
+
+Search and fetch separately when the choice of URL is yours:
+
+```js
+const found = await tools.tinyfish_search({ query: "python pdf invoice parser" });
+const urls = found.results.filter((r) => r.site_name === "docs.reportlab.com").map((r) => r.url);
+const pages = await tools.tinyfish_fetch_content({ urls, page_metadata: true });
 return { sources: pages.results.map((r) => [r.final_url, r.title]), failed: pages.errors };
 ```
 
-Both return the MCP envelope: the body as text in `content`, for the model, and the body itself in
-`structuredContent`, which is what a codemode script receives. So `found.results` is a property read,
-and no `JSON.parse` belongs in a script. The output schema is one open object, so a field the API adds
-still arrives. A per-URL fetch failure lands in `errors` and does not throw; a request-level failure
-throws.
+Each returns the body in `structuredContent`, which is what a codemode script receives, so
+`found.results` is a property read and no `JSON.parse` belongs in a script. `content` holds a short
+summary instead of the body: a count, the first three titles, and any failed URLs. The output schema is
+one open object, so a field the API adds still arrives. A per-URL fetch failure lands in `errors` and
+does not throw; a request-level failure throws.
 
 | Wire | What the agent sees |
 | --- | --- |
@@ -128,8 +131,14 @@ operator's cap.
 
 Each of these is a choice the port made, not something carried across.
 
-- `iframe_links` is a fetch flag the MCP had and the old skill never named, so it stays in the schema
-  and works, and the skill lists it with the other output flags.
+- `urls` is the only required fetch parameter. `format` and the output flags are sent only when set,
+  because the API answers the same without them and the model copies back whatever the schema shows. A
+  call as short as `{ urls: [...] }` works.
+- `page_metadata` and `links` are declared; `image_links` and `iframe_links` are not, and are passed
+  through by name. Over 2069 real fetch calls `page_metadata` was set in 72%, `links` in 4%,
+  `iframe_links` in 0.2%, and `image_links` never, so the last two do not earn a schema line.
+- `tools.tinyfish_research` is new and has no MCP ancestor. It exists because 39.5% of real fetches
+  took one URL and 9% of scripts ran a search and a fetch together, each paying the envelope twice.
 - A key that answered 402 or 403 comes back after `SPENT_COOLDOWN_MS`, 15 minutes. Nothing in the spec
   says a spent key returns, and a top up would otherwise need a restart.
 - This README is new. It covers the three parties the extension serves (agent, handler, operator) and
@@ -137,8 +146,24 @@ Each of these is a choice the port made, not something carried across.
 
 ## Params and envelopes
 
-`./params.ts` holds the MCP's parameter schemas field for field. `./http.ts` builds the query string,
-zero-padding `pub_year_*` to four characters, and the JSON fetch body.
+`./params.ts` holds the parameter schemas. `./http.ts` builds the query string, zero-padding
+`pub_year_*` to four characters, and the JSON fetch body, which is the caller's object and nothing it
+did not set. `./envelope.ts` builds the summary.
+
+## The corpus behind the shapes
+
+3379 TinyFish calls recovered from 1036 pi session logs, 2026-10-22 to 2026-11-10, checked before the
+shapes above were chosen:
+
+| Measured | Number | Shape it drove |
+| --- | --- | --- |
+| fetch calls taking exactly one URL | 560 / 1418 (39.5%) | `research`, which wraps search and fetch |
+| validation failures, all missing fetch args | 417 | nothing required but `urls` |
+| scripts reaching `.content[].text` | 2611 | body in `structuredContent`, summary in text |
+| callers setting `image_links` true | 0 of 1829 | left undeclared, passed through |
+| callers setting `iframe_links` true | 3 | left undeclared, passed through |
+| callers setting `page_metadata` true | 1321 (72%) | declared, worth reaching for |
+| `purpose` given, median length | 2782, 141 chars | kept; it carries intent, not the query again |
 
 ## Env
 

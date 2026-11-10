@@ -61,20 +61,45 @@ describe("classify", () => {
 });
 
 describe("the envelope", () => {
-	it("is the MCP shape, one text part holding the JSON body", () => {
-		const result = envelope({ query: "q", results: [], total_results: 0, page: 0 });
-		expect(result.content).toHaveLength(1);
-		expect(result.content[0]?.type).toBe("text");
-		expect(JSON.parse(result.content[0]?.text ?? "")).toEqual({ query: "q", results: [], total_results: 0, page: 0 });
+	it("puts the body in structuredContent, which is the value a script receives", () => {
+		const body = { query: "q", results: [], total_results: 0, page: 0 };
+		expect(envelope(body).structuredContent).toEqual(body);
 	});
 
 	it("forwards a field nobody declared", () => {
 		const body = { results: [], errors: [], brand_new_field: { deep: true } };
-		expect(JSON.parse(envelope(body).content[0]?.text ?? "")).toHaveProperty("brand_new_field.deep", true);
+		expect(envelope(body).structuredContent).toHaveProperty("brand_new_field.deep", true);
 	});
 
-	it("keeps a per-URL error array inside the text, not beside it", () => {
+	it("names a per-URL failure in the summary and keeps it in the body", () => {
 		const result = envelope({ results: [], errors: [{ url: "https://x.test", error: "bot_blocked" }] });
-		expect(JSON.parse(result.content[0]?.text ?? "").errors).toEqual([{ url: "https://x.test", error: "bot_blocked" }]);
+		expect(result.content[0]?.text).toContain("bot_blocked");
+		expect((result.structuredContent as { errors: unknown[] }).errors).toHaveLength(1);
+	});
+});
+
+describe("the summary in content", () => {
+	const text = (body: unknown) => envelope(body).content[0]?.text ?? "";
+
+	it("counts results and names the query instead of dumping them", () => {
+		expect(text({ query: "q", total_results: 12, results: [{ title: "A", url: "https://a.test" }] })).toBe(
+			'12 results for "q"\n- A https://a.test',
+		);
+	});
+
+	it("keeps a long result list to three lines and says how many it left out", () => {
+		const results = Array.from({ length: 6 }, (_unused, index) => ({ title: `T${index}`, url: `https://x${index}.test` }));
+		const shown = text({ results }).split("\n");
+		expect(shown).toHaveLength(5);
+		expect(shown.at(-1)).toBe("- and 3 more");
+	});
+
+	it("says no results rather than answering with an empty string", () => {
+		expect(text({ query: "q", results: [], total_results: 0 })).toBe('0 results for "q"');
+		expect(text({ nonsense: true })).toBe("no results");
+	});
+
+	it("still answers for a body that is not an object", () => {
+		expect(text("plain")).toBe('"plain"');
 	});
 });

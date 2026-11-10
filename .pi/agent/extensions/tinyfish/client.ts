@@ -2,7 +2,7 @@ import { readStore, type AccountStore } from "./accounts.ts";
 import type { CallConfig, PoolConfig } from "./config.ts";
 import { exhausted, toolError, type Depletion, type Exhaustion } from "./errors.ts";
 import { send, type Attempt, type EndpointRequest, type Transport } from "./http.ts";
-import type { FetchParams, SearchParams } from "./params.ts";
+import type { FetchParams, ResearchParams, SearchParams } from "./params.ts";
 import type { Pool } from "./pool.ts";
 
 export interface CallDeps {
@@ -18,6 +18,7 @@ export interface CallDeps {
 export interface Client {
 	search(params: SearchParams, signal?: AbortSignal): Promise<unknown>;
 	fetchContent(params: FetchParams, signal?: AbortSignal): Promise<unknown>;
+	research(params: ResearchParams, signal?: AbortSignal): Promise<unknown>;
 }
 
 const defaultSleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -95,7 +96,36 @@ export const callPool = async (
 const capError = (reason: Extract<Depletion, { kind: "all-cooling" }>, tried: readonly string[]): Error =>
 	toolError(exhausted({ ...reason, tried: [...new Set(tried)] }));
 
+type SearchBody = { readonly results?: readonly { readonly url?: string }[] };
+
+/**
+ * The URLs a fetch should read, best first. The API ranks, so order is kept; a result with no url is
+ * skipped rather than fetched as "undefined". `top` is capped at what one fetch takes.
+ */
+export const sourcesOf = (body: unknown, top: number): string[] => {
+	const results = (body as SearchBody | null)?.results;
+	if (!Array.isArray(results)) return [];
+	return results
+		.slice(0, Math.min(top, 10))
+		.map((result) => result?.url)
+		.filter((url): url is string => typeof url === "string" && url.length > 0);
+};
+
 export const createClient = (deps: CallDeps): Client => ({
 	search: (params, signal) => callPool(deps, { endpoint: "search", params }, signal),
 	fetchContent: (params, signal) => callPool(deps, { endpoint: "fetch", params }, signal),
+	/** Two turns, so a dead key is handled inside each and a caller sees three limits, not nine. */
+	async research(params, signal) {
+		const { top = 3, ...search } = params;
+		const found = await callPool(deps, { endpoint: "search", params: search }, signal);
+		const sources = sourcesOf(found, top);
+		// A search that found nothing is an answer, not a failure, so it never reaches the fetch.
+		if (sources.length === 0) return { ...(found as object), sources };
+		const read = (await callPool(
+			deps,
+			{ endpoint: "fetch", params: { urls: sources, format: "markdown", purpose: params.purpose } },
+			signal,
+		)) as { results?: unknown; errors?: unknown };
+		return { ...(found as object), results: read.results ?? [], errors: read.errors ?? [], sources };
+	},
 });
