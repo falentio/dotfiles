@@ -34,9 +34,6 @@ const deps = (overrides: Partial<CallDeps> = {}): CallDeps => ({
 
 const search = { endpoint: "search" as const, params: { query: "q" } };
 
-/** A reload that serves a second account, for the revival case. */
-const twoAccounts = async () => storeOf("a1", "a2");
-
 /** A transport that records the key it was handed and replays a script, repeating the last arm. */
 const scripted = (outcomes: readonly Outcome[], seen: string[] = []) => {
 	let turn = 0;
@@ -158,13 +155,65 @@ describe("the store reload", () => {
 		expect(reads).toBe(1);
 	});
 
-	it("revives a spent pool from a reload, so a top-up joins without a restart", async () => {
-		const spentNow = createPool({ store: storeOf("a1"), now: time.now, wait: time.wait });
-		const lease = await spentNow.acquire("search");
-		lease.release({ kind: "spent", walletUrl: "https://wallet" });
-		const body = await callPool(deps({ pool: spentNow, transport: scripted([{ kind: "ok" }]), reload: twoAccounts }), search);
-		expect(body).toEqual({ results: [] });
-		expect(stub.seen).toEqual([]);
+	it("reloads neither for a paced pool nor for a spent one", async () => {
+		let reads = 0;
+		const reload = async () => {
+			reads += 1;
+			return storeOf("a1", "a2");
+		};
+		const paced = pool("a1");
+		const pacing = await paced.acquire("search");
+		pacing.release({ kind: "rate-limited", windowMs: 600_000, limit: null });
+		await expect(
+			callPool(deps({ pool: paced, poolConfig: { maxWaitMs: 1_000 }, reload, transport: scripted([{ kind: "ok" }]) }), search),
+		).rejects.toThrow("wait limit hit");
+		const spent = pool("a1");
+		const burning = await spent.acquire("search");
+		burning.release({ kind: "spent", walletUrl: null });
+		await expect(
+			callPool(deps({ pool: spent, poolConfig: { maxWaitMs: 1_000 }, reload, transport: scripted([{ kind: "ok" }]) }), search),
+		).rejects.toThrow("out of credits");
+		expect(reads).toBe(0);
+	});
+
+	it("reloads once for an all-dead pool, then reports it", async () => {
+		let reads = 0;
+		const reload = async () => {
+			reads += 1;
+			return storeOf();
+		};
+		const dead = pool("a1", "a2");
+		for (let i = 0; i < 2; i += 1) {
+			const lease = await dead.acquire("search");
+			lease.release({ kind: "dead-key" });
+		}
+		await expect(callPool(deps({ pool: dead, reload, transport: scripted([{ kind: "ok" }]) }), search)).rejects.toThrow(
+			"tinyfish-auth-set",
+		);
+		expect(reads).toBe(1);
+	});
+
+	it("surfaces an acquire failure that is not an exhaustion, without a reload", async () => {
+		let reads = 0;
+		const reload = async () => {
+			reads += 1;
+			return storeOf("a1");
+		};
+		const abort = new AbortController();
+		const stuck = createPool({
+			store: storeOf("a1"),
+			now: time.now,
+			wait: () =>
+				new Promise((_resolve, reject) => {
+					abort.signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+				}),
+		});
+		const lease = await stuck.acquire("search");
+		lease.release({ kind: "rate-limited", windowMs: 60_000, limit: null });
+		const pending = callPool(deps({ pool: stuck, reload, transport: scripted([{ kind: "ok" }]) }), search, abort.signal);
+		abort.abort();
+		await expect(pending).rejects.toThrow("aborted");
+		expect(reads).toBe(0);
 	});
 
 	it("reloads only once per call, then reports the empty store", async () => {
