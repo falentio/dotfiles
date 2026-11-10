@@ -153,7 +153,8 @@ did not set. `./envelope.ts` builds the summary.
 ## The corpus behind the shapes
 
 3379 TinyFish calls recovered from 1036 pi session logs, 2026-10-22 to 2026-11-10, checked before the
-shapes above were chosen:
+shapes above were chosen. The extraction is not committed (`.audit/` is ignored), so the numbers are
+a snapshot, not something a checkout can re-derive:
 
 | Measured | Number | Shape it drove |
 | --- | --- | --- |
