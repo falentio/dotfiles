@@ -34,11 +34,19 @@ const EXTENSION_DIR = dirname(fileURLToPath(import.meta.url));
 /** The command that puts a key in the store. The operator's whole fix for an empty or dead pool. */
 export const addKeyCommand = (): string => `printf '%s' '<key>' | ${join(EXTENSION_DIR, "bin", "tinyfish-auth-set")}`;
 
-/** `search: 30/minute`, from the server's own numbers, or the endpoint's ceiling marked as a local guess. */
-const limitText = (endpoint: EndpointId, limit: Limit | null): string =>
-	limit === null
-		? `${endpoint}: ${ENDPOINTS[endpoint].perWindow}/minute (the local default; the server named no limit)`
-		: `${endpoint}: ${limit.limit}/${limit.unit}`;
+/** A span an operator acts on: whole minutes past a minute, whole seconds below it. */
+const span = (ms: number): string =>
+	ms >= 60_000 ? `${Math.round(ms / 60_000)}m` : `${Math.max(1, Math.round(ms / 1000))}s`;
+
+/**
+ * `search: 30/minute`, from the server's own numbers, or the endpoint's ceiling marked as a local guess.
+ * A window past two minutes is spelled out, because `30/minute` alone reads as a minute-long cooldown.
+ */
+const limitText = (endpoint: EndpointId, limit: Limit | null): string => {
+	if (limit === null) return `${endpoint}: ${ENDPOINTS[endpoint].perWindow}/minute (the local default; the server named no limit)`;
+	const named = `${endpoint}: ${limit.limit}/${limit.unit}`;
+	return limit.windowSeconds >= 120 ? `${named} over a ${span(limit.windowSeconds * 1000)} window` : named;
+};
 
 const clock = (at: Date): string =>
 	at.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
