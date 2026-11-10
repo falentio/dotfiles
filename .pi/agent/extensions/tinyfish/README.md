@@ -115,6 +115,17 @@ Death is on both endpoints, cooldown on one, and `readyAt` reads all three arms 
 `acquire` stamps synchronously before it returns, so two acquires in one tick take different keys
 without a mutex.
 
+## Where this goes past the MCP
+
+Each of these is a choice the port made, not something carried across.
+
+- `iframe_links` is a fetch flag the MCP had and the old skill never named, so it stays in the schema
+  and works, and the skill lists it with the other output flags.
+- A key that answered 402 or 403 comes back after `SPENT_COOLDOWN_MS`, 15 minutes. Nothing in the spec
+  says a spent key returns, and a top up would otherwise need a restart.
+- This README is new. It covers the three parties the extension serves (agent, handler, operator) and
+  the review it shipped from, and it is not in the PR's scope list.
+
 ## Params and envelopes
 
 `./params.ts` holds the MCP's parameter schemas field for field. `./http.ts` builds the query string,
