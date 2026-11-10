@@ -3,7 +3,7 @@ import { captureFromCli, EMPTY_STORE, readStore, saveCursor, storePath, type Acc
 import { CALL_CONFIG, POOL_CONFIG } from "./config.ts";
 import { createClient, type Client } from "./client.ts";
 import { envelope, OUTPUT_SCHEMA } from "./envelope.ts";
-import { TOOL_NAMES } from "./names.ts";
+import { MCP_NAMES, TOOL_NAMES } from "./names.ts";
 import {
 	FETCH_DESCRIPTION,
 	FETCH_PARAMETERS,
@@ -14,7 +14,13 @@ import {
 } from "./params.ts";
 import { createPool, cursorOf, type Pool } from "./pool.ts";
 
-const NAMESPACE = { name: "tinyfish", description: "TinyFish web search and page fetch" } as const;
+const NAMESPACE = {
+	name: "tinyfish",
+	description: "TinyFish web search and page fetch",
+	// `tools` resolves an identifier, never a dotted path, so this is the only way a pre-move prompt's
+	// `tools.tinyfish.search` still reads. Registering the dotted name twice would not help.
+	instructions: `MCP-era names: ${MCP_NAMES.search} is tools.tinyfish_search, ${MCP_NAMES.fetch} is tools.tinyfish_fetch_content.`,
+} as const;
 
 type Definition = Omit<ToolDefinition, "name">;
 
