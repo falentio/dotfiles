@@ -8,7 +8,7 @@ const README = join(DIR, "README.md");
 const read = () => readFileSync(README, "utf8");
 
 /** Every finding the review raised, from the table that carries them. */
-const rules = (text: string): string[] => [...text.matchAll(/^\| ([HMLN]\d+) \|/gm)].map((match) => match[1] ?? "");
+const rules = (text: string): string[] => [...text.matchAll(/^\| ([SDHMLN]\d+) \|/gm)].map((match) => match[1] ?? "");
 
 /** The commit that closes a finding, searched by its trailer rather than by a sha that a rebase moves. */
 const closerOf = (rule: string): string | undefined =>
@@ -19,11 +19,11 @@ const closerOf = (rule: string): string | undefined =>
 		.filter(Boolean)
 		.at(-1);
 
-const ROW = /^(\| [HMLN]\d+ \| .+ \| )\`[0-9a-f]{7}\`( \|)$/gm;
+const ROW = /^(\| [SDHMLN]\d+ \| .+ \| )\`[0-9a-f]{7}\`( \|)$/gm;
 
 const relinked = (text: string): string =>
 	text.replace(ROW, (line, head: string, tail: string) => {
-		const rule = /^\| ([HMLN]\d+) \|/.exec(line)?.[1] ?? "";
+		const rule = /^\| ([SDHMLN]\d+) \|/.exec(line)?.[1] ?? "";
 		return head + "\`" + (closerOf(rule) ?? "?") + "\`" + tail;
 	});
 

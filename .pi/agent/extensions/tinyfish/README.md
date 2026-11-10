@@ -153,27 +153,50 @@ trailer fails the suite. A rule id is that reviewer's label, not the repo's.
 
 | # | Finding | Commit |
 | --- | --- | --- |
-| H1 | A 429 on fetch was reported as a 30/min search limit | `5ed3649` |
-| H2 | An unreadable store was overwritten at shutdown | `1f4882e` |
-| M1 | The cap test capped the pool and never the call | `48a814c` |
-| M2 | A dropped acquire rejection fell into the reload | `7c42692` |
-| M3 | The reload fired on a pool that was merely paced | `7c42692` |
-| M4 | `CallDeps.poolConfig` had no production caller | `48a814c` |
-| M5 | The no-retry claim sat inside the clock's spacing window | `7b83df2` |
-| M6 | The cap error conflated out-of-credits with paced | `e55b919` |
-| M7 | The skill promised a retired key never reaches the agent | `8073a0f` |
-| L1 | The empty-pool error was absolute, the skill's copy relative | `d91e2e5` |
-| L2 | An undeclared 4xx was retried three times | `25e6902` |
-| L3 | The cap clock was locale- and timezone-dependent | `6d6e551` |
-| L4 | A guessed 429 limit was stored as the server's | `724a46f` |
-| L5 | A 600 s limit rendered as a per-minute rate | `bf87536` |
-| L6 | Concurrent cursor writes were last-writer-wins | `f701ccb` |
-| L7 | `reload` could land the cursor on `null` | `eed3d9d` |
-| N1 | Comments restated the code below them | `d1bfbd3` |
-| N2 | The auth-set symlink was a duplicate and broke on checkout | `3f9b7a8` |
-| N3 | An intentional abort wrote an `AbortError` trace to stderr | `1258385` |
-| N4 | The cap error never named the keys the call burned | `c064d47` |
-| N5 | The README said `send` writes `X-API-Key` and nothing else | `7736dc4` |
+| H1 | A 429 on fetch was reported as a 30/min search limit | `ec89d44` |
+| H2 | An unreadable store was overwritten at shutdown | `cc76b89` |
+| M1 | The cap test capped the pool and never the call | `6c9e07b` |
+| M2 | A dropped acquire rejection fell into the reload | `b884162` |
+| M3 | The reload fired on a pool that was merely paced | `b884162` |
+| M4 | `CallDeps.poolConfig` had no production caller | `6c9e07b` |
+| M5 | The no-retry claim sat inside the clock's spacing window | `75e4873` |
+| M6 | The cap error conflated out-of-credits with paced | `11f15dc` |
+| M7 | The skill promised a retired key never reaches the agent | `5251117` |
+| L1 | The empty-pool error was absolute, the skill's copy relative | `6697756` |
+| L2 | An undeclared 4xx was retried three times | `5592581` |
+| L3 | The cap clock was locale- and timezone-dependent | `bde5510` |
+| L4 | A guessed 429 limit was stored as the server's | `cb080fb` |
+| L5 | A 600 s limit rendered as a per-minute rate | `e7c9ae2` |
+| L6 | Concurrent cursor writes were last-writer-wins | `13a0931` |
+| L7 | `reload` could land the cursor on `null` | `76f4992` |
+| N1 | Comments restated the code below them | `968ee83` |
+| N2 | The auth-set symlink was a duplicate and broke on checkout | `8425dae` |
+| N3 | An intentional abort wrote an `AbortError` trace to stderr | `a2fb0db` |
+| N4 | The cap error never named the keys the call burned | `edc1d70` |
+| N5 | The README said `send` writes `X-API-Key` and nothing else | `ecc2a82` |
+| S1 | Tool names did not match the MCP's, so old prompts broke | `-` |
+| S2 | A call resolved to a string, so the skill's example threw | `-` |
+| S3 | A second corrupt store re-reported the first one's backup | `-` |
+| S4 | A fetch without the three output flags rejected | `-` |
+| S5 | No test called a registered tool | `-` |
+| S6 | run_web_automation survived with nothing behind it | `-` |
+| S7 | The committed skill checker expected the old names | `-` |
+| S8 | The review-fix claim had no list to audit | `-` |
+| S9 | The smoke passed `-e` and skipped discovery | `-` |
+| S10 | iframe_links came from nowhere | `-` |
+| S11 | SPENT_COOLDOWN_MS revived a spent key, unmentioned | `-` |
+| S12 | The README was a deliverable outside the scope section | `-` |
+| D1 | Bare repo paths in the README | `-` |
+| D2 | Seven commits carried no Rule trailer | `-` |
+| D3 | One isRecord guard written twice | `-` |
+| D4 | The envelope test re-declared the envelope | `-` |
+| D5 | seeded re-implemented seedRecords | `-` |
+| D6 | Members nothing calls stayed | `-` |
+| D7 | poolConfig was a client dep the pool already defaults | `-` |
+| D8 | Standing and graded named nothing | `-` |
+| D9 | Three comments restated their code | `-` |
+| D10 | The smoke sat beside the unit tests, not under smoke/ | `-` |
+| D11 | Stray tabs held blank lines in store.test.ts | `-` |
 
 H2 and L1 each took a second pass (`f01946f`, `c1eeb83`); the table names the commit that closes
 the finding.
