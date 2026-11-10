@@ -9,6 +9,8 @@ export type Depletion =
 			readonly kind: "all-cooling";
 			readonly endpoint: EndpointId;
 			readonly releaseAt: number;
+			/** How long that is from the moment the arm was built, on the pool's own clock. */
+			readonly releaseInMs: number;
 			readonly limit: Limit | null;
 			/** Keys out of credits alongside the paced ones, so "retry" and "top up" read apart. */
 			readonly spentCount: number;
@@ -45,9 +47,14 @@ const EXTENSION_DIR = dirname(fileURLToPath(import.meta.url));
 /** The command that puts a key in the store. The operator's whole fix for an empty or dead pool. */
 export const addKeyCommand = (): string => `printf '%s' '<key>' | ${join(EXTENSION_DIR, "bin", "tinyfish-auth-set")}`;
 
-/** A span an operator acts on: whole minutes past a minute, whole seconds below it. */
-const span = (ms: number): string =>
-	ms >= 60_000 ? `${Math.round(ms / 60_000)}m` : `${Math.max(1, Math.round(ms / 1000))}s`;
+/** A span an operator acts on, coarse past a minute: `4m 12s`, `10m`, `1s`. */
+const span = (ms: number): string => {
+	const total = Math.max(0, Math.round(ms / 1000));
+	if (total < 60) return `${Math.max(1, total)}s`;
+	const minutes = Math.floor(total / 60);
+	const seconds = total % 60;
+	return seconds === 0 ? `${minutes}m` : `${minutes}m ${seconds}s`;
+};
 
 /**
  * `search: 30/minute`, from the server's own numbers, or the endpoint's ceiling marked as a local guess.
@@ -59,8 +66,8 @@ const limitText = (endpoint: EndpointId, limit: Limit | null): string => {
 	return limit.windowSeconds >= 120 ? `${named} over a ${span(limit.windowSeconds * 1000)} window` : named;
 };
 
-const clock = (at: Date): string =>
-	at.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+/** UTC, so the reading means one thing on every host. The span beside it is what the operator acts on. */
+const clock = (at: number): string => `${new Date(at).toISOString().slice(11, 19)}Z`;
 
 /** The only place the operator's failure text exists. */
 export const render = (error: TinyfishToolError): string => {
@@ -84,7 +91,7 @@ const renderExhaustion = (reason: Exhaustion): string => {
 					? ""
 					: ` ${reason.spentCount} of them ${reason.spentCount === 1 ? "is" : "are"} out of credits; the soonest returns in ${span(reason.spentAt - reason.releaseAt)}.`;
 			const burned = reason.tried.length === 0 ? "" : ` Tried: ${reason.tried.join(", ")}.`;
-			return `TinyFish wait limit hit: every key is cooling on ${limitText(reason.endpoint, reason.limit)}, next free at ${clock(new Date(reason.releaseAt))}.${spent}${burned} Retry then.`;
+			return `TinyFish wait limit hit: every key is cooling on ${limitText(reason.endpoint, reason.limit)}, next free in ${span(reason.releaseInMs)} at ${clock(reason.releaseAt)}.${spent}${burned} Retry then.`;
 		}
 		case "all-spent":
 			return `Every TinyFish key is out of credits.${reason.walletUrl === null ? "" : ` Top up at ${reason.walletUrl}.`}`;

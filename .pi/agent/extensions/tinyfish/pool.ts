@@ -209,13 +209,15 @@ const spentOf = (registry: Registry): { spentCount: number; spentAt: number | nu
 	return { spentCount, spentAt };
 };
 
-const depletionOf = (registry: Registry, record: AccountRecord, endpoint: EndpointId): Depletion => {
+const depletionOf = (registry: Registry, record: AccountRecord, endpoint: EndpointId, now: number): Depletion => {
 	if (record.health.kind === "spent") return { kind: "all-spent", walletUrl: record.health.walletUrl };
 	const standing = record.standing[endpoint];
+	const releaseAt = readyAt(record, endpoint);
 	return {
 		kind: "all-cooling",
 		endpoint,
-		releaseAt: readyAt(record, endpoint),
+		releaseAt,
+		releaseInMs: releaseAt - now,
 		limit: standing.kind === "cooling" ? standing.limit : null,
 		tried: [],
 		...spentOf(registry),
@@ -249,7 +251,7 @@ export const select = (registry: Registry, endpoint: EndpointId, now: number): S
 		if (upcoming === undefined || releaseAt < upcoming.releaseAt) upcoming = { record, releaseAt };
 	}
 	if (upcoming === undefined) return { kind: "exhausted", reason: { kind: "all-dead" } };
-	return { kind: "wait", readyAt: upcoming.releaseAt, unless: depletionOf(registry, upcoming.record, endpoint) };
+	return { kind: "wait", readyAt: upcoming.releaseAt, unless: depletionOf(registry, upcoming.record, endpoint, now) };
 };
 
 export const createPool = (seed: PoolSeed): Pool => {
