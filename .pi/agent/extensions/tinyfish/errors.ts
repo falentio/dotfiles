@@ -34,9 +34,11 @@ const EXTENSION_DIR = dirname(fileURLToPath(import.meta.url));
 /** The command that puts a key in the store. The operator's whole fix for an empty or dead pool. */
 export const addKeyCommand = (): string => `printf '%s' '<key>' | ${join(EXTENSION_DIR, "bin", "tinyfish-auth-set")}`;
 
-/** `search: 30/min`, from the server's own numbers when it gave them. */
+/** `search: 30/minute`, from the server's own numbers, or the endpoint's ceiling marked as a local guess. */
 const limitText = (endpoint: EndpointId, limit: Limit | null): string =>
-	`${endpoint}: ${limit?.limit ?? ENDPOINTS[endpoint].perWindow}${limit === null ? "/min" : `/${limit.unit}`}`;
+	limit === null
+		? `${endpoint}: ${ENDPOINTS[endpoint].perWindow}/minute (the local default; the server named no limit)`
+		: `${endpoint}: ${limit.limit}/${limit.unit}`;
 
 const clock = (at: Date): string =>
 	at.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });

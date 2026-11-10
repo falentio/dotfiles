@@ -16,7 +16,7 @@ export interface Limit {
  */
 export type Standing =
 	| { readonly kind: "open"; readonly lastUsedAt: number | null }
-	| { readonly kind: "cooling"; readonly until: number; readonly limit: Limit };
+	| { readonly kind: "cooling"; readonly until: number; readonly limit: Limit | null };
 
 /** Per account, both endpoints. Checked before any standing. */
 export type Health =
@@ -72,7 +72,7 @@ export type Invalid = { readonly kind: "invalid"; readonly error: TinyfishToolEr
 export type Outcome =
 	| Ok
 	| Invalid
-	| { readonly kind: "rate-limited"; readonly windowMs: number; readonly limit: Limit }
+	| { readonly kind: "rate-limited"; readonly windowMs: number; readonly limit: Limit | null }
 	| { readonly kind: "dead-key" }
 	| { readonly kind: "spent"; readonly walletUrl: string | null }
 	| { readonly kind: "transient" };
