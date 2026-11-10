@@ -61,12 +61,44 @@ export const parseStore = (raw: unknown): AccountStore => {
 	return { accounts, cursor: cursor !== null && accounts.some((a) => a.id === cursor) ? cursor : null };
 };
 
-/** A missing or unreadable file yields an empty store: the pool owns the "no key" message. */
-export const readStore = async (path: string = storePath()): Promise<AccountStore> => {
+/** A parsed store, plus the copy kept aside when the file was there and would not parse. */
+export interface StoreLoad {
+	readonly store: AccountStore;
+	readonly brokenAt: string | null;
+}
+
+const isCode = (error: unknown, code: string): boolean =>
+	typeof error === "object" && error !== null && "code" in error && error.code === code;
+
+/**
+ * Keep the bytes of a file that will not parse beside it, once, so a hand-edit mistake is recoverable.
+ * Best effort: a store that cannot be copied still yields the empty store.
+ */
+const keepBroken = async (raw: string, path: string): Promise<string | null> => {
+	const kept = `${path}.broken`;
 	try {
-		return parseStore(JSON.parse(await readFile(path, "utf8")));
+		await writeFile(kept, raw, { mode: 0o600, flag: "wx" });
+		return kept;
+	} catch (error) {
+		return isCode(error, "EEXIST") ? kept : null;
+	}
+};
+
+/**
+ * A missing file is an empty store. A file that is there and will not parse is an empty store too, but
+ * it is copied aside first and the path reported, so the entry point can say the keys went missing.
+ */
+export const readStore = async (path: string = storePath()): Promise<StoreLoad> => {
+	let raw: string;
+	try {
+		raw = await readFile(path, "utf8");
 	} catch {
-		return EMPTY_STORE;
+		return { store: EMPTY_STORE, brokenAt: null };
+	}
+	try {
+		return { store: parseStore(JSON.parse(raw)), brokenAt: null };
+	} catch {
+		return { store: EMPTY_STORE, brokenAt: await keepBroken(raw, path) };
 	}
 };
 
@@ -121,7 +153,7 @@ const nextId = (store: AccountStore): AccountId => {
 	return `a${n}`;
 };
 
-export const saveCursor = async (cursor: AccountId | null): Promise<void> => {
-	const store = await readStore();
+/** The store that was parsed in, not a fresh read: a shutdown write never comes from a guess. */
+export const saveCursor = async (store: AccountStore, cursor: AccountId | null): Promise<void> => {
 	await writeStore({ ...store, cursor }, storePath());
 };

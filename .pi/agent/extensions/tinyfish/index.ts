@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { captureFromCli, EMPTY_STORE, readStore, saveCursor, type AccountStore } from "./accounts.ts";
+import { captureFromCli, EMPTY_STORE, readStore, saveCursor, storePath, type AccountStore } from "./accounts.ts";
 import { CALL_CONFIG, POOL_CONFIG } from "./config.ts";
 import { createClient, type Client } from "./client.ts";
 import { FETCH_DESCRIPTION, FETCH_PARAMETERS, SEARCH_DESCRIPTION, SEARCH_PARAMETERS, type FetchParams, type SearchParams } from "./params.ts";
@@ -52,15 +52,23 @@ export default function tinyfish(pi: ExtensionAPI): void {
 		},
 	});
 
-	pi.on("session_start", async () => {
-		store = await captureFromCli(await readStore());
+	pi.on("session_start", async (_event, ctx) => {
+		const loaded = await readStore();
+		if (loaded.brokenAt !== null) {
+			const why = ctx.hasUI ? "" : " The keys still in there are not in play this session.";
+			ctx.ui.notify(
+				`TinyFish: ${storePath()} would not parse, so its keys are not loaded. The bytes are kept at ${loaded.brokenAt}.${why}`,
+				"error",
+			);
+		}
+		store = await captureFromCli(loaded.store);
 		built = undefined;
 	});
 
 	pi.on("session_shutdown", async () => {
 		const cursor = cursorOf(built?.pool.snapshot());
 		built = undefined;
+		await saveCursor(store, cursor);
 		store = EMPTY_STORE;
-		await saveCursor(cursor);
 	});
 }
