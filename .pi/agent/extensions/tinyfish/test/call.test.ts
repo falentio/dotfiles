@@ -268,6 +268,15 @@ describe("the wire", () => {
 		expect(stub.seen).toEqual(["key-a1", "key-a2"]);
 	});
 
+	it("marks a fetch limit the server never named as the local default", async () => {
+		stub.script("key-a1", "fetch", [json(429, { error: { code: "RATE_LIMIT_EXCEEDED", details: { window_seconds: 600 } } })]);
+		const only = pool("a1");
+		const wire = createClient(deps({ pool: only, poolConfig: { maxWaitMs: 10_000 } }));
+		await expect(
+			wire.fetchContent({ urls: ["https://x.test"], format: "markdown", links: false, image_links: false, page_metadata: false }),
+		).rejects.toThrow("fetch: 150/minute (the local default; the server named no limit)");
+	});
+
 	it("honours Retry-After on a 429 body with no window", async () => {
 		stub.script("key-a1", "search", [
 			json(429, { error: { code: "RATE_LIMIT_EXCEEDED" } }, { "retry-after": "7" }),
