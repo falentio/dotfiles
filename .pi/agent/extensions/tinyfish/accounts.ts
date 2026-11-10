@@ -133,16 +133,26 @@ export const captureFromCli = async (
 	return next;
 };
 
-/** Same append path as capture, for a key pasted into `tinyfish auth set`. */
-export const addAccount = async (key: string, store: AccountStore): Promise<AccountStore> => {
-	if (store.accounts.some((account) => account.key === key)) return store;
+/** The store after an add, and the id the key already held when nothing was written. */
+export interface AddResult {
+	readonly store: AccountStore;
+	readonly duplicateOf: AccountId | null;
+}
+
+/**
+ * Same append path as capture, for a key pasted into `tinyfish auth set`. A key already in the store is
+ * a no-op that names its id, so the CLI can say which entry to delete to revive it.
+ */
+export const addAccount = async (key: string, store: AccountStore): Promise<AddResult> => {
+	const held = store.accounts.find((account) => account.key === key);
+	if (held !== undefined) return { store, duplicateOf: held.id };
 	const id = nextId(store);
 	const next: AccountStore = {
 		accounts: [...store.accounts, { id, label: id, key: asKey(key), weight: 1 }],
 		cursor: store.cursor,
 	};
 	await writeStore(next, storePath());
-	return next;
+	return { store: next, duplicateOf: null };
 };
 
 /** The lowest free `a<N>`, so a deleted middle entry does not hand its id to a newcomer. */
