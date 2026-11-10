@@ -304,6 +304,13 @@ describe("the wire", () => {
 		).rejects.toThrow("1 of them is out of credits; the soonest returns in 5m");
 	});
 
+	it("names the keys the call burned, so a rotated key is diagnosable", async () => {
+		const wire = scripted([{ kind: "rate-limited", windowMs: 600_000, limit: { limit: 30, unit: "minute", windowSeconds: 600 } }]);
+		await expect(callPool(deps({ poolConfig: { maxWaitMs: 1_000 }, transport: wire }), search)).rejects.toThrow(
+			"Tried: a1, a2.",
+		);
+	});
+
 	it("honours Retry-After on a 429 body with no window", async () => {
 		stub.script("key-a1", "search", [
 			json(429, { error: { code: "RATE_LIMIT_EXCEEDED" } }, { "retry-after": "7" }),
