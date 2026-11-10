@@ -118,6 +118,12 @@ Death is on both endpoints, cooldown on one, and `readyAt` reads all three arms 
 `acquire` stamps synchronously before it returns, so two acquires in one tick take different keys
 without a mutex.
 
+Open: the deadline is a client concern. `CallDeps.poolConfig` exists only so `callPool` can build
+one, while `Pool` already carries a `maxWaitMs` and derives its default from it. Deriving the
+deadline inside the pool and dropping the dep reshapes the pool and its tests, more than this pass
+holds, so it stays as it is. Nothing else needs the seam: a caller deadline can only shorten the
+operator's cap.
+
 ## Where this goes past the MCP
 
 Each of these is a choice the port made, not something carried across.
