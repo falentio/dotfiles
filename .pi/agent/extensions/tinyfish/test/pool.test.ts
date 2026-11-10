@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { createPool, graded, readyAt, select, stamped, type Registry } from "../pool.ts";
 import { clock, seeded, storeOf } from "./fixture.ts";
 
-const registryOf = (...ids: string[]): Registry => ({ records: seeded(storeOf(...ids)), cursor: 0 });
+const registryOf = (...ids: string[]): Registry => ({ records: seeded(storeOf(...ids)), cursor: -1 });
 
 const rateLimited = (windowMs: number, limit = 30) => ({
 	kind: "rate-limited" as const,
@@ -90,7 +90,7 @@ describe("acquire", () => {
 			taken.push(lease.account.id);
 			lease.release({ kind: "ok" });
 		}
-		expect(taken).toEqual(["a2", "a3", "a1"]);
+		expect(taken).toEqual(["a1", "a2", "a3"]);
 	});
 
 	it("sleeps to the earliest release and then serves", async () => {

@@ -33,6 +33,7 @@ export interface AccountRecord {
 /** The whole pool state. Replaced, never mutated. */
 export interface Registry {
 	readonly records: readonly AccountRecord[];
+	/** The index the last acquire took, or -1 before the first, so a fresh pool starts at account one. */
 	readonly cursor: number;
 }
 
@@ -88,7 +89,7 @@ export const seedRecords = (store: AccountStore): readonly AccountRecord[] =>
 
 export const cursorOf = (registry: Registry | undefined): AccountId | null => {
 	if (registry === undefined) return null;
-	return registry.records[registry.cursor]?.account.id ?? null;
+	return registry.records.at(registry.cursor)?.account.id ?? null;
 };
 
 /** Shared by acquire and the test fake: setTimeout, rejected by the signal, cleared on both paths. */
@@ -239,7 +240,7 @@ export const createPool = (seed: PoolSeed): Pool => {
 	const now = seed.now ?? Date.now;
 	const wait = seed.wait ?? defaultWait;
 	const config = seed.config ?? POOL_CONFIG;
-	let registry: Registry = { records: seedRecords(seed.store), cursor: 0 };
+	let registry: Registry = { records: seedRecords(seed.store), cursor: -1 };
 
 	const leaseOver = (index: number, endpoint: EndpointId): Lease => {
 		const record = registry.records[index];
