@@ -1,9 +1,8 @@
 import { describe, expect, it } from "bun:test";
+import { envelope } from "../envelope.ts";
 import { classify } from "../http.ts";
 
 const headers = new Headers();
-
-const envelope = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value) }] });
 
 describe("classify", () => {
 	it("accepts every 2xx", () => {
@@ -75,7 +74,7 @@ describe("the envelope", () => {
 	});
 
 	it("keeps a per-URL error array inside the text, not beside it", () => {
-		const text = envelope({ results: [], errors: [{ url: "https://x.test", error: "bot_blocked" }] }).content[0]?.text ?? "";
-		expect(JSON.parse(text).errors).toEqual([{ url: "https://x.test", error: "bot_blocked" }]);
+		const result = envelope({ results: [], errors: [{ url: "https://x.test", error: "bot_blocked" }] });
+		expect(JSON.parse(result.content[0]?.text ?? "").errors).toEqual([{ url: "https://x.test", error: "bot_blocked" }]);
 	});
 });
