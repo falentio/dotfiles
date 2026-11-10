@@ -73,15 +73,17 @@ npx -y @tiny-fish/cli@latest auth login   # browser; writes ~/.tinyfish/config.j
 pi                                        # the extension captures that key into accounts.json
 ```
 
-Or skip the browser and paste one:
+Or skip the browser and paste one, from anywhere:
 
 ```sh
-printf '%s' '<key>' | .pi/agent/extensions/tinyfish/bin/tinyfish-auth-set
+printf '%s' '<key>' | "$(dirname "$(readlink -f ~/.pi/agent/extensions/tinyfish/bin/tinyfish-auth-set)")/../auth-set.ts"
 ```
 
+Shorter, once you are in the repo: `.pi/agent/extensions/tinyfish/bin/tinyfish-auth-set`.
+
 The extension reads `~/.tinyfish/config.json` once at session start and appends a key the store does
-not already hold, mode `0600`. Pressing login again with the same account adds nothing. No key at all
-throws the exact `printf` line above.
+not already hold, mode `0600`. Pressing login again with the same account adds nothing, and pasting a
+key that is already there reports which entry holds it. No key at all throws the absolute command.
 
 `accounts.json`:
 
