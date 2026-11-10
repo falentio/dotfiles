@@ -11,7 +11,7 @@ Search returns ranked result metadata. Fetch returns content from known URLs.
 
 ## Accounts
 
-The tools hold one or more API keys in `~/.tinyfish/accounts.json` and rotate across them, so one key's budget never ends a burst. A rate limit waits instead of throwing. When the pool is empty, the error carries the exact command that adds a key: `printf '%s' '<key>' | .pi/agent/extensions/tinyfish/bin/tinyfish-auth-set`. Surface that command to the user rather than guessing at one. `npx -y @tiny-fish/cli@latest auth login` is the browser path: it writes `~/.tinyfish/config.json`, which the next session captures.
+The tools hold one or more API keys in `~/.tinyfish/accounts.json` and rotate across them, so one key's budget never ends a burst. A rate limit waits instead of throwing. When the pool is empty, the error carries the exact command that adds a key, as an absolute path under wherever pi installed the extension. Surface that command as the error spells it rather than guessing at one. `npx -y @tiny-fish/cli@latest auth login` is the browser path: it writes `~/.tinyfish/config.json`, which the next session captures.
 
 What the errors mean:
 
