@@ -38,18 +38,6 @@ export function clock(start = 1_000_000): Clock {
 	};
 }
 
-export const bearer = (limit = 30, windowSeconds = 60): unknown => ({
-	error: { code: "RATE_LIMIT_EXCEEDED", message: "slow down", details: { limit, unit: "minute", window_seconds: windowSeconds } },
-});
-
-export const spentBody = (walletUrl?: string): unknown => ({
-	error: {
-		code: "INSUFFICIENT_CREDITS",
-		message: "no credits",
-		...(walletUrl === undefined ? {} : { details: { wallet_url: walletUrl } }),
-	},
-});
-
 export const seeded = (store: AccountStore): readonly AccountRecord[] =>
 	store.accounts.map((account) => ({
 		account,

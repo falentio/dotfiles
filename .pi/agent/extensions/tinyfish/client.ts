@@ -1,6 +1,6 @@
 import { readStore, type AccountStore } from "./accounts.ts";
 import { POOL_CONFIG, type CallConfig, type PoolConfig } from "./config.ts";
-import { exhausted, invalid, toolError, type Depletion, type Exhaustion } from "./errors.ts";
+import { exhausted, toolError, type Depletion, type Exhaustion } from "./errors.ts";
 import { send, type Attempt, type EndpointRequest, type Transport } from "./http.ts";
 import type { FetchParams, SearchParams } from "./params.ts";
 import type { Pool } from "./pool.ts";
@@ -100,5 +100,3 @@ export const createClient = (deps: CallDeps): Client => ({
 	search: (params, signal) => callPool(deps, { endpoint: "search", params }, signal),
 	fetchContent: (params, signal) => callPool(deps, { endpoint: "fetch", params }, signal),
 });
-
-export { invalid };

@@ -16,7 +16,6 @@ export interface Stub {
 	hit(key: string, endpoint: Endpoint): number;
 	/** Queue answers for one key on one endpoint; the last answer repeats once the queue runs out. */
 	script(key: string, endpoint: Endpoint, answers: readonly Scripted[]): void;
-	delay(endpoint: Endpoint, ms: number): void;
 	stop(): void;
 }
 
@@ -35,7 +34,6 @@ export function startStub(): Stub {
 	const seen: string[] = [];
 	const delivered = new Map<string, number>();
 	const scripts = new Map<string, { answers: readonly Scripted[]; taken: number }>();
-	const delays: Record<Endpoint, number> = { search: 0, fetch: 0 };
 
 	const server = Bun.serve({
 		hostname: "127.0.0.1",
@@ -47,7 +45,6 @@ export function startStub(): Stub {
 			const name = `${key} ${endpoint}`;
 			seen.push(key);
 			delivered.set(name, (delivered.get(name) ?? 0) + 1);
-			if (delays[endpoint] > 0) await Bun.sleep(delays[endpoint]);
 			const script = scripts.get(name);
 			const answer = script === undefined ? undefined : script.answers[Math.min(script.taken, script.answers.length - 1)];
 			if (script !== undefined) script.taken += 1;
@@ -67,7 +64,6 @@ export function startStub(): Stub {
 		seen,
 		hit: (key, endpoint) => delivered.get(`${key} ${endpoint}`) ?? 0,
 		script: (key, endpoint, answers) => void scripts.set(`${key} ${endpoint}`, { answers, taken: 0 }),
-		delay: (endpoint, ms) => void (delays[endpoint] = ms),
 		stop: () => void server.stop(true),
 	};
 }
