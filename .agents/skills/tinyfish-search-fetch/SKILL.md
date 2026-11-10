@@ -61,7 +61,7 @@ Rules for the runtime:
 
 - Use Search when the relevant URL is unknown or the user asks you to find sources.
 - Use Fetch when the user gives a URL or when Search has identified source pages.
-- Use Agent automation when the task requires interaction instead of reading.
+- Fetch alone when the task needs a click, a form, or a login instead of reading. The MCP `run_web_automation` tool did not come across, and nothing here replaces it: fetch the page and drive a browser separately when the page needs interaction.
 
 ## Search
 
