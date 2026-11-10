@@ -39,8 +39,8 @@ export function clock(start = 1_000_000): Clock {
 }
 
 export const seeded = (store: AccountStore): readonly AccountRecord[] =>
-	store.accounts.map((account) => ({
-		account,
+	store.accounts.map((entry) => ({
+		account: entry,
 		health: { kind: "live" },
 		standing: { search: { kind: "open", lastUsedAt: null }, fetch: { kind: "open", lastUsedAt: null } },
 	}));
