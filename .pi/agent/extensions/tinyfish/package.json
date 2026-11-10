@@ -7,7 +7,8 @@
 	},
 	"scripts": {
 		"test": "bun ../../test-support/link-pi.mjs && bun --no-install test",
-		"typecheck": "bun ../../test-support/link-pi.mjs && tsc --noEmit"
+		"typecheck": "bun ../../test-support/link-pi.mjs && tsc --noEmit",
+		"test:smoke": "bun ../../test-support/link-pi.mjs && bun --no-install test ./test/smoke.ts"
 	},
 	"peerDependencies": {
 		"@earendil-works/pi-coding-agent": "*"

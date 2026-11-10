@@ -17,7 +17,8 @@ beforeAll(() => {
 	stub = startStub();
 	dir = mkdtempSync(join(tmpdir(), "tinyfish-smoke-"));
 	agentDir = mkdtempSync(join(tmpdir(), "tinyfish-smoke-agent-"));
-	// The run keeps the real providers, minus every other extension and MCP server.
+	// The temp agent dir has no extensions/ of its own, which is what keeps the run isolated.
+	// Providers stay real: bandar is the one that answers here.
 	for (const file of ["models.json", "auth.json"]) copyFileSync(join(homedir(), ".pi", "agent", file), join(agentDir, file));
 	writeFileSync(
 		join(dir, "accounts.json"),
@@ -40,7 +41,6 @@ function runPi(): Promise<{ code: number | null; out: string; err: string }> {
 			[
 				...PI.slice(1),
 				"-p",
-				"--no-extensions",
 				"--no-mcp",
 				"--no-skills",
 				"--no-context-files",
@@ -48,6 +48,8 @@ function runPi(): Promise<{ code: number | null; out: string; err: string }> {
 				"--thinking",
 				"off",
 				"-e", join(EXT_DIR, "index.ts"),
+				// codemode ships as an extension, so --no-extensions would remove the tools namespace itself.
+				"--tools", "+codemode",
 				`In one codemode script call tools.tinyfish_search({ query: "smoke" }) and tools.tinyfish_fetch_content({ urls: ["https://x.test"], format: "markdown", links: false, image_links: false, page_metadata: false }), then reply with only their text.`,
 			],
 			{
@@ -72,7 +74,7 @@ function runPi(): Promise<{ code: number | null; out: string; err: string }> {
 		const timer = setTimeout(() => {
 			child.kill("SIGKILL");
 			reject(new Error(`pi timed out\nSTDOUT:${out}\nSTDERR:${err}`));
-		}, 360_000);
+		}, 90_000);
 		child.on("error", reject);
 		child.on("exit", (code) => {
 			clearTimeout(timer);
@@ -94,6 +96,6 @@ describe("the extension inside pi", () => {
 			expect(stub.seen).toContain("smoke-key");
 			expect(stub.hit("smoke-key", "fetch")).toBeGreaterThan(0);
 		},
-		{ timeout: 380_000 },
+		{ timeout: 120_000 },
 	);
 });
