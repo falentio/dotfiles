@@ -1,6 +1,7 @@
 import { DEFAULT_WINDOW_MS } from "./config.ts";
 import { ENDPOINTS } from "./endpoints.ts";
 import { invalid } from "./errors.ts";
+import { isRecord } from "./json.ts";
 import type { Lease, Limit, NonOk, Ok } from "./pool.ts";
 import type { FetchParams, SearchParams } from "./params.ts";
 
@@ -13,9 +14,6 @@ export type Attempt =
 	| { readonly outcome: NonOk; readonly body?: undefined };
 
 export type Transport = (request: EndpointRequest, lease: Lease, signal: AbortSignal) => Promise<Attempt>;
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-	typeof value === "object" && value !== null && !Array.isArray(value);
 
 const nested = (value: unknown, key: string): unknown => (isRecord(value) ? value[key] : undefined);
 

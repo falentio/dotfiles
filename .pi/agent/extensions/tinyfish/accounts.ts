@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { isRecord } from "./json.ts";
 
 declare const KEY: unique symbol;
 export type ApiKey = string & { readonly [KEY]: true };
@@ -26,9 +27,6 @@ export const CLI_CONFIG_PATH = join(homedir(), ".tinyfish", "config.json");
 /** Read per call, not at import: a test points it at a temp dir, and a shell can point it anywhere. */
 export const storePath = (): string =>
 	process.env.TINYFISH_ACCOUNTS_FILE ?? join(homedir(), ".tinyfish", "accounts.json");
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-	typeof value === "object" && value !== null && !Array.isArray(value);
 
 const text = (value: unknown): string | null =>
 	typeof value === "string" && value.trim() !== "" ? value.trim() : null;
