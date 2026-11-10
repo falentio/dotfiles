@@ -189,6 +189,23 @@ describe("acquire", () => {
 	});
 });
 
+it("keeps the cursor on its own account across a reload that drops one ahead of it", async () => {
+	const pool = createPool({ store: storeOf("a1", "a2", "a3"), now: () => 0 });
+	await pool.acquire("search");
+	await pool.acquire("search");
+	pool.reload(storeOf("a2", "a3"));
+	expect(pool.snapshot().cursor).toBe(0);
+	expect((await pool.acquire("search")).account.id).toBe("a3");
+});
+
+it("puts the cursor back at the start when a reload drops the account it named", async () => {
+	const pool = createPool({ store: storeOf("a1", "a2"), now: () => 0 });
+	await pool.acquire("search");
+	pool.reload(storeOf("a2"));
+	expect(pool.snapshot().cursor).toBe(-1);
+	expect((await pool.acquire("search")).account.id).toBe("a2");
+});
+
 it("keeps the cooldown and the health of a record a reload re-seeds", async () => {
 	const pool = createPool({ store: storeOf("a1"), now: () => 0 });
 	const lease = await pool.acquire("search");
