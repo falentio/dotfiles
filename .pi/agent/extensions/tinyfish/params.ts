@@ -114,7 +114,7 @@ export const RESEARCH_PARAMETERS = obj(
 );
 
 export const RESEARCH_DESCRIPTION =
-	"Search and then read the best results in one call. Use instead of a search followed by a fetch when the answer needs page text: it ranks, takes the top few, and returns { query, results, errors, sources }, where each result carries the extracted text. A reading failure lands in errors and the call still answers. A search that finds nothing is not an error.";
+	"Search and then read the best results in one call. Use instead of a search followed by a fetch when the answer needs page text: it ranks, takes the top few, and answers { query, total_results, sources, ranking, results, errors }: results are the read pages, ranking the search hits. A reading failure lands in errors and the call still answers. A search that finds nothing is not an error.";
 
 /** The search params a research call forwards: the shared ones plus its own passthrough. */
 export type ResearchParams = Static<typeof RESEARCH_PARAMETERS>;

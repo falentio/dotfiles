@@ -312,11 +312,14 @@ describe("the wire", () => {
 		stub.script("key-a1", "fetch", [json(200, { results: [{ url: "https://a.test/1", text: "hello" }], errors: [] })]);
 		const body = (await createClient(deps({ pool: pool("a1") })).research({ query: "q", top: 2 })) as {
 			sources: string[];
-			results: unknown[];
+			results: { url: string }[];
+			ranking: unknown[];
 		};
 		expect(body.sources).toEqual(["https://a.test/1", "https://b.test/2"]);
 		expect(stub.hit("key-a1", "fetch")).toBe(1);
-		expect(body.results).toHaveLength(1);
+		// `results` holds the read pages, and the ranking is not lost.
+		expect(body.results[0]?.url).toBe("https://a.test/1");
+		expect(body.ranking).toHaveLength(3);
 	});
 
 	it("answers a research that found nothing without spending a fetch", async () => {

@@ -119,13 +119,22 @@ export const createClient = (deps: CallDeps): Client => ({
 		const { top = 3, ...search } = params;
 		const found = await callPool(deps, { endpoint: "search", params: search }, signal);
 		const sources = sourcesOf(found, top);
+		const listing = (found ?? {}) as { readonly total_results?: unknown; readonly results?: readonly unknown[] };
+		// The ranking is kept as `ranking` and `results` becomes the read pages, so a caller reads one
+		// array for content instead of guessing which meaning of `results` it holds.
+		const shape = {
+			query: params.query,
+			total_results: listing.total_results ?? 0,
+			sources,
+			ranking: listing.results ?? [],
+		};
 		// A search that found nothing is an answer, not a failure, so it never reaches the fetch.
-		if (sources.length === 0) return { ...(found as object), sources };
+		if (sources.length === 0) return { ...shape, results: [], errors: [] };
 		const read = (await callPool(
 			deps,
 			{ endpoint: "fetch", params: { urls: sources, format: "markdown", purpose: params.purpose } },
 			signal,
 		)) as { results?: unknown; errors?: unknown };
-		return { ...(found as object), results: read.results ?? [], errors: read.errors ?? [], sources };
+		return { ...shape, results: read.results ?? [], errors: read.errors ?? [] };
 	},
 });
