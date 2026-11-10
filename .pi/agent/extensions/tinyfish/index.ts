@@ -2,6 +2,7 @@ import type { ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-age
 import { captureFromCli, EMPTY_STORE, readStore, saveCursor, storePath, type AccountStore } from "./accounts.ts";
 import { CALL_CONFIG, POOL_CONFIG } from "./config.ts";
 import { createClient, type Client } from "./client.ts";
+import { envelope, OUTPUT_SCHEMA } from "./envelope.ts";
 import { DOTTED, TOOL_NAMES } from "./names.ts";
 import {
 	FETCH_DESCRIPTION,
@@ -21,11 +22,6 @@ const NAMESPACE = {
 	aliases: [DOTTED.search, DOTTED.fetch],
 } as const;
 
-const envelope = (value: unknown) => ({
-	content: [{ type: "text" as const, text: JSON.stringify(value) }],
-	details: undefined,
-});
-
 type Definition = Omit<ToolDefinition, "name">;
 
 export default function tinyfish(pi: ExtensionAPI): void {
@@ -44,6 +40,7 @@ export default function tinyfish(pi: ExtensionAPI): void {
 		label: "TinyFish search",
 		description: SEARCH_DESCRIPTION,
 		parameters: SEARCH_PARAMETERS,
+		outputSchema: OUTPUT_SCHEMA,
 		exposure: "codemode",
 		namespace: NAMESPACE,
 		annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
@@ -56,6 +53,7 @@ export default function tinyfish(pi: ExtensionAPI): void {
 		label: "TinyFish fetch",
 		description: FETCH_DESCRIPTION,
 		parameters: FETCH_PARAMETERS,
+		outputSchema: OUTPUT_SCHEMA,
 		exposure: "codemode",
 		namespace: NAMESPACE,
 		annotations: { readOnlyHint: true, openWorldHint: true },

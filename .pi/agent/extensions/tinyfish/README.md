@@ -31,10 +31,11 @@ const pages = await tools.tinyfish_fetch_content({
 return { sources: pages.results.map((r) => [r.final_url, r.title]), failed: pages.errors };
 ```
 
-Both return the API body JSON-serialized in the MCP envelope:
-`{ content: [{ type: "text", text: JSON.stringify(body) }] }`. No response schema sits in between, so
-a field the API adds still arrives. A per-URL fetch failure lands in `errors` and does not throw; a
-request-level failure throws.
+Both return the MCP envelope: the body as text in `content`, for the model, and the body itself in
+`structuredContent`, which is what a codemode script receives. So `found.results` is a property read,
+and no `JSON.parse` belongs in a script. The output schema is one open object, so a field the API adds
+still arrives. A per-URL fetch failure lands in `errors` and does not throw; a request-level failure
+throws.
 
 | Wire | What the agent sees |
 | --- | --- |
