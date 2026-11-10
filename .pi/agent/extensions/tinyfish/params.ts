@@ -1,4 +1,4 @@
-import { arr, bool, int, obj, opt, str, union, type Schema, type Static } from "@earendil-works/pi-schema";
+import { arr, bool, int, obj, opt, str, type Schema, type Static } from "@earendil-works/pi-schema";
 
 const choice = <const V extends readonly string[]>(values: V, description: string): Schema<V[number]> =>
 	({ enum: values, description });

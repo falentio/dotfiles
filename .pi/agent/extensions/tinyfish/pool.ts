@@ -1,6 +1,6 @@
 import type { Account, AccountId, AccountStore } from "./accounts.ts";
 import { POOL_CONFIG, SPENT_COOLDOWN_MS, type PoolConfig } from "./config.ts";
-import { ENDPOINTS, spacingOf, type Endpoint, type EndpointId } from "./endpoints.ts";
+import { ENDPOINTS, spacingOf, type EndpointId } from "./endpoints.ts";
 import { exhausted, toolError, type Depletion, type TinyfishToolError } from "./errors.ts";
 
 /** What one 429 said, kept so the eventual error can name the limit. */
