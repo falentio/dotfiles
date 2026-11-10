@@ -19,6 +19,10 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const nested = (value: unknown, key: string): unknown => (isRecord(value) ? value[key] : undefined);
 
+/** A left-out output flag posts `false`, which is what the MCP defaulted it to. */
+const fetchBody = (params: FetchParams): string =>
+	JSON.stringify({ ...params, links: params.links ?? false, image_links: params.image_links ?? false, page_metadata: params.page_metadata ?? false });
+
 const searchUrl = (params: SearchParams): string => {
 	const url = new URL(ENDPOINTS.search.baseUrl());
 	for (const [name, value] of Object.entries(params)) {
@@ -87,7 +91,7 @@ export const send: Transport = async (request, lease, signal) => {
 		const body =
 			request.endpoint === "search"
 				? undefined
-				: JSON.stringify(request.params satisfies FetchParams);
+				: fetchBody(request.params);
 		response = await fetch(url, {
 			method: request.endpoint === "search" ? "GET" : "POST",
 			headers: body === undefined ? headers : { ...headers, "Content-Type": "application/json" },

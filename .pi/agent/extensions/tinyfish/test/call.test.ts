@@ -263,7 +263,7 @@ describe("the wire", () => {
 		}
 	});
 
-	it("posts the fetch body as JSON", async () => {
+	it("posts the fetch body as JSON, defaulting a left-out output flag to false", async () => {
 		const bodies: string[] = [];
 		const server = Bun.serve({
 			hostname: "127.0.0.1",
@@ -283,6 +283,8 @@ describe("the wire", () => {
 				page_metadata: true,
 			});
 			expect(JSON.parse(bodies[0] ?? "{}")).toMatchObject({ urls: ["https://example.com"], page_metadata: true });
+			await createClient(deps()).fetchContent({ urls: ["https://example.com"], format: "markdown" });
+			expect(JSON.parse(bodies[1] ?? "{}")).toMatchObject({ links: false, image_links: false, page_metadata: false });
 		} finally {
 			server.stop(true);
 			process.env.TINYFISH_FETCH_BASE_URL = stub.fetchBase;

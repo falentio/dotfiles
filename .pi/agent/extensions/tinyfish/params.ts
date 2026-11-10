@@ -54,9 +54,10 @@ export const FETCH_PARAMETERS = obj(
 			["markdown", "html", "json"],
 			'Output format: "markdown" for readable content, "html" for markup, "json" for a document tree.',
 		),
-		links: bool({ description: "Also return outbound links (<a href>) per result", default: false }),
-		image_links: bool({ description: "Also return image URLs (<img src>) per result", default: false }),
-		page_metadata: bool({ description: "Also return page-head metadata per result", default: false }),
+		// Optional because the MCP took a call without them, and each defaults to off on the wire.
+		links: opt(bool({ description: "Also return outbound links (<a href>) per result", default: false })),
+		image_links: opt(bool({ description: "Also return image URLs (<img src>) per result", default: false })),
+		page_metadata: opt(bool({ description: "Also return page-head metadata per result", default: false })),
 		iframe_links: opt(bool({ description: "Also return iframe src URLs per result", default: false })),
 		purpose: opt(
 			str({
