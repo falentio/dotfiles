@@ -59,7 +59,8 @@ async execute(_id, params, signal) {
 
 Under that, one attempt is a lease: acquire, `send`, release with the grade. `callPool` owns the retry
 loop, so the transport is the wire call and nothing else. `send` is the only reader of
-`lease.account.key`; it writes `X-API-Key` and nothing else ever holds a raw key.
+`lease.account.key`; it writes `X-API-Key`, adds `Content-Type: application/json` on the fetch POST,
+and nothing else ever holds a raw key.
 
 `callPool` releases on both exits and rotates on `rate-limited`, `dead-key`, `spent`, and `transient`
 (the last for three turns, with backoff), before surfacing the error. A `transient` release also
