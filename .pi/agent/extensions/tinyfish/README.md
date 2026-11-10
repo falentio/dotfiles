@@ -14,9 +14,10 @@ Read it as three parties:
 
 ## The agent view
 
-The names, the parameters, and the envelope are the MCP's. Both tools stay reachable only from
-codemode scripts, because `.pi/agent/settings.json` sets `codemode.mode: "only"`. A rate limit that
-used to throw now costs wall-clock time instead, so a burst keeps working.
+The names, the parameters, and the envelope are the MCP's, so a prompt written before the move
+keeps calling. Both tools stay reachable only from codemode scripts, because
+`.pi/agent/settings.json` sets `codemode.mode: "only"`. A rate limit that used to throw now costs
+wall-clock time instead, so a burst keeps working.
 
 ```js
 const found = await tools.tinyfish_search({ query: "python pdf invoice parser", page: 0 });

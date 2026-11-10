@@ -5,7 +5,7 @@ description: Use this skill before any TinyFish web research (MANDATORY). Run Se
 
 # Search and fetch with TinyFish
 
-Call TinyFish from the Code Mode `execute` tool. The runtime exposes `tools.tinyfish_search` and `tools.tinyfish_fetch_content`. Both are local extension tools with `codemode` exposure, so they are callable only from a script and never declared to the model.
+Call TinyFish from the Code Mode `execute` tool. The runtime exposes `tools.tinyfish_search` and `tools.tinyfish_fetch_content`. Both are local extension tools with `codemode` exposure, so they are callable only from a script and never declared to the model. Both are also registered under the MCP name a pre-move prompt already holds, `tools["tinyfish.search"]` (read `tools.tinyfish.search`) and `tools["tinyfish.fetch_content"]` (read `tools.tinyfish.fetch_content`), which resolve the same way.
 
 Search returns ranked result metadata. Fetch returns content from known URLs.
 
@@ -50,7 +50,7 @@ Rules for the runtime:
 - `tools.tinyfish_fetch_content` requires `urls`, `format`, `links`, `image_links`, and `page_metadata`. Omitting any of the four output fields throws a `Missing key` error before any network work.
 - A request-level validation error throws. Conflicting search filters and a batch carrying a validator both throw. Wrap the block in `try/catch` when the arguments come from a user or a model.
 - A per-URL failure does not throw. It appears in the `errors` array of the fetch envelope.
-- Return JSON-serializable data. Read the live signature with `tinyfish_search({ query: "tinyfish" })` inside `execute` when a parameter shape matters.
+- Return JSON-serializable data. Read the live signature with `tools.tinyfish_search({ query: "tinyfish" })` inside `execute` when a parameter shape matters.
 - A rate limit costs wall-clock time, not the call. Budget for a wait before a large batch and keep the block inside one `execute`.
 
 ## When TinyFish is not suitable
@@ -236,7 +236,7 @@ When the origin returns `304`, the result carries `not_modified: true` and `text
 
 ## Search API reference
 
-Use the live `tools.tinyfish_search` schema as the runtime contract. Read it with `tinyfish_search({ query: "tinyfish" })` inside `execute`. The HTTP API endpoint is `GET https://api.search.tinyfish.ai`. The extension writes the `X-API-Key` header for you from whichever account it dispatches to. Search requests are free at any wallet balance, but the key still needs Search API access.
+Use the live `tools.tinyfish_search` schema as the runtime contract. Read it with `tools.tinyfish_search({ query: "tinyfish" })` inside `execute`. The HTTP API endpoint is `GET https://api.search.tinyfish.ai`. The extension writes the `X-API-Key` header for you from whichever account it dispatches to. Search requests are free at any wallet balance, but the key still needs Search API access.
 
 ### Search filter rules
 
@@ -252,7 +252,7 @@ Search metadata is not full page content. Fetch the URL before treating a snippe
 
 ## Fetch API reference
 
-Use the live `tools.tinyfish_fetch_content` schema as the runtime contract. Read it with `tinyfish_search({ query: "tinyfish" })` inside `execute`. The HTTP API endpoint is `POST https://api.fetch.tinyfish.ai`. The extension writes `X-API-Key` and `Content-Type: application/json` for you. Fetch requests are free at any wallet balance, but the key still needs API access.
+Use the live `tools.tinyfish_fetch_content` schema as the runtime contract. Read it with `tools.tinyfish_search({ query: "tinyfish" })` inside `execute`. The HTTP API endpoint is `POST https://api.fetch.tinyfish.ai`. The extension writes `X-API-Key` and `Content-Type: application/json` for you. Fetch requests are free at any wallet balance, but the key still needs API access.
 
 Required fields are `urls`, `format`, `links`, `image_links`, and `page_metadata`. Selector parameters can contain CSS comma-grouping. Invalid CSS syntax throws from the tool call, and the error names the offending selector.
 

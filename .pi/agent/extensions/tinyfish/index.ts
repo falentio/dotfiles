@@ -1,16 +1,32 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { captureFromCli, EMPTY_STORE, readStore, saveCursor, storePath, type AccountStore } from "./accounts.ts";
 import { CALL_CONFIG, POOL_CONFIG } from "./config.ts";
 import { createClient, type Client } from "./client.ts";
-import { FETCH_DESCRIPTION, FETCH_PARAMETERS, SEARCH_DESCRIPTION, SEARCH_PARAMETERS, type FetchParams, type SearchParams } from "./params.ts";
+import { DOTTED, TOOL_NAMES } from "./names.ts";
+import {
+	FETCH_DESCRIPTION,
+	FETCH_PARAMETERS,
+	SEARCH_DESCRIPTION,
+	SEARCH_PARAMETERS,
+	type FetchParams,
+	type SearchParams,
+} from "./params.ts";
 import { createPool, cursorOf, type Pool } from "./pool.ts";
 
-const NAMESPACE = { name: "tinyfish", description: "TinyFish web search and page fetch" } as const;
+const NAMESPACE = {
+	name: "tinyfish",
+	description: "TinyFish web search and page fetch",
+	// `tools` has no `tinyfish` member, so the dotted names are registered tools of their own rather
+	// than lookup aliases; these only make discovery and `describeNamespace` answer to the group.
+	aliases: [DOTTED.search, DOTTED.fetch],
+} as const;
 
 const envelope = (value: unknown) => ({
 	content: [{ type: "text" as const, text: JSON.stringify(value) }],
 	details: undefined,
 });
+
+type Definition = Omit<ToolDefinition, "name">;
 
 export default function tinyfish(pi: ExtensionAPI): void {
 	let store: AccountStore = EMPTY_STORE;
@@ -24,31 +40,34 @@ export default function tinyfish(pi: ExtensionAPI): void {
 		return built;
 	};
 
-	pi.registerTool({
-		name: "tinyfish_search",
+	const search: Definition = {
 		label: "TinyFish search",
 		description: SEARCH_DESCRIPTION,
 		parameters: SEARCH_PARAMETERS,
 		exposure: "codemode",
 		namespace: NAMESPACE,
 		annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
-		async execute(_id: string, params: SearchParams, signal: AbortSignal) {
-			return envelope(await deps().client.search(params, signal));
+		async execute(_id, params, signal) {
+			return envelope(await deps().client.search(params as SearchParams, signal));
 		},
-	});
+	};
 
-	pi.registerTool({
-		name: "tinyfish_fetch_content",
+	const fetchContent: Definition = {
 		label: "TinyFish fetch",
 		description: FETCH_DESCRIPTION,
 		parameters: FETCH_PARAMETERS,
 		exposure: "codemode",
 		namespace: NAMESPACE,
 		annotations: { readOnlyHint: true, openWorldHint: true },
-		async execute(_id: string, params: FetchParams, signal: AbortSignal) {
-			return envelope(await deps().client.fetchContent(params, signal));
+		async execute(_id, params, signal) {
+			return envelope(await deps().client.fetchContent(params as FetchParams, signal));
 		},
-	});
+	};
+
+	pi.registerTool({ ...search, name: TOOL_NAMES.search });
+	pi.registerTool({ ...search, name: DOTTED.search });
+	pi.registerTool({ ...fetchContent, name: TOOL_NAMES.fetch });
+	pi.registerTool({ ...fetchContent, name: DOTTED.fetch });
 
 	pi.on("session_start", async (_event, ctx) => {
 		const loaded = await readStore();
