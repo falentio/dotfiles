@@ -277,6 +277,15 @@ describe("the wire", () => {
 		).rejects.toThrow("fetch: 150/minute (the local default; the server named no limit)");
 	});
 
+	it("spells out a cooldown window past two minutes, so a 600 s limit does not read as a per-minute rate", async () => {
+		stub.script("key-a1", "search", [
+			json(429, { error: { code: "RATE_LIMIT_EXCEEDED", details: { limit: 30, unit: "minute", window_seconds: 600 } } }),
+		]);
+		const only = pool("a1");
+		const wire = createClient(deps({ pool: only, poolConfig: { maxWaitMs: 10_000 } }));
+		await expect(wire.search({ query: "q" })).rejects.toThrow("search: 30/minute over a 10m window");
+	});
+
 	it("honours Retry-After on a 429 body with no window", async () => {
 		stub.script("key-a1", "search", [
 			json(429, { error: { code: "RATE_LIMIT_EXCEEDED" } }, { "retry-after": "7" }),
