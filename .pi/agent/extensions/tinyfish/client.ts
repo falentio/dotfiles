@@ -58,6 +58,8 @@ export const callPool = async (
 			const reason = exhaustionOf(error);
 			if (reason === null) throw error;
 			if (reason.kind === "all-cooling" && reason.releaseAt > deadline) throw capError(reason, tried);
+			// Only a new key can fix these two; a paced or spent pool is the same pool after a re-read.
+			if (reason.kind !== "no-accounts" && reason.kind !== "all-dead") throw error;
 			// A key added out of process joins here, at the moment the pool runs dry, with no restart.
 			// Once per call is enough: a second look that finds nothing is the same store as the first.
 			if (reloaded) throw error;
