@@ -17,7 +17,6 @@ beforeAll(() => {
 	stub = startStub();
 	dir = mkdtempSync(join(tmpdir(), "tinyfish-smoke-"));
 	agentDir = mkdtempSync(join(tmpdir(), "tinyfish-smoke-agent-"));
-	// The temp agent dir has no extensions/ of its own, which is what keeps the run isolated.
 	// Providers stay real: bandar is the one that answers here.
 	for (const file of ["models.json", "auth.json"]) copyFileSync(join(homedir(), ".pi", "agent", file), join(agentDir, file));
 	writeFileSync(
@@ -33,7 +32,6 @@ afterAll(() => {
 	rmSync(agentDir, { recursive: true, force: true });
 });
 
-/** One pi run that calls both tools from a codemode script and prints what came back. */
 function runPi(): Promise<{ code: number | null; out: string; err: string }> {
 	return new Promise((resolve, reject) => {
 		const child = spawn(

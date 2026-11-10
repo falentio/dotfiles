@@ -5,11 +5,8 @@ type Scripted = { readonly status: number; readonly body?: unknown; readonly hea
 export interface Stub {
 	readonly searchBase: string;
 	readonly fetchBase: string;
-	/** The X-API-Key of every request, in arrival order. */
 	readonly seen: string[];
-	/** Responses sent per key and endpoint. */
 	hit(key: string, endpoint: Endpoint): number;
-	/** Queue answers for one key on one endpoint; the last answer repeats once the queue runs out. */
 	script(key: string, endpoint: Endpoint, answers: readonly Scripted[]): void;
 	stop(): void;
 }

@@ -3,22 +3,17 @@ import { POOL_CONFIG, SPENT_COOLDOWN_MS, type PoolConfig } from "./config.ts";
 import { ENDPOINTS, spacingOf, type EndpointId } from "./endpoints.ts";
 import { exhausted, toolError, type Depletion, type TinyfishToolError } from "./errors.ts";
 
-/** What one 429 said, kept so the eventual error can name the limit. */
 export interface Limit {
 	readonly limit: number;
 	readonly unit: string;
 	readonly windowSeconds: number;
 }
 
-/**
- * Per account, per endpoint. A cooling standing always carries its release, an open one never does, so
- * "cooling with no release" cannot be written down.
- */
+/** "Cooling with no release" cannot be written down. */
 export type Standing =
 	| { readonly kind: "open"; readonly lastUsedAt: number | null }
 	| { readonly kind: "cooling"; readonly until: number; readonly limit: Limit | null };
 
-/** Per account, both endpoints. Checked before any standing. */
 export type Health =
 	| { readonly kind: "live" }
 	| { readonly kind: "spent"; readonly until: number; readonly walletUrl: string | null }
@@ -30,10 +25,8 @@ export interface AccountRecord {
 	readonly standing: Readonly<Record<EndpointId, Standing>>;
 }
 
-/** The whole pool state. Replaced, never mutated. */
 export interface Registry {
 	readonly records: readonly AccountRecord[];
-	/** The index the last acquire took, or -1 before the first, so a fresh pool starts at account one. */
 	readonly cursor: number;
 }
 
@@ -41,12 +34,10 @@ export type Wait = (ms: number, signal: AbortSignal | undefined) => Promise<void
 
 export interface Lease {
 	readonly account: Account;
-	/** Grade the attempt. The second call is a no-op, so a handler that releases and then throws is safe. */
 	release(outcome: Outcome): void;
 }
 
 export interface Pool {
-	/** `deadline` bounds the total wait; the caller owns it so one call has one budget, not one per turn. */
 	acquire(endpoint: EndpointId, signal?: AbortSignal, deadline?: number): Promise<Lease>;
 	now(): number;
 	snapshot(): Registry;
@@ -63,10 +54,6 @@ export interface PoolSeed {
 export type Ok = { readonly kind: "ok" };
 export type Invalid = { readonly kind: "invalid"; readonly error: TinyfishToolError };
 
-/**
- * The grade of one attempt. A closed set, so both the release table and the retry match fail to compile
- * when an arm is added. `invalid` is an arm because the release path must see it, even though it is a no-op.
- */
 export type Outcome =
 	| Ok
 	| Invalid
@@ -75,7 +62,6 @@ export type Outcome =
 	| { readonly kind: "spent"; readonly walletUrl: string | null }
 	| { readonly kind: "transient" };
 
-/** What rotation matches on: every arm but `ok`. */
 export type NonOk = Exclude<Outcome, Ok>;
 
 const open = (lastUsedAt: number | null): Standing => ({ kind: "open", lastUsedAt });
@@ -108,7 +94,6 @@ export const defaultWait: Wait = (ms, signal) =>
 		signal?.addEventListener("abort", onAbort, { once: true });
 	});
 
-/** The pacing stamp plus the cursor move, written in the same synchronous step as the selection. */
 export const stamped = (registry: Registry, index: number, endpoint: EndpointId, at: number): Registry => ({
 	cursor: index,
 	records: registry.records.map((record, i) =>
@@ -175,7 +160,6 @@ export const graded = (
 	return { ...registry, records: registry.records.map((r, i) => (i === index ? next : r)) };
 };
 
-/** When this record could serve this endpoint again, for every health arm in one place. */
 export const readyAt = (record: AccountRecord, endpoint: EndpointId): number => {
 	switch (record.health.kind) {
 		case "dead":
@@ -195,7 +179,6 @@ export type Selection =
 	| { readonly kind: "wait"; readonly readyAt: number; readonly unless: Depletion }
 	| { readonly kind: "exhausted"; readonly reason: Depletion };
 
-/** How many records sit out of credits, and the soonest of them returns. */
 const spentOf = (registry: Registry): { spentCount: number; spentAt: number | null } => {
 	let spentCount = 0;
 	let spentAt: number | null = null;

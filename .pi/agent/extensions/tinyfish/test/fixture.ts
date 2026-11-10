@@ -13,11 +13,9 @@ export const storeOf = (...ids: string[]): AccountStore => ({
 	cursor: null,
 });
 
-/** A clock and a wait the test drives, so no case spends real millis. */
 export interface Clock {
 	now(): number;
 	advance(ms: number): void;
-	/** Every wait either pool asked for, in order. */
 	waits: number[];
 	wait: (ms: number, signal: AbortSignal | undefined) => Promise<void>;
 }

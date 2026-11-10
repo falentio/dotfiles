@@ -1,5 +1,4 @@
 #!/usr/bin/env bun
-/** `tinyfish auth set`: append one pasted key to the store. Reads stdin, so it works piped and pasted. */
 import { addAccount, readStore, storePath } from "./accounts.ts";
 
 const key = (await Bun.stdin.text()).trim();

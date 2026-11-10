@@ -107,14 +107,11 @@ interface AccountRecord {
 }
 ```
 
-A cooling standing always carries its release and an open one never does, so "cooling with no release"
-cannot be written down. Death is on both endpoints, cooldown on one, and `readyAt` reads all three
-arms in one place so `select` never branches on health itself.
+Death is on both endpoints, cooldown on one, and `readyAt` reads all three arms in one place so
+`select` never branches on health itself.
 
-`select` is a pure read answering `take`, `wait`, or `exhausted`. It passes live records before spent
-ones, so a wallet 402 never outranks a key that is merely paced. `stamped` and `graded` are the only
-two transitions; `acquire` stamps synchronously before it returns, so two acquires in one tick take
-different keys without a mutex.
+`acquire` stamps synchronously before it returns, so two acquires in one tick take different keys
+without a mutex.
 
 ## Params and envelopes
 
