@@ -53,8 +53,12 @@ describe("classify", () => {
 		expect(classify(400, null, headers)).toMatchObject({ kind: "invalid" });
 	});
 
+	it("grades an undeclared 4xx invalid, so a mistyped base URL fails without four attempts", () => {
+		expect(classify(404, "Not Found", headers)).toMatchObject({ kind: "invalid", error: { status: 404 } });
+	});
+
 	it("answers null for everything it cannot place", () => {
-		for (const status of [301, 500, 502, 503, 418]) expect(classify(status, "<html>", headers)).toBeNull();
+		for (const status of [301, 304, 500, 502, 503]) expect(classify(status, "<html>", headers)).toBeNull();
 	});
 });
 

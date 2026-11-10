@@ -250,6 +250,13 @@ describe("the wire", () => {
 		expect(stub.seen).toEqual(["key-a1"]);
 	});
 
+	it("surfaces a 404 on the first key instead of rotating and backing off", async () => {
+		stub.script("key-a1", "search", [json(404, "Not Found")]);
+		stub.script("key-a2", "search", [json(404, "Not Found")]);
+		await expect(createClient(deps()).search({ query: "q" })).rejects.toThrow("HTTP 404");
+		expect(stub.seen).toEqual(["key-a1"]);
+	});
+
 	it("treats an unclassifiable 502 as transient and backs off", async () => {
 		stub.script("key-a1", "search", [json(502, "<html>bad gateway</html>")]);
 		stub.script("key-a2", "search", [json(502, "<html>bad gateway</html>")]);
