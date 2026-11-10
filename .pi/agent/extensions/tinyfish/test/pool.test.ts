@@ -138,13 +138,12 @@ describe("acquire", () => {
 		expect((await pool.acquire("fetch")).account.id).toBe("a1");
 	});
 
-	it("throws past the deadline instead of sleeping, naming the limit", async () => {
+	it("throws past its own configured cap when the caller passes no deadline", async () => {
 		const time = clock();
 		const pool = createPool({ store: storeOf("a1"), now: time.now, wait: time.wait, config: { maxWaitMs: 10_000 } });
 		const lease = await pool.acquire("search");
 		lease.release(rateLimited(60_000));
-		const failure = pool.acquire("search");
-		await expect(failure).rejects.toThrow("search: 30/minute");
+		await expect(pool.acquire("search")).rejects.toThrow("search: 30/minute");
 		expect(time.waits).toEqual([]);
 	});
 

@@ -28,6 +28,7 @@ const pool = (...ids: string[]) => createPool({ store: storeOf(...ids), now: tim
 const deps = (overrides: Partial<CallDeps> = {}): CallDeps => ({
 	pool: shared,
 	config: { maxTransient: 3, backoffMs: () => 0 },
+	poolConfig: { maxWaitMs: 300_000 },
 	...overrides,
 });
 
@@ -131,13 +132,17 @@ describe("callPool transient", () => {
 });
 
 describe("the cap", () => {
-	it("throws naming the endpoint and its limit rather than sleeping past five minutes", async () => {
-		const talkative = createPool({ store: storeOf("a1"), now: time.now, wait: time.wait, config: { maxWaitMs: 10_000 } });
+	it("throws naming the endpoint and its limit rather than sleeping past the client's own deadline", async () => {
+		// The pool is left on its five minute default and the release is one minute out, so the pool alone
+		// would have waited it out. Only the client's 10 s can produce this throw.
+		const talkative = pool("a1");
 		const lease = await talkative.acquire("search");
-		lease.release({ kind: "rate-limited", windowMs: 600_000, limit: { limit: 30, unit: "minute", windowSeconds: 600 } });
-		await expect(callPool(deps({ pool: talkative, transport: scripted([{ kind: "ok" }]) }), search)).rejects.toThrow(
-			"search: 30/minute",
-		);
+		lease.release({ kind: "rate-limited", windowMs: 60_000, limit: { limit: 30, unit: "minute", windowSeconds: 60 } });
+		await expect(
+			createClient(
+				deps({ pool: talkative, poolConfig: { maxWaitMs: 10_000 }, transport: scripted([{ kind: "ok" }]) }),
+			).search({ query: "q" }),
+		).rejects.toThrow("search: 30/minute");
 		expect(time.waits).toEqual([]);
 	});
 });
