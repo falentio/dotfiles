@@ -197,7 +197,19 @@ export type Selection =
 	| { readonly kind: "wait"; readonly readyAt: number; readonly unless: Depletion }
 	| { readonly kind: "exhausted"; readonly reason: Depletion };
 
-const depletionOf = (record: AccountRecord, endpoint: EndpointId): Depletion => {
+/** How many records sit out of credits, and the soonest of them returns. */
+const spentOf = (registry: Registry): { spentCount: number; spentAt: number | null } => {
+	let spentCount = 0;
+	let spentAt: number | null = null;
+	for (const record of registry.records) {
+		if (record.health.kind !== "spent") continue;
+		spentCount += 1;
+		if (spentAt === null || record.health.until < spentAt) spentAt = record.health.until;
+	}
+	return { spentCount, spentAt };
+};
+
+const depletionOf = (registry: Registry, record: AccountRecord, endpoint: EndpointId): Depletion => {
 	if (record.health.kind === "spent") return { kind: "all-spent", walletUrl: record.health.walletUrl };
 	const standing = record.standing[endpoint];
 	return {
@@ -205,6 +217,7 @@ const depletionOf = (record: AccountRecord, endpoint: EndpointId): Depletion => 
 		endpoint,
 		releaseAt: readyAt(record, endpoint),
 		limit: standing.kind === "cooling" ? standing.limit : null,
+		...spentOf(registry),
 	};
 };
 
@@ -235,7 +248,7 @@ export const select = (registry: Registry, endpoint: EndpointId, now: number): S
 		if (upcoming === undefined || releaseAt < upcoming.releaseAt) upcoming = { record, releaseAt };
 	}
 	if (upcoming === undefined) return { kind: "exhausted", reason: { kind: "all-dead" } };
-	return { kind: "wait", readyAt: upcoming.releaseAt, unless: depletionOf(upcoming.record, endpoint) };
+	return { kind: "wait", readyAt: upcoming.releaseAt, unless: depletionOf(registry, upcoming.record, endpoint) };
 };
 
 export const createPool = (seed: PoolSeed): Pool => {

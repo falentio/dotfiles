@@ -286,6 +286,17 @@ describe("the wire", () => {
 		await expect(wire.search({ query: "q" })).rejects.toThrow("search: 30/minute over a 10m window");
 	});
 
+	it("names the spent keys behind a paced pool, so a top up reads apart from a retry", async () => {
+		const mixed = pool("a1", "a2");
+		const first = await mixed.acquire("search");
+		first.release({ kind: "spent", walletUrl: "https://wallet" });
+		const second = await mixed.acquire("search");
+		second.release({ kind: "rate-limited", windowMs: 600_000, limit: { limit: 30, unit: "minute", windowSeconds: 600 } });
+		await expect(
+			callPool(deps({ pool: mixed, poolConfig: { maxWaitMs: 10_000 }, transport: scripted([{ kind: "ok" }]) }), search),
+		).rejects.toThrow("1 of them is out of credits; the soonest returns in 5m");
+	});
+
 	it("honours Retry-After on a 429 body with no window", async () => {
 		stub.script("key-a1", "search", [
 			json(429, { error: { code: "RATE_LIMIT_EXCEEDED" } }, { "retry-after": "7" }),

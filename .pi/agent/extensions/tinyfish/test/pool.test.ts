@@ -67,7 +67,25 @@ it("answers wait with the earliest release when nothing is due", () => {
 	expect(select(registry, "search", 0)).toEqual({
 		kind: "wait",
 		readyAt: 30_000,
-		unless: { kind: "all-cooling", endpoint: "search", releaseAt: 30_000, limit: rateLimited(30_000).limit },
+		unless: { kind: "all-cooling", endpoint: "search", releaseAt: 30_000, limit: rateLimited(30_000).limit, spentCount: 0, spentAt: null },
+	});
+});
+
+it("counts the spent records behind a paced pool and names the soonest of them", () => {
+	const spent = graded(registryOf("a1", "a2", "a3"), "a3", "search", { kind: "spent", walletUrl: null }, 0);
+	const one = graded(spent, "a1", "search", rateLimited(30_000), 0);
+	const registry = graded(one, "a2", "search", rateLimited(90_000), 0);
+	expect(select(registry, "search", 0)).toEqual({
+		kind: "wait",
+		readyAt: 30_000,
+		unless: {
+			kind: "all-cooling",
+			endpoint: "search",
+			releaseAt: 30_000,
+			limit: rateLimited(30_000).limit,
+			spentCount: 1,
+			spentAt: 900_000,
+		},
 	});
 });
 
