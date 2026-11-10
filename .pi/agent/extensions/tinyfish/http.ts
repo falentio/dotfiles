@@ -1,5 +1,5 @@
 import { DEFAULT_WINDOW_MS } from "./config.ts";
-import { ENDPOINTS, type EndpointId } from "./endpoints.ts";
+import { ENDPOINTS } from "./endpoints.ts";
 import { invalid } from "./errors.ts";
 import type { Lease, Limit, NonOk, Ok } from "./pool.ts";
 import type { FetchParams, SearchParams } from "./params.ts";
@@ -104,5 +104,3 @@ export const send: Transport = async (request, lease, signal) => {
 	if (outcome === null) return { outcome: { kind: "transient" } };
 	return outcome.kind === "ok" ? { outcome, body: payload } : { outcome };
 };
-
-export type { EndpointId };
