@@ -1,5 +1,4 @@
 import type { Account, AccountStore } from "../accounts.ts";
-import type { AccountRecord } from "../pool.ts";
 
 export const account = (id: string, key = `key-${id}`): Account => ({
 	id,
@@ -36,9 +35,3 @@ export function clock(start = 1_000_000): Clock {
 	};
 }
 
-export const seeded = (store: AccountStore): readonly AccountRecord[] =>
-	store.accounts.map((entry) => ({
-		account: entry,
-		health: { kind: "live" },
-		standing: { search: { kind: "open", lastUsedAt: null }, fetch: { kind: "open", lastUsedAt: null } },
-	}));

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { createPool, graded, readyAt, select, stamped, type Registry } from "../pool.ts";
-import { clock, seeded, storeOf } from "./fixture.ts";
+import { createPool, graded, readyAt, seedRecords, select, stamped, type Registry } from "../pool.ts";
+import { clock, storeOf } from "./fixture.ts";
 
-const registryOf = (...ids: string[]): Registry => ({ records: seeded(storeOf(...ids)), cursor: -1 });
+const registryOf = (...ids: string[]): Registry => ({ records: seedRecords(storeOf(...ids)), cursor: -1 });
 
 const rateLimited = (windowMs: number, limit = 30) => ({
 	kind: "rate-limited" as const,
