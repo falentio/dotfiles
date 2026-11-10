@@ -55,9 +55,8 @@ export default function tinyfish(pi: ExtensionAPI): void {
 	pi.on("session_start", async (_event, ctx) => {
 		const loaded = await readStore();
 		if (loaded.brokenAt !== null) {
-			const why = ctx.hasUI ? "" : " The keys still in there are not in play this session.";
 			ctx.ui.notify(
-				`TinyFish: ${storePath()} would not parse, so its keys are not loaded. The bytes are kept at ${loaded.brokenAt}.${why}`,
+				`TinyFish: ${storePath()} would not parse, so its keys are not in play this session. The bytes are kept at ${loaded.brokenAt}.`,
 				"error",
 			);
 		}
