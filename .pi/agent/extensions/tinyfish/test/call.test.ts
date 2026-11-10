@@ -371,6 +371,18 @@ describe("the wire", () => {
 		);
 	});
 
+	it("reads the release in UTC with a relative span beside it", async () => {
+		stub.script("key-a1", "search", [
+			json(429, { error: { code: "RATE_LIMIT_EXCEEDED", details: { limit: 30, unit: "minute", window_seconds: 600 } } }),
+		]);
+		const only = pool("a1");
+		const failure = await createClient(deps({ pool: only, poolConfig: { maxWaitMs: 10_000 } }))
+			.search({ query: "q" })
+			.catch((error: Error) => error.message);
+		expect(failure).toContain("next free in 10m at");
+		expect(failure).toContain(`${new Date(time.now() + 600_000).toISOString().slice(11, 19)}Z`);
+	});
+
 	it("honours Retry-After on a 429 body with no window", async () => {
 		stub.script("key-a1", "search", [
 			json(429, { error: { code: "RATE_LIMIT_EXCEEDED" } }, { "retry-after": "7" }),
