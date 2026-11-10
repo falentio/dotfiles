@@ -87,11 +87,17 @@ describe("callPool rotation", () => {
 });
 
 describe("callPool transient", () => {
-	it("rotates to the next key instead of retrying the one that failed", async () => {
+	it("stamps a transient key a spacing out, so the retry cannot land back on it", async () => {
+		// a2 fails both calls. Its stamp is what keeps the second call off it: the cursor alone wraps
+		// straight back to a2, and only the spacing pushed onto its last use sends that call to a1.
 		const keys: string[] = [];
-		const wire = scripted([{ kind: "transient" }, { kind: "ok" }], keys);
-		await callPool(deps({ transport: wire }), search);
-		expect(keys).toEqual(["key-a1", "key-a2"]);
+		const wire = scripted([{ kind: "ok" }, { kind: "transient" }, { kind: "ok" }], keys);
+		const only = pool("a1", "a2");
+		await callPool(deps({ pool: only, transport: wire }), search);
+		await callPool(deps({ pool: only, transport: wire }), search);
+		expect(keys).toEqual(["key-a1", "key-a2", "key-a1"]);
+		expect(time.waits).toEqual([2_000]);
+		expect(only.snapshot().records[1]?.standing.search).toEqual({ kind: "open", lastUsedAt: 1_002_000 });
 	});
 
 	it("spends the same budget on a thrown transport failure as on a 5xx", async () => {
