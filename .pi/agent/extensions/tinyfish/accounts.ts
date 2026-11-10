@@ -58,18 +58,28 @@ export interface StoreLoad {
 	readonly brokenAt: string | null;
 }
 
+/** Bounded, so a directory full of old copies cannot spin the loop. */
+const BROKEN_LIMIT = 99;
+
 const isCode = (error: unknown, code: string): boolean =>
 	typeof error === "object" && error !== null && "code" in error && error.code === code;
 
-/** Best effort: a store that cannot be copied still yields the empty store. */
+/**
+ * Writes the bytes aside under the first free name, so the path reported always holds them: a second
+ * break in the same session must not point at the first break's copy. Best effort, so a store that
+ * cannot be copied still yields the empty store.
+ */
 const keepBroken = async (raw: string, path: string): Promise<string | null> => {
-	const kept = `${path}.broken`;
-	try {
-		await writeFile(kept, raw, { mode: 0o600, flag: "wx" });
-		return kept;
-	} catch (error) {
-		return isCode(error, "EEXIST") ? kept : null;
+	for (let n = 1; n <= BROKEN_LIMIT; n += 1) {
+		const kept = n === 1 ? `${path}.broken` : `${path}.broken.${n}`;
+		try {
+			await writeFile(kept, raw, { mode: 0o600, flag: "wx" });
+			return kept;
+		} catch (error) {
+			if (!isCode(error, "EEXIST")) return null;
+		}
 	}
+	return null;
 };
 
 /**
