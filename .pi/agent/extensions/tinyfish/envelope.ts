@@ -9,8 +9,8 @@ export const OUTPUT_SCHEMA = { type: "object", additionalProperties: true } as c
 
 /** A script reads a primitive or an array by property, so both arrive wrapped. A real object passes. */
 const keyed = (body: unknown): JsonValue => {
-	const parsed = JSON.parse(JSON.stringify(body ?? null)) as JsonValue;
-	return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed) ? parsed : { value: parsed };
+	const value = (body ?? null) as JsonValue;
+	return typeof value === "object" && value !== null && !Array.isArray(value) ? value : { value };
 };
 
 export const envelope = (body: unknown) => ({
