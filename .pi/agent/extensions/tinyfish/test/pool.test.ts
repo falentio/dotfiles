@@ -28,7 +28,6 @@ it("cools one endpoint only, and only until its window ends", () => {
 });
 
 it("pushes the pacing stamp a spacing past the last use on transient, so the retry cannot land back", () => {
-	// 60_000 ms / 30 per window is a 2 s spacing: stamped 2 s forward, then 2 s of pacing on top.
 	const registry = graded(registryOf("a1", "a2"), "a1", "search", { kind: "transient" }, 0);
 	expect(readyAt(registry.records[0]!, "search")).toBe(4_000);
 	expect(select(registry, "search", 0)).toEqual({ kind: "take", index: 1 });

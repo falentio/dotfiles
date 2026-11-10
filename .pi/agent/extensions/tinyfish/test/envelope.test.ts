@@ -3,7 +3,6 @@ import { classify } from "../http.ts";
 
 const headers = new Headers();
 
-/** The envelope `index.ts` registers: the API body JSON-serialized, with no response schema in between. */
 const envelope = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value) }] });
 
 describe("classify", () => {

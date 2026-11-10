@@ -34,7 +34,6 @@ const deps = (overrides: Partial<CallDeps> = {}): CallDeps => ({
 
 const search = { endpoint: "search" as const, params: { query: "q" } };
 
-/** A transport that records the key it was handed and replays a script, repeating the last arm. */
 const scripted = (outcomes: readonly Outcome[], seen: string[] = []) => {
 	let turn = 0;
 	return async (_request: unknown, lease: { account: { key: string } }) => {
@@ -136,8 +135,7 @@ describe("callPool transient", () => {
 
 describe("the cap", () => {
 	it("throws naming the endpoint and its limit rather than sleeping past the client's own deadline", async () => {
-		// The pool is left on its five minute default and the release is one minute out, so the pool alone
-		// would have waited it out. Only the client's 10 s can produce this throw.
+		// The pool's own five minute default would have waited it out; only the client's 10 s can produce this throw.
 		const talkative = pool("a1");
 		const lease = await talkative.acquire("search");
 		lease.release({ kind: "rate-limited", windowMs: 60_000, limit: { limit: 30, unit: "minute", windowSeconds: 60 } });

@@ -23,7 +23,6 @@ export interface Client {
 
 const defaultSleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** The exhaustion behind an acquire rejection, so the loop can tell "woke up empty" from "waited past". */
 const exhaustionOf = (error: unknown): Exhaustion | null => {
 	const cause = (error as { cause?: unknown }).cause;
 	if (typeof cause !== "object" || cause === null) return null;
@@ -32,9 +31,6 @@ const exhaustionOf = (error: unknown): Exhaustion | null => {
 };
 
 /**
- * The whole retry policy. Rotates on rate-limited, dead-key, spent, and transient; surfaces on invalid;
- * gives up after `maxTransient` transport turns. Every turn re-acquires, and both exits release.
- *
  * `maxWaitMs` is one deadline for the whole call, not per turn, so a pool that keeps cooling cannot
  * stall the agent past it: the turn that would land later throws naming the endpoint and its limit.
  */
@@ -97,7 +93,6 @@ export const callPool = async (
 	}
 };
 
-/** Past the cap the pool answered "wait", so the reason carries the endpoint, the limit, and the keys burned. */
 const capError = (reason: Extract<Depletion, { kind: "all-cooling" }>, tried: readonly string[]): Error =>
 	toolError(exhausted({ ...reason, tried: [...new Set(tried)] }));
 

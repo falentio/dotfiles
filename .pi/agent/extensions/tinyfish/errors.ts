@@ -3,27 +3,21 @@ import { fileURLToPath } from "node:url";
 import { ENDPOINTS, type EndpointId } from "./endpoints.ts";
 import type { Limit } from "./pool.ts";
 
-/** Why nothing can serve this endpoint. Every arm is actionable by the operator. */
 export type Depletion =
 	| {
 			readonly kind: "all-cooling";
 			readonly endpoint: EndpointId;
 			readonly releaseAt: number;
-			/** How long that is from the moment the arm was built, on the pool's own clock. */
 			readonly releaseInMs: number;
 			readonly limit: Limit | null;
-			/** Keys out of credits alongside the paced ones, so "retry" and "top up" read apart. */
 			readonly spentCount: number;
-			/** The soonest of those returns, or null when none is spent. */
 			readonly spentAt: number | null;
-			/** The labels this call burned, so a rotated key is named rather than a mystery. */
 			readonly tried: readonly string[];
 	  }
 	| { readonly kind: "all-spent"; readonly walletUrl: string | null }
 	| { readonly kind: "all-dead" }
 	| { readonly kind: "no-accounts" };
 
-/** A depletion, plus the one reason that belongs to the call loop rather than to a selection. */
 export type Exhaustion = Depletion | { readonly kind: "transient"; readonly turns: number };
 
 export type TinyfishToolError =
@@ -44,10 +38,8 @@ export const transport = (message: string): TinyfishToolError => ({ type: "tinyf
 /** Not `import.meta.dir`: pi also loads extensions under Node, where only the URL exists. */
 const EXTENSION_DIR = dirname(fileURLToPath(import.meta.url));
 
-/** The command that puts a key in the store. The operator's whole fix for an empty or dead pool. */
 export const addKeyCommand = (): string => `printf '%s' '<key>' | ${join(EXTENSION_DIR, "bin", "tinyfish-auth-set")}`;
 
-/** A span an operator acts on, coarse past a minute: `4m 12s`, `10m`, `1s`. */
 const span = (ms: number): string => {
 	const total = Math.max(0, Math.round(ms / 1000));
 	if (total < 60) return `${Math.max(1, total)}s`;
@@ -56,10 +48,7 @@ const span = (ms: number): string => {
 	return seconds === 0 ? `${minutes}m` : `${minutes}m ${seconds}s`;
 };
 
-/**
- * `search: 30/minute`, from the server's own numbers, or the endpoint's ceiling marked as a local guess.
- * A window past two minutes is spelled out, because `30/minute` alone reads as a minute-long cooldown.
- */
+/** A window past two minutes is spelled out, because `30/minute` alone reads as a minute-long cooldown. */
 const limitText = (endpoint: EndpointId, limit: Limit | null): string => {
 	if (limit === null) return `${endpoint}: ${ENDPOINTS[endpoint].perWindow}/minute (the local default; the server named no limit)`;
 	const named = `${endpoint}: ${limit.limit}/${limit.unit}`;
@@ -69,7 +58,6 @@ const limitText = (endpoint: EndpointId, limit: Limit | null): string => {
 /** UTC, so the reading means one thing on every host. The span beside it is what the operator acts on. */
 const clock = (at: number): string => `${new Date(at).toISOString().slice(11, 19)}Z`;
 
-/** The only place the operator's failure text exists. */
 export const render = (error: TinyfishToolError): string => {
 	switch (error.type) {
 		case "tinyfish-transport":
@@ -102,7 +90,6 @@ const renderExhaustion = (reason: Exhaustion): string => {
 	}
 };
 
-/** The thrown form a caller sees. `cause` keeps the arm readable by the call loop. */
 export const toolError = (error: TinyfishToolError): Error => new Error(render(error), { cause: error });
 
 export const isToolError = (value: unknown): value is TinyfishToolError =>

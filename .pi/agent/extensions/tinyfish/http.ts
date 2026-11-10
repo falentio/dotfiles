@@ -8,7 +8,6 @@ export type SearchRequest = { readonly endpoint: "search"; readonly params: Sear
 export type FetchRequest = { readonly endpoint: "fetch"; readonly params: FetchParams };
 export type EndpointRequest = SearchRequest | FetchRequest;
 
-/** One attempt. `body` exists only beside `ok`, so a non-ok arm cannot carry a payload. */
 export type Attempt =
 	| { readonly outcome: Ok; readonly body: unknown }
 	| { readonly outcome: NonOk; readonly body?: undefined };
@@ -77,8 +76,8 @@ export const classify = (status: number, body: unknown, headers: Headers): Ok | 
 };
 
 /**
- * The only reader of a raw key. A transport failure is an arm, not a throw, so the retry policy owns
- * the decision; only an abort leaves here as a rejection.
+ * A transport failure is an arm, not a throw, so the retry policy owns the decision; only an abort
+ * leaves here as a rejection.
  */
 export const send: Transport = async (request, lease, signal) => {
 	const headers = { "X-API-Key": lease.account.key };

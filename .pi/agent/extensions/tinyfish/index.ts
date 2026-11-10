@@ -7,7 +7,6 @@ import { createPool, cursorOf, type Pool } from "./pool.ts";
 
 const NAMESPACE = { name: "tinyfish", description: "TinyFish web search and page fetch" } as const;
 
-/** The MCP envelope, byte for byte: the API body JSON-serialized, no response schema in between. */
 const envelope = (value: unknown) => ({
 	content: [{ type: "text" as const, text: JSON.stringify(value) }],
 	details: undefined,
@@ -17,7 +16,6 @@ export default function tinyfish(pi: ExtensionAPI): void {
 	let store: AccountStore = EMPTY_STORE;
 	let built: { client: Client; pool: Pool } | undefined;
 
-	/** Built lazily, so the pool seeds from a store the session_start read has already filled. */
 	const deps = () => {
 		if (built === undefined) {
 			const pool = createPool({ store, config: POOL_CONFIG });

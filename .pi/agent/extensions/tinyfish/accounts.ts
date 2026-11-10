@@ -11,11 +11,9 @@ export interface Account {
 	readonly id: AccountId;
 	readonly label: string;
 	readonly key: ApiKey;
-	/** Pacing multiplier: 1 by default, more for an account with a bigger allowance. */
 	readonly weight: number;
 }
 
-/** The file shape, parsed. Junk stops here. */
 export interface AccountStore {
 	readonly accounts: readonly Account[];
 	readonly cursor: AccountId | null;
@@ -23,7 +21,6 @@ export interface AccountStore {
 
 export const EMPTY_STORE: AccountStore = { accounts: [], cursor: null };
 
-/** Fully qualified, not "~/": the CLI is a mini-app and a path shim can break a leading tilde. */
 export const CLI_CONFIG_PATH = join(homedir(), ".tinyfish", "config.json");
 
 /** Read per call, not at import: a test points it at a temp dir, and a shell can point it anywhere. */
@@ -41,10 +38,7 @@ const asKey = (value: string): ApiKey => value as ApiKey;
 const asWeight = (value: unknown): number =>
 	typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 1;
 
-/**
- * Total over junk: one hand-edited record drops out instead of failing the whole read, because a
- * single bad entry must not cost the operator every other key.
- */
+/** One bad hand-edited record must not cost the operator every other key. */
 export const parseStore = (raw: unknown): AccountStore => {
 	if (!isRecord(raw)) return EMPTY_STORE;
 	const entries = Array.isArray(raw.accounts) ? raw.accounts : [];
@@ -61,7 +55,6 @@ export const parseStore = (raw: unknown): AccountStore => {
 	return { accounts, cursor: cursor !== null && accounts.some((a) => a.id === cursor) ? cursor : null };
 };
 
-/** A parsed store, plus the copy kept aside when the file was there and would not parse. */
 export interface StoreLoad {
 	readonly store: AccountStore;
 	readonly brokenAt: string | null;
@@ -70,10 +63,7 @@ export interface StoreLoad {
 const isCode = (error: unknown, code: string): boolean =>
 	typeof error === "object" && error !== null && "code" in error && error.code === code;
 
-/**
- * Keep the bytes of a file that will not parse beside it, once, so a hand-edit mistake is recoverable.
- * Best effort: a store that cannot be copied still yields the empty store.
- */
+/** Best effort: a store that cannot be copied still yields the empty store. */
 const keepBroken = async (raw: string, path: string): Promise<string | null> => {
 	const kept = `${path}.broken`;
 	try {
@@ -85,8 +75,8 @@ const keepBroken = async (raw: string, path: string): Promise<string | null> => 
 };
 
 /**
- * A missing file is an empty store. A file that is there and will not parse is an empty store too, but
- * it is copied aside first and the path reported, so the entry point can say the keys went missing.
+ * A file that is there and will not parse is copied aside first and the path reported, so the entry
+ * point can say the keys went missing.
  */
 export const readStore = async (path: string = storePath()): Promise<StoreLoad> => {
 	let raw: string;
@@ -107,10 +97,7 @@ const writeStore = async (store: AccountStore, path: string): Promise<void> => {
 	await writeFile(path, `${JSON.stringify(store, null, 2)}\n`, { mode: 0o600 });
 };
 
-/**
- * Capture the key the CLI left behind. Both sources (this and a pasted key) append, never replace, and
- * both are keyed by the key itself so a repeated login is a no-op.
- */
+/** Keyed by the key itself, so a repeated login is a no-op. */
 export const captureFromCli = async (
 	store: AccountStore,
 	path: string = CLI_CONFIG_PATH,
@@ -133,15 +120,13 @@ export const captureFromCli = async (
 	return next;
 };
 
-/** The store after an add, and the id the key already held when nothing was written. */
 export interface AddResult {
 	readonly store: AccountStore;
 	readonly duplicateOf: AccountId | null;
 }
 
 /**
- * Same append path as capture, for a key pasted into `tinyfish auth set`. A key already in the store is
- * a no-op that names its id, so the CLI can say which entry to delete to revive it.
+ * A key already in the store is a no-op that names its id, so the CLI can say which entry to revoke.
  */
 export const addAccount = async (key: string, store: AccountStore): Promise<AddResult> => {
 	const held = store.accounts.find((account) => account.key === key);
@@ -155,7 +140,6 @@ export const addAccount = async (key: string, store: AccountStore): Promise<AddR
 	return { store: next, duplicateOf: null };
 };
 
-/** The lowest free `a<N>`, so a deleted middle entry does not hand its id to a newcomer. */
 const nextId = (store: AccountStore): AccountId => {
 	const taken = new Set(store.accounts.map((account) => account.id));
 	let n = store.accounts.length + 1;
