@@ -6,9 +6,9 @@
 		"extensions": ["./index.ts"]
 	},
 	"scripts": {
-		"test": "bun ../../test-support/link-pi.mjs && bun --no-install test",
+		"test": "bun ../../test-support/link-pi.mjs && bun --no-install test ./test",
 		"typecheck": "bun ../../test-support/link-pi.mjs && tsc --noEmit",
-		"test:smoke": "bun ../../test-support/link-pi.mjs && bun --no-install test ./test/smoke.ts"
+		"test:smoke": "bun ../../test-support/link-pi.mjs && bun --no-install test ./smoke"
 	},
 	"peerDependencies": {
 		"@earendil-works/pi-coding-agent": "*"
