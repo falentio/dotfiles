@@ -96,7 +96,11 @@ export const send: Transport = async (request, lease, signal) => {
 			signal,
 		});
 	} catch (error) {
-		if (signal.aborted) throw error;
+		if (signal.aborted) {
+			// An abort is the caller's own cancel, not a failure: rethrow quietly so the loop can see it.
+			if (error instanceof Error && error.name === "AbortError") error.stack = undefined;
+			throw error;
+		}
 		return { outcome: { kind: "transient" } };
 	}
 	const raw = await response.text();
