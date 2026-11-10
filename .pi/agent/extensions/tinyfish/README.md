@@ -53,7 +53,6 @@ A cooling pool is waited out, up to five minutes, and then throws naming the end
 One call, one wrap. Everything about the pool is under the client.
 
 ```ts
-// ./index.ts, one of two, same shape
 async execute(_id, params, signal) {
   return envelope(await deps().client.search(params, signal));
 }

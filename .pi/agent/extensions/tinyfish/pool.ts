@@ -76,7 +76,7 @@ export const cursorOf = (registry: Registry | undefined): AccountId | null => {
 	return registry.records.at(registry.cursor)?.account.id ?? null;
 };
 
-/** Shared by acquire and the test fake: setTimeout, rejected by the signal, cleared on both paths. */
+/** The real wait. The test clock is the other one, and both settle on a resolve or an abort. */
 export const defaultWait: Wait = (ms, signal) =>
 	new Promise((resolve, reject) => {
 		if (signal?.aborted === true) {
