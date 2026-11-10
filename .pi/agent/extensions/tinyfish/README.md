@@ -16,7 +16,7 @@ Read it as three parties:
 
 The names, the parameters, and the envelope are the MCP's, so a prompt written before the move
 keeps calling. Both tools stay reachable only from codemode scripts, because
-`.pi/agent/settings.json` sets `codemode.mode: "only"`. A rate limit that used to throw now costs
+`./.pi/agent/settings.json` sets `codemode.mode: "only"`. A rate limit that used to throw now costs
 wall-clock time instead, so a burst keeps working.
 
 ```js
@@ -80,7 +80,7 @@ Or skip the browser and paste one, from anywhere:
 printf '%s' '<key>' | "$(dirname "$(readlink -f ~/.pi/agent/extensions/tinyfish/bin/tinyfish-auth-set)")/../auth-set.ts"
 ```
 
-Shorter, once you are in the repo: `.pi/agent/extensions/tinyfish/bin/tinyfish-auth-set`.
+Shorter, once you are in the repo: `./.pi/agent/extensions/tinyfish/bin/tinyfish-auth-set`.
 
 The extension reads `~/.tinyfish/config.json` once at session start and appends a key the store does
 not already hold, mode `0600`. Pressing login again with the same account adds nothing, and pasting a
@@ -142,7 +142,7 @@ at a `Bun.serve` stub. `TINYFISH_ACCOUNTS_FILE` moves the store.
 ## The review this shipped from
 
 An independent reviewer raised 16 findings against this branch, plus 5 nits. Every one landed as its
-own commit, and `test/trailer.test.ts` re-reads the table below, so a commit that loses its `Rule:`
+own commit, and `./test/trailer.test.ts` re-reads the table below, so a commit that loses its `Rule:`
 trailer fails the suite. A rule id is that reviewer's label, not the repo's.
 
 | # | Finding | Commit |
@@ -174,9 +174,9 @@ the finding.
 
 ## Tests
 
-`bun run test` is the offline suite under `test/`: it drives the real `acquire`/`release` with a fake
+`bun run test` is the offline suite under `./test/`: it drives the real `acquire`/`release` with a fake
 clock and a real `Bun.serve` stub, so nothing about the transport is mocked and no case spends
 wall-clock time.
 
-`bun run test:smoke` is the one run that needs a real provider, and it lives under `smoke/` beside
+`bun run test:smoke` is the one run that needs a real provider, and it lives under `./smoke/` beside
 the offline suite the way the sibling extensions keep theirs. `./smoke/README.md` has the shape.
