@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { createPool, graded, readyAt, seedRecords, select, stamped, type Registry } from "../pool.ts";
+import { createPool, settle, readyAt, seedRecords, select, stamped, type Registry } from "../pool.ts";
 import { clock, storeOf } from "./fixture.ts";
 
 const registryOf = (...ids: string[]): Registry => ({ records: seedRecords(storeOf(...ids)), cursor: -1 });
@@ -17,42 +17,42 @@ it("stamps the taken account and moves the cursor onto it", () => {
 });
 
 it("rotates to the next account because the stamp paces the one just taken", () => {
-	const registry = graded(stamped(registryOf("a1", "a2"), 0, "search", 1_000), "a1", "search", { kind: "ok" }, 1_000);
+	const registry = settle(stamped(registryOf("a1", "a2"), 0, "search", 1_000), "a1", "search", { kind: "ok" }, 1_000);
 	expect(select(registry, "search", 1_000)).toEqual({ kind: "take", index: 1 });
 });
 
 it("cools one endpoint only, and only until its window ends", () => {
-	const registry = graded(registryOf("a1"), "a1", "search", rateLimited(60_000), 0);
+	const registry = settle(registryOf("a1"), "a1", "search", rateLimited(60_000), 0);
 	expect(readyAt(registry.records[0]!, "search")).toBe(60_000);
 	expect(readyAt(registry.records[0]!, "fetch")).toBe(Number.NEGATIVE_INFINITY);
 });
 
 it("pushes the pacing stamp a spacing past the last use on transient, so the retry cannot land back", () => {
-	const registry = graded(registryOf("a1", "a2"), "a1", "search", { kind: "transient" }, 0);
+	const registry = settle(registryOf("a1", "a2"), "a1", "search", { kind: "transient" }, 0);
 	expect(readyAt(registry.records[0]!, "search")).toBe(4_000);
 	expect(select(registry, "search", 0)).toEqual({ kind: "take", index: 1 });
 });
 
 it("retires a dead key on both endpoints", () => {
-	const registry = graded(registryOf("a1", "a2"), "a1", "search", { kind: "dead-key" }, 0);
+	const registry = settle(registryOf("a1", "a2"), "a1", "search", { kind: "dead-key" }, 0);
 	expect(readyAt(registry.records[0]!, "search")).toBe(Number.POSITIVE_INFINITY);
 	expect(readyAt(registry.records[0]!, "fetch")).toBe(Number.POSITIVE_INFINITY);
 	expect(select(registry, "fetch", 0)).toEqual({ kind: "take", index: 1 });
 });
 
 it("parks a spent account until its cooldown, keeping the wallet url", () => {
-	const registry = graded(registryOf("a1"), "a1", "search", { kind: "spent", walletUrl: "https://wallet" }, 0);
+	const registry = settle(registryOf("a1"), "a1", "search", { kind: "spent", walletUrl: "https://wallet" }, 0);
 	expect(registry.records[0]?.health).toEqual({ kind: "spent", until: 900_000, walletUrl: "https://wallet" });
 });
 
 it("prefers a due live key over a due spent one the rotation would reach first", () => {
-	const registry = graded(registryOf("a1", "a2"), "a2", "search", { kind: "spent", walletUrl: null }, 0);
+	const registry = settle(registryOf("a1", "a2"), "a2", "search", { kind: "spent", walletUrl: null }, 0);
 	expect(select(registry, "search", 900_000)).toEqual({ kind: "take", index: 0 });
 });
 
 it("still takes a spent key once it is due when no live key is left", () => {
-	const spent = graded(registryOf("a1", "a2"), "a2", "search", { kind: "spent", walletUrl: null }, 0);
-	const registry = graded(spent, "a1", "search", { kind: "dead-key" }, 0);
+	const spent = settle(registryOf("a1", "a2"), "a2", "search", { kind: "spent", walletUrl: null }, 0);
+	const registry = settle(spent, "a1", "search", { kind: "dead-key" }, 0);
 	expect(select(registry, "search", 899_999)).toMatchObject({
 		kind: "wait",
 		unless: { kind: "all-spent", walletUrl: null },
@@ -61,8 +61,8 @@ it("still takes a spent key once it is due when no live key is left", () => {
 });
 
 it("answers wait with the earliest release when nothing is due", () => {
-	const one = graded(registryOf("a1", "a2"), "a1", "search", rateLimited(30_000), 0);
-	const registry = graded(one, "a2", "search", rateLimited(60_000), 0);
+	const one = settle(registryOf("a1", "a2"), "a1", "search", rateLimited(30_000), 0);
+	const registry = settle(one, "a2", "search", rateLimited(60_000), 0);
 	expect(select(registry, "search", 0)).toEqual({
 		kind: "wait",
 		readyAt: 30_000,
@@ -80,9 +80,9 @@ it("answers wait with the earliest release when nothing is due", () => {
 });
 
 it("counts the spent records behind a paced pool and names the soonest of them", () => {
-	const spent = graded(registryOf("a1", "a2", "a3"), "a3", "search", { kind: "spent", walletUrl: null }, 0);
-	const one = graded(spent, "a1", "search", rateLimited(30_000), 0);
-	const registry = graded(one, "a2", "search", rateLimited(90_000), 0);
+	const spent = settle(registryOf("a1", "a2", "a3"), "a3", "search", { kind: "spent", walletUrl: null }, 0);
+	const one = settle(spent, "a1", "search", rateLimited(30_000), 0);
+	const registry = settle(one, "a2", "search", rateLimited(90_000), 0);
 	expect(select(registry, "search", 0)).toEqual({
 		kind: "wait",
 		readyAt: 30_000,
@@ -104,7 +104,7 @@ it("answers no-accounts for an empty store and all-dead when every key is retire
 		kind: "exhausted",
 		reason: { kind: "no-accounts" },
 	});
-	const registry = graded(registryOf("a1"), "a1", "search", { kind: "dead-key" }, 0);
+	const registry = settle(registryOf("a1"), "a1", "search", { kind: "dead-key" }, 0);
 	expect(select(registry, "search", 0)).toEqual({ kind: "exhausted", reason: { kind: "all-dead" } });
 });
 

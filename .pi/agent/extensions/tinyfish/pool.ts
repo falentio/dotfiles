@@ -9,8 +9,8 @@ export interface Limit {
 	readonly windowSeconds: number;
 }
 
-/** "Cooling with no release" cannot be written down. */
-export type Standing =
+/** Where one account stands on one endpoint: free with its last use, or cooling until a release. */
+export type EndpointStanding =
 	| { readonly kind: "open"; readonly lastUsedAt: number | null }
 	| { readonly kind: "cooling"; readonly until: number; readonly limit: Limit | null };
 
@@ -22,7 +22,7 @@ export type Health =
 export interface AccountRecord {
 	readonly account: Account;
 	readonly health: Health;
-	readonly standing: Readonly<Record<EndpointId, Standing>>;
+	readonly standing: Readonly<Record<EndpointId, EndpointStanding>>;
 }
 
 export interface Registry {
@@ -64,9 +64,9 @@ export type Outcome =
 
 export type NonOk = Exclude<Outcome, Ok>;
 
-const open = (lastUsedAt: number | null): Standing => ({ kind: "open", lastUsedAt });
+const open = (lastUsedAt: number | null): EndpointStanding => ({ kind: "open", lastUsedAt });
 
-const allOpen = (at: number | null): Record<EndpointId, Standing> => ({ search: open(at), fetch: open(at) });
+const allOpen = (at: number | null): Record<EndpointId, EndpointStanding> => ({ search: open(at), fetch: open(at) });
 
 export const seedRecords = (store: AccountStore): readonly AccountRecord[] =>
 	store.accounts.map((account) => ({ account, health: { kind: "live" }, standing: allOpen(null) }));
@@ -114,10 +114,11 @@ const floorOf = (record: AccountRecord, endpoint: EndpointId): number => {
 };
 
 /**
- * The release table. `transient` moves the stamp one spacing on instead of opening the account, so the
- * turn that retries right away lands on the next key rather than back on the one that just failed.
+ * Settles one account's standing and health against how its turn came back. `transient` moves the stamp
+ * one spacing on instead of opening the account, so the turn that retries right away lands on the next
+ * key rather than back on the one that just failed.
  */
-export const graded = (
+export const settle = (
 	registry: Registry,
 	accountId: AccountId,
 	endpoint: EndpointId,
@@ -250,7 +251,7 @@ export const createPool = (seed: PoolSeed): Pool => {
 			release(outcome) {
 				if (released) return;
 				released = true;
-				registry = graded(registry, record.account.id, endpoint, outcome, now());
+				registry = settle(registry, record.account.id, endpoint, outcome, now());
 			},
 		};
 	};
