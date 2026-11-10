@@ -65,8 +65,7 @@ describe("callPool rotation", () => {
 		expect(first).toEqual({ results: [] });
 		expect(second).toEqual({ results: [] });
 		expect(keys).toEqual(["key-a1", "key-a1", "key-a1"]);
-		// The 5 s cooldown, then the pacing floor the release left on the key.
-		expect(time.waits).toEqual([5_000, 2_000]);
+		expect(time.waits, "the 5 s cooldown, then the pacing floor the release left").toEqual([5_000, 2_000]);
 	});
 
 	it("never re-enters a dead key", async () => {
