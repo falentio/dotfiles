@@ -1,0 +1,120 @@
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
+import { spawn } from "node:child_process";
+import { copyFileSync, cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
+import { join } from "node:path";
+import { piCommand } from "../../../test-support/pi-install.mjs";
+import { json, startStub, type Stub } from "../test/stub.ts";
+
+const EXT_DIR = join(import.meta.dir, "..");
+const PI = piCommand();
+
+let stub: Stub;
+let dir: string;
+let agentDir: string;
+
+beforeAll(() => {
+	stub = startStub();
+	dir = mkdtempSync(join(tmpdir(), "tinyfish-smoke-"));
+	agentDir = mkdtempSync(join(tmpdir(), "tinyfish-smoke-agent-"));
+	// Providers stay real: bandar is the one that answers here.
+	for (const file of ["models.json", "auth.json"]) copyFileSync(join(homedir(), ".pi", "agent", file), join(agentDir, file));
+	// No `-e`: the extension is copied into the agent dir's discovery path, so this run proves the
+	// layout that loads it on a fresh machine.
+	mkdirSync(join(agentDir, "extensions"), { recursive: true });
+	const target = join(agentDir, "extensions", "tinyfish");
+	cpSync(EXT_DIR, target, {
+		recursive: true,
+		filter: (source) => !source.includes("node_modules") || !source.includes("@earendil-works"),
+	});
+	// The schema package is the extension's one runtime import, so it has to travel with the copy.
+	cpSync(join(EXT_DIR, "node_modules", "@earendil-works", "pi-schema"), join(target, "node_modules", "@earendil-works", "pi-schema"), {
+		recursive: true,
+	});
+	writeFileSync(
+		join(dir, "accounts.json"),
+		JSON.stringify({ accounts: [{ id: "a1", label: "smoke", key: "smoke-key", weight: 1 }], cursor: null }),
+		{ mode: 0o600 },
+	);
+});
+
+afterAll(() => {
+	stub.stop();
+	rmSync(dir, { recursive: true, force: true });
+	rmSync(agentDir, { recursive: true, force: true });
+});
+
+function runPi(): Promise<{ code: number | null; out: string; err: string }> {
+	return new Promise((resolve, reject) => {
+		const child = spawn(
+			PI[0] as string,
+			[
+				...PI.slice(1),
+				"-p",
+				"--no-mcp",
+				"--no-skills",
+				"--no-context-files",
+				"--no-session",
+				"--thinking",
+				"off",
+				// codemode ships as an extension too, so --no-extensions would remove the tools namespace.
+				"--tools", "+codemode",
+				`In one codemode script call tools.tinyfish_search({ query: "smoke" }), tools.tinyfish_fetch_content({ urls: ["https://x.test"] }), and tools.tinyfish_research({ query: "smoke", top: 1 }), then reply with only a line of the form SMOKE <total_results> <results length> <fetch errors length> <research results length>.`,
+			],
+			{
+				cwd: dir,
+				stdio: ["ignore", "pipe", "pipe"],
+				env: {
+					...process.env,
+					TINYFISH_SEARCH_BASE_URL: stub.searchBase,
+					TINYFISH_FETCH_BASE_URL: stub.fetchBase,
+					TINYFISH_ACCOUNTS_FILE: join(dir, "accounts.json"),
+					PI_CODING_AGENT_DIR: agentDir,
+					PI_OFFLINE: "1",
+				},
+			},
+		);
+		let out = "";
+		let err = "";
+		child.stdout.setEncoding("utf8");
+		child.stderr.setEncoding("utf8");
+		child.stdout.on("data", (part: string) => (out += part));
+		child.stderr.on("data", (part: string) => (err += part));
+		const timer = setTimeout(() => {
+			child.kill("SIGKILL");
+			reject(new Error(`pi timed out\nSTDOUT:${out}\nSTDERR:${err}`));
+		}, 90_000);
+		child.on("error", reject);
+		child.on("exit", (code) => {
+			clearTimeout(timer);
+			resolve({ code, out, err });
+		});
+	});
+}
+
+describe("the extension inside pi", () => {
+	it(
+		"is found by discovery and serves all three tools",
+		async () => {
+			stub.script("smoke-key", "search", [
+				json(200, {
+					query: "smoke",
+					results: [{ position: 1, site_name: "x", title: "t", snippet: "s", url: "https://x.test" }],
+					total_results: 1,
+					page: 0,
+				}),
+			]);
+			stub.script("smoke-key", "fetch", [json(200, { results: [{ url: "https://x.test", text: "hi" }], errors: [] })]);
+			const { code, out, err } = await runPi();
+			expect(code, `pi exited ${code}
+STDOUT:
+${out}
+STDERR:
+${err}`).toBe(0);
+			expect(out).toContain("SMOKE 1 1 0 1");
+			expect(stub.seen).toContain("smoke-key");
+			expect(stub.hit("smoke-key", "fetch")).toBeGreaterThan(0);
+		},
+		{ timeout: 120_000 },
+	);
+});

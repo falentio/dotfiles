@@ -1,13 +1,24 @@
 ---
 name: tinyfish-search-fetch
-description: Use this skill before any TinyFish web research (MANDATORY). Run Search and Fetch through the Code Mode execute tool with tools.tinyfish.search and tools.tinyfish.fetch_content when the user needs current facts, source discovery, page content, news, research papers, structured extraction, or a Search-to-Fetch research pass.
+description: Use this skill before any TinyFish web research (MANDATORY). Run Search and Fetch through the Code Mode execute tool with tools.tinyfish_search and tools.tinyfish_fetch_content when the user needs current facts, source discovery, page content, news, research papers, structured extraction, or a Search-to-Fetch research pass.
 ---
 
 # Search and fetch with TinyFish
 
-Call TinyFish from the Code Mode `execute` tool. The runtime exposes `tools.tinyfish.search` and `tools.tinyfish.fetch_content`. The legacy native tools `tinyfish_search` and `tinyfish_fetch_content` are not in the Code Mode catalog, so every TinyFish call belongs inside `execute`.
+Call TinyFish from the Code Mode `execute` tool. The runtime exposes `tools.tinyfish_search`, `tools.tinyfish_fetch_content`, and `tools.tinyfish_research`. Both are local extension tools with `codemode` exposure, so they are callable only from a script and never declared to the model. A tool name becomes one flat script identifier and never a nested path, so the MCP-era `tools.tinyfish.search` is now `tools.tinyfish_search`. A prompt written before the move has to be rewritten; `describeNamespace("tinyfish")` names the mapping.
 
-Search returns ranked result metadata. Fetch returns content from known URLs. Use `tools.tinyfish.run_web_automation` for clicks, form entry, login, or another site workflow.
+Search returns ranked result metadata. Fetch returns content from known URLs. Research does both in one call: it ranks, reads the top few, and returns their text.
+
+## Accounts
+
+The tools hold one or more API keys in `~/.tinyfish/accounts.json` and rotate across them, so one key's budget never ends a burst. A rate limit waits instead of throwing. When the pool is empty, the error carries the exact command that adds a key, as an absolute path under wherever pi installed the extension. Surface that command as the error spells it rather than guessing at one. `npx -y @tiny-fish/cli@latest auth login` is the browser path: it writes `~/.tinyfish/config.json`, which the next session captures.
+
+What the errors mean:
+
+- Every key cooling is waited out, up to five minutes, then throws naming the endpoint and its limit. Retry then; a second attempt right away just waits again.
+- Every key out of credits throws with the `wallet_url` to top up.
+- A dead key is retired for the session without reaching you.
+- A 400 or 422 throws and does not rotate, so fix the arguments and retry.
 
 ## Why route through Code Mode
 
@@ -18,28 +29,34 @@ Search returns ranked result metadata. Fetch returns content from known URLs. Us
 
 ## Call shape
 
+Reach for `research` when the answer needs page text: one call does the search and the reading, and a page that will not load lands in `errors` instead of failing the batch.
+
 ```js
-const found = await tools.tinyfish.search({ query: "...", page: 0 });
-const fetched = await tools.tinyfish.fetch_content({
-  urls: found.results.slice(0, 3).map((r) => r.url),
-  format: "markdown",
-  links: false,
-  image_links: false,
-  page_metadata: true,
-});
+const found = await tools.tinyfish_research({ query: "...", top: 3, purpose: "..." });
 return {
-  sources: fetched.results.map((r) => ({ url: r.final_url, title: r.title })),
-  failed: fetched.errors,
+  sources: found.results.map((r) => ({ url: r.final_url, title: r.title })),
+  text: found.results.map((r) => r.text.slice(0, 2000)),
+  failed: found.errors,
 };
+```
+
+Search then Fetch separately when you need to choose from the ranking yourself, or to re-read URLs you already have:
+
+```js
+const found = await tools.tinyfish_search({ query: "..." });
+const urls = found.results.filter((r) => r.site_name === "docs.example.com").map((r) => r.url);
+const fetched = await tools.tinyfish_fetch_content({ urls, page_metadata: true });
+return { sources: fetched.results.map((r) => ({ url: r.final_url, title: r.title })), failed: fetched.errors };
 ```
 
 Rules for the runtime:
 
 - Await every call. Pending calls are interrupted when the block ends.
-- `tools.tinyfish.fetch_content` requires `urls`, `format`, `links`, `image_links`, and `page_metadata`. Omitting any of the four output fields throws a `Missing key` error before any network work.
+- `tools.tinyfish_fetch_content` requires only `urls`. Everything else is optional and sent only when set, so `{ urls: [...] }` is a valid call and answers markdown.
 - A request-level validation error throws. Conflicting search filters and a batch carrying a validator both throw. Wrap the block in `try/catch` when the arguments come from a user or a model.
 - A per-URL failure does not throw. It appears in the `errors` array of the fetch envelope.
-- Return JSON-serializable data. Read the live signature with `search({ query: "tinyfish" })` inside `execute` when a parameter shape matters.
+- Return JSON-serializable data. Read the live signature with `tools.tinyfish_search({ query: "tinyfish" })` inside `execute` when a parameter shape matters.
+- A rate limit costs wall-clock time, not the call. Budget for a wait before a large batch and keep the block inside one `execute`.
 
 ## When TinyFish is not suitable
 
@@ -49,7 +66,7 @@ Rules for the runtime:
 
 - Use Search when the relevant URL is unknown or the user asks you to find sources.
 - Use Fetch when the user gives a URL or when Search has identified source pages.
-- Use Agent automation when the task requires interaction instead of reading.
+- Fetch alone when the task needs a click, a form, or a login instead of reading. The MCP `run_web_automation` tool did not come across, and nothing here replaces it: fetch the page and drive a browser separately when the page needs interaction.
 
 ## Search
 
@@ -57,10 +74,10 @@ Rules for the runtime:
 2. Choose the search type. Use `domain_type: "web"` for general sources, `"news"` for articles with publisher and date fields, and `"research_paper"` for academic results.
 3. Add only relevant filters. Use `include_domains` and `exclude_domains` for domain control. Use `location` and `language` for a regional result set. Use `recency_minutes` for a rolling freshness window or `after_date` and `before_date` for calendar bounds.
 4. Keep time filters valid. Use `pub_year_min` and `pub_year_max` for research papers. Keep research-paper searches free of `recency_minutes`, `after_date`, and `before_date`. Keep rolling and calendar freshness filters separate.
-5. Call `tools.tinyfish.search` with `page: 0` for the first page. Request another page only when the first page lacks enough relevant or independent sources. Keep `page` within `0` through `10`.
+5. Call `tools.tinyfish_search` with `page: 0` for the first page. Request another page only when the first page lacks enough relevant or independent sources. Keep `page` within `0` through `10`.
 6. Read the envelope. `results` holds discovery records with `position`, `site_name`, `title`, `snippet`, and `url`. `total_results` and `page` echo the request. A news record adds `date` and `publisher`. A research-paper record adds `authors`, `year`, `venue`, `cited_by_count`, and `pdf_url`.
 7. Treat each result's title, snippet, and URL as discovery data. Preserve the result URL and source position.
-8. Use the `fetch` parameter for a one-call search and extraction only when its live schema matches the extraction need. The value is a JSON-encoded string of at most `256` characters, and the response adds a nested `fetch` object to each result. Use explicit `tools.tinyfish.fetch_content` when selectors, validators, or independent URL failure handling matter.
+8. Use the `fetch` parameter for a one-call search and extraction only when its live schema matches the extraction need. The value is a JSON-encoded string of at most `256` characters, and the response adds a nested `fetch` object to each result. Use explicit `tools.tinyfish_fetch_content` when selectors, validators, or independent URL failure handling matter.
 9. Set `include_thumbnail` to the string `"true"` or `"false"`, never a boolean. Request thumbnails only when the caller needs result images.
 10. Base factual claims on fetched page content when available. Label a claim as a search-result summary when only a snippet supports it. The completed research has a traceable URL for every source-backed claim.
 
@@ -69,10 +86,10 @@ Use `purpose` as a short statement of the user's goal, not as a second keyword l
 ## Fetch
 
 1. Normalize the input to public `http` or `https` URLs. Batch at most ten URLs per call. The URL set is valid before the tool call.
-2. Pass all four required output fields: `format`, `links`, `image_links`, and `page_metadata`. A call without them is rejected before any network work.
+2. Leave out what you do not need. `urls` alone is a valid call: the API answers markdown with no extra fields. Turn a flag on only when its fields matter.
 3. Define the extraction goal in `purpose` when the task needs focused extraction. Keep the purpose under `2000` characters.
 4. Choose one output format. Use `format: "markdown"` for readable page content, `"html"` when markup matters, and `"json"` for the structured document tree.
-5. Set output flags deliberately. Set `links: true` when outbound URLs matter. Set `image_links: true` when image URLs matter. Set `page_metadata: true` when titles, descriptions, authors, dates, or Open Graph data matter.
+5. Set output flags deliberately. Set `page_metadata: true` when titles, descriptions, authors, dates, or Open Graph data matter; it is the one worth reaching for. Set `links: true` when outbound URLs matter. `image_links` and `iframe_links` still work but are undeclared, so pass them by name when image or frame URLs matter.
 6. Scope extraction when the page has a clear region. Use `exclude_selectors` before `include_selectors` to remove noise and keep the target region. Each selector array has at most twenty entries, and each entry has at most one thousand characters.
 7. Treat selector results as a contract. A partial include match returns matched content and `unmatched_selectors`. A total miss returns `selector_not_matched` with candidate selectors. Retry with a useful candidate or change the selector. Keep a scoped request scoped.
 8. Set freshness intentionally. Omit `ttl` to accept the cache, use `ttl: 0` for a live preference, and use a positive number of seconds for a bounded freshness preference. Use `per_url_timeout_ms` only when a page needs a custom deadline.
@@ -85,17 +102,15 @@ Use `purpose` as a short statement of the user's goal, not as a second keyword l
 When Search produced the URLs, preserve result order and pass the smallest useful set to Fetch in the same `execute` call. Fetch the top three sources for a normal research pass. Use a larger batch only when the question needs broader comparison and the batch remains within ten URLs.
 
 ```js
-const { results } = await tools.tinyfish.search({
+const { results } = await tools.tinyfish_search({
   query: "...",
   purpose: "...",
   page: 0,
 });
-const { results: pages, errors } = await tools.tinyfish.fetch_content({
+const { results: pages, errors } = await tools.tinyfish_fetch_content({
   urls: results.slice(0, 3).map((r) => r.url),
   purpose: "Extract ...",
   format: "markdown",
-  links: false,
-  image_links: false,
   page_metadata: true,
 });
 return {
@@ -109,7 +124,7 @@ return {
 ### Search the web with intent
 
 ```js
-const out = await tools.tinyfish.search({
+const out = await tools.tinyfish_search({
   query: "Python PDF invoice parser",
   purpose: "Find an open-source library for parsing PDF invoices in Python",
   include_domains: "github.com,pypi.org",
@@ -122,7 +137,7 @@ return out.results;
 ### Search recent news
 
 ```js
-const out = await tools.tinyfish.search({
+const out = await tools.tinyfish_search({
   query: "AI regulation",
   purpose: "Find reporting from the last 24 hours about AI regulation",
   domain_type: "news",
@@ -136,7 +151,7 @@ return out.results.map(({ title, publisher, date, url }) => ({ title, publisher,
 ### Search research papers by publication year
 
 ```js
-const out = await tools.tinyfish.search({
+const out = await tools.tinyfish_search({
   query: "transformer architecture",
   purpose: "Find academic papers about transformer architecture published from 2019 through 2022",
   domain_type: "research_paper",
@@ -152,17 +167,15 @@ Do not add `recency_minutes`, `after_date`, or `before_date` to this research-pa
 ### Search and fetch source pages in one call
 
 ```js
-const found = await tools.tinyfish.search({
+const found = await tools.tinyfish_search({
   query: "TinyFish web agent",
   purpose: "Find authoritative pages that explain the TinyFish web agent",
   page: 0,
 });
-const fetched = await tools.tinyfish.fetch_content({
+const fetched = await tools.tinyfish_fetch_content({
   urls: found.results.slice(0, 3).map((r) => r.url),
   purpose: "Extract the sections that explain when to use Search and how to pass search intent",
   format: "markdown",
-  links: false,
-  image_links: false,
   page_metadata: true,
 });
 return {
@@ -174,12 +187,10 @@ return {
 ### Fetch a focused page region
 
 ```js
-const out = await tools.tinyfish.fetch_content({
+const out = await tools.tinyfish_fetch_content({
   urls: ["https://example.com/article"],
   purpose: "Extract the article body without navigation, comments, or related links",
   format: "markdown",
-  links: false,
-  image_links: false,
   page_metadata: true,
   exclude_selectors: ["nav", "aside", ".comments"],
   include_selectors: ["main", "article"],
@@ -194,11 +205,9 @@ If the response contains `unmatched_selectors`, use the matched content and repo
 First request validators:
 
 ```js
-const first = await tools.tinyfish.fetch_content({
+const first = await tools.tinyfish_fetch_content({
   urls: ["https://example.com/status"],
   format: "markdown",
-  links: false,
-  image_links: false,
   page_metadata: true,
   ttl: 0,
   include_etag_and_last_modified: true,
@@ -209,11 +218,9 @@ return first.results[0].etag;
 On a later single-URL request, replay one validator from the result:
 
 ```js
-const next = await tools.tinyfish.fetch_content({
+const next = await tools.tinyfish_fetch_content({
   urls: ["https://example.com/status"],
   format: "markdown",
-  links: false,
-  image_links: false,
   page_metadata: true,
   if_none_match: "<etag from the previous result>",
 });
@@ -224,7 +231,7 @@ When the origin returns `304`, the result carries `not_modified: true` and `text
 
 ## Search API reference
 
-Use the live `tools.tinyfish.search` schema as the runtime contract. Read it with `search({ query: "tinyfish.search" })` inside `execute`. The HTTP API endpoint is `GET https://api.search.tinyfish.ai`. Requests use the `X-API-Key` header. The documented environment variable is `TINYFISH_API_KEY`. Search requests are free at any wallet balance, but the account still needs Search API access.
+Use the live `tools.tinyfish_search` schema as the runtime contract. Read it with `tools.tinyfish_search({ query: "tinyfish" })` inside `execute`. The HTTP API endpoint is `GET https://api.search.tinyfish.ai`. The extension writes the `X-API-Key` header for you from whichever account it dispatches to. Search requests are free at any wallet balance, but the key still needs Search API access.
 
 ### Search filter rules
 
@@ -240,9 +247,9 @@ Search metadata is not full page content. Fetch the URL before treating a snippe
 
 ## Fetch API reference
 
-Use the live `tools.tinyfish.fetch_content` schema as the runtime contract. Read it with `search({ query: "tinyfish.fetch_content" })` inside `execute`. The HTTP API endpoint is `POST https://api.fetch.tinyfish.ai`. Requests use the `X-API-Key` header and `Content-Type: application/json`. The documented environment variable is `TINYFISH_API_KEY`. Fetch requests are free at any wallet balance, but the account still needs an API key.
+Use the live `tools.tinyfish_fetch_content` schema as the runtime contract. Read it with `tools.tinyfish_search({ query: "tinyfish" })` inside `execute`. The HTTP API endpoint is `POST https://api.fetch.tinyfish.ai`. The extension writes `X-API-Key` and `Content-Type: application/json` for you. Fetch requests are free at any wallet balance, but the key still needs API access.
 
-Required fields are `urls`, `format`, `links`, `image_links`, and `page_metadata`. Selector parameters can contain CSS comma-grouping. Invalid CSS syntax throws from the tool call, and the error names the offending selector.
+`urls` is the only required field. The output flags are sent only when set; `image_links` and `iframe_links` are undeclared but accepted. Selector parameters can contain CSS comma-grouping. Invalid CSS syntax throws from the tool call, and the error names the offending selector.
 
 ### Fetch result envelope
 

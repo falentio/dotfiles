@@ -1,0 +1,120 @@
+import { DEFAULT_WINDOW_MS } from "./config.ts";
+import { ENDPOINTS } from "./endpoints.ts";
+import { invalid } from "./errors.ts";
+import { isRecord } from "./json.ts";
+import type { Lease, Limit, NonOk, Ok } from "./pool.ts";
+import type { FetchParams, SearchParams } from "./params.ts";
+
+export type SearchRequest = { readonly endpoint: "search"; readonly params: SearchParams };
+export type FetchRequest = { readonly endpoint: "fetch"; readonly params: FetchParams };
+export type EndpointRequest = SearchRequest | FetchRequest;
+
+export type Attempt =
+	| { readonly outcome: Ok; readonly body: unknown }
+	| { readonly outcome: NonOk; readonly body?: undefined };
+
+export type Transport = (request: EndpointRequest, lease: Lease, signal: AbortSignal) => Promise<Attempt>;
+
+const nested = (value: unknown, key: string): unknown => (isRecord(value) ? value[key] : undefined);
+
+/**
+ * Only the keys a caller set. `false` and a missing key answer the same field set from the API, so a
+ * filled-in default is bytes nobody reads, and the model copies back whatever the schema shows.
+ */
+const fetchBody = (params: FetchParams): string => JSON.stringify(params);
+
+const searchUrl = (params: SearchParams): string => {
+	const url = new URL(ENDPOINTS.search.baseUrl());
+	for (const [name, value] of Object.entries(params)) {
+		if (value === undefined) continue;
+		// The API takes publication years as four-character strings, and the schema types them as numbers.
+		const wire = name.startsWith("pub_year_") ? String(value).padStart(4, "0") : String(value);
+		url.searchParams.set(name, wire);
+	}
+	return url.toString();
+};
+
+/**
+ * A 429's window and the limit it named: its body first, then its header, then the full default window.
+ * The limit stays null when the body named none, so a fallback ceiling never reads as a server claim.
+ */
+const windowOf = (body: unknown, headers: Headers): { windowMs: number; limit: Limit | null } => {
+	const details = nested(nested(body, "error"), "details");
+	const seconds = nested(details, "window_seconds");
+	const header = Number(headers.get("retry-after"));
+	const windowMs =
+		typeof seconds === "number" && seconds > 0
+			? seconds * 1000
+			: Number.isFinite(header) && header > 0
+				? header * 1000
+				: DEFAULT_WINDOW_MS;
+	const limit = nested(details, "limit");
+	return {
+		windowMs,
+		limit:
+			typeof limit === "number"
+				? {
+						limit,
+						unit: typeof nested(details, "unit") === "string" ? String(nested(details, "unit")) : "minute",
+						windowSeconds: Math.round(windowMs / 1000),
+					}
+				: null,
+	};
+};
+
+/**
+ * Status to arm. `null` for a non-2xx the contract does not name (302 through a proxy, HTML from a
+ * gateway, a 5xx), so the call loop decides: it backs off and rotates rather than spending the key.
+ * An undeclared 4xx is a fixed wrongness, so it is `invalid`: retrying a 404 four times buys nothing.
+ */
+export const classify = (status: number, body: unknown, headers: Headers): Ok | NonOk | null => {
+	if (status >= 200 && status < 300) return { kind: "ok" };
+	if (status === 429) return { kind: "rate-limited", ...windowOf(body, headers) };
+	if (status === 401) return { kind: "dead-key" };
+	if (status === 402 || status === 403) {
+		const walletUrl = nested(nested(body, "error"), "details");
+		return { kind: "spent", walletUrl: isRecord(walletUrl) ? String(walletUrl.wallet_url ?? "") || null : null };
+	}
+	if (status >= 400 && status < 500) return { kind: "invalid", error: invalid(status, body) };
+	return null;
+};
+
+/**
+ * A transport failure is an arm, not a throw, so the retry policy owns the decision; only an abort
+ * leaves here as a rejection.
+ */
+export const send: Transport = async (request, lease, signal) => {
+	const headers = { "X-API-Key": lease.account.key };
+	let response: Response;
+	try {
+		const url = request.endpoint === "search" ? searchUrl(request.params) : ENDPOINTS.fetch.baseUrl();
+		const body =
+			request.endpoint === "search"
+				? undefined
+				: fetchBody(request.params);
+		response = await fetch(url, {
+			method: request.endpoint === "search" ? "GET" : "POST",
+			headers: body === undefined ? headers : { ...headers, "Content-Type": "application/json" },
+			body,
+			signal,
+		});
+	} catch (error) {
+		if (signal.aborted) {
+			// An abort is the caller's own cancel, not a failure: rethrow quietly so the loop can see it.
+			if (error instanceof Error && error.name === "AbortError") error.stack = undefined;
+			throw error;
+		}
+		return { outcome: { kind: "transient" } };
+	}
+	const raw = await response.text();
+	const payload = ((): unknown => {
+		try {
+			return JSON.parse(raw);
+		} catch {
+			return raw;
+		}
+	})();
+	const outcome = classify(response.status, payload, response.headers);
+	if (outcome === null) return { outcome: { kind: "transient" } };
+	return outcome.kind === "ok" ? { outcome, body: payload } : { outcome };
+};
