@@ -125,5 +125,10 @@ at a `Bun.serve` stub. `TINYFISH_ACCOUNTS_FILE` moves the store.
 
 ## Tests
 
-`bun run test`. The suite drives the real `acquire`/`release` with a fake clock and a real HTTP stub,
-so nothing about the transport is mocked and no case spends wall-clock time.
+`bun run test` is the offline suite: it drives the real `acquire`/`release` with a fake clock and a
+real `Bun.serve` stub, so nothing about the transport is mocked and no case spends wall-clock time.
+
+`bun run test:smoke` loads the extension into a real `pi -p` run and calls both tools through the
+`tools.tinyfish_*` namespace against the stub. It needs a configured provider. The run keeps
+`codemode`, which ships as an extension, so it passes `--tools +codemode` and leaves extension
+discovery on; isolation comes from a temp `PI_CODING_AGENT_DIR` with no `extensions/` in it.
