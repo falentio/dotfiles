@@ -1,6 +1,6 @@
 import { readStore, type AccountStore } from "./accounts.ts";
 import { POOL_CONFIG, type CallConfig, type PoolConfig } from "./config.ts";
-import { exhausted, invalid, toolError, type Depletion } from "./errors.ts";
+import { exhausted, invalid, toolError, type Depletion, type Exhaustion } from "./errors.ts";
 import { send, type Attempt, type EndpointRequest, type Transport } from "./http.ts";
 import type { FetchParams, SearchParams } from "./params.ts";
 import type { Pool } from "./pool.ts";
@@ -23,8 +23,13 @@ export interface Client {
 
 const defaultSleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Thrown as `cause`, so the loop can tell "woke up empty" from "waited past the cap". */
-const signalOf = (error: unknown): unknown => (error as { cause?: unknown }).cause;
+/** The exhaustion behind an acquire rejection, so the loop can tell "woke up empty" from "waited past". */
+const exhaustionOf = (error: unknown): Exhaustion | null => {
+	const cause = (error as { cause?: unknown }).cause;
+	if (typeof cause !== "object" || cause === null) return null;
+	if (!("type" in cause) || cause.type !== "tinyfish-exhausted") return null;
+	return "reason" in cause ? (cause.reason as Exhaustion) : null;
+};
 
 /**
  * The whole retry policy. Rotates on rate-limited, dead-key, spent, and transient; surfaces on invalid;
@@ -49,8 +54,8 @@ export const callPool = async (
 		try {
 			lease = await deps.pool.acquire(request.endpoint, signal, deadline);
 		} catch (error) {
-			const reason = signalOf(error);
-			if (!isDepletion(reason)) throw error;
+			const reason = exhaustionOf(error);
+			if (reason === null) throw error;
 			if (reason.kind === "all-cooling" && reason.releaseAt > deadline) throw capError(reason);
 			// A key added out of process joins here, at the moment the pool runs dry, with no restart.
 			if (reason.kind !== "no-accounts" || reloaded) throw error;
@@ -62,8 +67,12 @@ export const callPool = async (
 		try {
 			attempt = await wire(request, lease, signal ?? new AbortController().signal);
 		} catch (error) {
-			lease.release({ kind: "transient" });
-			throw error;
+			// A socket blip is a transient turn, spending the same budget a 5xx does. Only an abort escapes.
+			if (signal?.aborted === true) {
+				lease.release({ kind: "transient" });
+				throw error;
+			}
+			attempt = { outcome: { kind: "transient" } };
 		}
 		lease.release(attempt.outcome);
 		if (attempt.outcome.kind === "ok") return attempt.body;
@@ -82,11 +91,6 @@ export const callPool = async (
 		}
 	}
 };
-
-const DEPLETIONS = new Set(["all-cooling", "all-spent", "all-dead", "no-accounts"]);
-
-const isDepletion = (value: unknown): value is Depletion =>
-	typeof value === "object" && value !== null && "kind" in value && DEPLETIONS.has(String(value.kind));
 
 /** Past the cap the pool answered "wait", so the reason carries the endpoint and the limit it named. */
 const capError = (reason: Extract<Depletion, { kind: "all-cooling" }>): Error =>

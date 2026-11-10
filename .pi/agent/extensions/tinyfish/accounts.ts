@@ -26,7 +26,9 @@ export const EMPTY_STORE: AccountStore = { accounts: [], cursor: null };
 /** Fully qualified, not "~/": the CLI is a mini-app and a path shim can break a leading tilde. */
 export const CLI_CONFIG_PATH = join(homedir(), ".tinyfish", "config.json");
 
-export const STORE_PATH = process.env.TINYFISH_ACCOUNTS_FILE ?? join(homedir(), ".tinyfish", "accounts.json");
+/** Read per call, not at import: a test points it at a temp dir, and a shell can point it anywhere. */
+export const storePath = (): string =>
+	process.env.TINYFISH_ACCOUNTS_FILE ?? join(homedir(), ".tinyfish", "accounts.json");
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	typeof value === "object" && value !== null && !Array.isArray(value);
@@ -60,7 +62,7 @@ export const parseStore = (raw: unknown): AccountStore => {
 };
 
 /** A missing or unreadable file yields an empty store: the pool owns the "no key" message. */
-export const readStore = async (path: string = STORE_PATH): Promise<AccountStore> => {
+export const readStore = async (path: string = storePath()): Promise<AccountStore> => {
 	try {
 		return parseStore(JSON.parse(await readFile(path, "utf8")));
 	} catch {
@@ -95,7 +97,7 @@ export const captureFromCli = async (
 		accounts: [...store.accounts, { id, label: label ?? "cli login", key: asKey(key), weight: 1 }],
 		cursor: store.cursor,
 	};
-	await writeStore(next, STORE_PATH);
+	await writeStore(next, storePath());
 	return next;
 };
 
@@ -107,7 +109,7 @@ export const addAccount = async (key: string, store: AccountStore): Promise<Acco
 		accounts: [...store.accounts, { id, label: id, key: asKey(key), weight: 1 }],
 		cursor: store.cursor,
 	};
-	await writeStore(next, STORE_PATH);
+	await writeStore(next, storePath());
 	return next;
 };
 
@@ -121,5 +123,5 @@ const nextId = (store: AccountStore): AccountId => {
 
 export const saveCursor = async (cursor: AccountId | null): Promise<void> => {
 	const store = await readStore();
-	await writeStore({ ...store, cursor }, STORE_PATH);
+	await writeStore({ ...store, cursor }, storePath());
 };
