@@ -11,7 +11,7 @@ Every call is a `tools.mcp__t3_code__*` call in a codemode script and targets on
 
 ## 1. Open the tab
 
-Start the dev server with `devproc` (see the Long-running processes rule) and read its port from `devproc here`. Then open a background tab at that port:
+Start the dev server the way the project does, note the port it binds, then open a background tab at it:
 
 ```js
 const tab = JSON.parse(await tools.mcp__t3_code__preview_open({

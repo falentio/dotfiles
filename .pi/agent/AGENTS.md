@@ -18,19 +18,11 @@ TypeScript, lint, and format errors wait until implementation is done. While imp
 
 Every rule fix is its own commit: an imperative subject that reads on its own, with the rule id in a `Rule:` trailer for `git log --grep`. The `fix-checks` skill holds the child's steps.
 
-## Long-running processes
-
-A dev server, watcher, worker, or tunnel — anything outliving the command that starts it — runs as a tmux **DEV session** via `devproc`, one per worktree; its name, `DEV <repo> <branch> <port>`, is the registry.
-
-Every dev server binds the wildcard: pass `--host {host}` and `devproc` fills in `0.0.0.0`, so the server listens on every interface — loopback, LAN, and tailnet — whether or not Tailscale is up. Never hand-write the host.
-
-Read [tmux-processes.md](docs/tmux-processes.md) before starting, reading, stopping, or cleaning up one.
-
 ## Dev server handoff
 
 Work that touches a frontend page, with a dev server up, ends its reply with a **Dev server** section, so the change is one click from being seen and proven:
 
-- **The server.** Its session name (`devproc here`) and URL, `http://<host>:<port>` from `devproc host` and the session's port.
+- **The server.** The command you started it with, and its URL, `http://localhost:<port>`.
 - **Try it.** The route to open and the clicks or input that show the change.
 - **The evidence.** Screenshots of the change, reported per [Evidence](#evidence).
 
