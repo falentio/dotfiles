@@ -1,5 +1,5 @@
 {
-  "lastChangelogVersion": "1.5.0",
+  "lastChangelogVersion": "1.5.2",
   "defaultProvider": "9Router",
   "defaultModel": "deepseek",
   "defaultTools": [
@@ -11,5 +11,8 @@
   "theme": "dark",
   "defaultThinkingLevel": "xhigh",
   "hideThinkingBlock": false,
-  "httpIdleTimeoutMs": 300000
+  "httpIdleTimeoutMs": 300000,
+  "compaction": {
+    "enabled": false
+  }
 }
