@@ -8,6 +8,7 @@
 .pi/scout/
 
 # credentials / secrets: never commit these
+.pi/memories
 .pi/agent/auth.json
 .pi/agent/mcp-auth.json
 .pi/agent/models.json
